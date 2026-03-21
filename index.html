@@ -2436,13 +2436,13 @@ window.onload=()=>{
         .then(r=>r.json())
         .then(d=>{
           if(d.auth && typeof d.balance==='number'){
+            // Sheet returns full wallet balance — only update _totalBalance
+            // Do NOT overwrite session balance (G.balance = chips at table, not wallet)
+            const prevTotal=G._totalBalance;
             G._totalBalance=d.balance;
-            // Always update balance from sheet on restore — sheet is source of truth
-            if(G.phase==='bet' && d.balance!==G.balance){
-              G.balance=d.balance;
-              G.sessionStart=d.balance;
-              updateUI();
-              notif('Balance updated from sheet: '+fmtKFC(d.balance));
+            if(G.phase==='bet' && d.balance!==prevTotal){
+              // Wallet changed while away (e.g. admin top-up) — notify but keep session balance
+              notif('Wallet updated: '+fmtKFC(d.balance));
             }
           }
         })
@@ -2672,7 +2672,10 @@ function updateInventoryBar(){
 
 function updateUI(){
   document.getElementById('tb-bal').textContent=fmtKFC(G.balance);
-  const remaining=G.deck?G.deck.length:0;
+  // Subtract 1 for the cut card which is still in the deck
+  const rawLen=G.deck?G.deck.length:0;
+  const hasCut=G.deck&&G.deck.some(c=>c.cutCard);
+  const remaining=hasCut?rawLen-1:rawLen;
   const sc=document.getElementById('shoe-count'); if(sc) sc.textContent=remaining;
   document.getElementById('tb-stake').textContent=G.s.label.toUpperCase();
   // Update discard tray
