@@ -131,8 +131,13 @@ select option { background: var(--bg2); }
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 24px; background: var(--bg1); position: sticky; top: 0; z-index: 100;
 }
+/* True-center the player info regardless of left/right widths */
+.tb-center {
+  position: absolute; left: 50%; transform: translateX(-50%);
+}
 .tb-logo { font-size: 11px; letter-spacing: 5px; color: var(--gold); font-weight: 700; text-transform: uppercase; }
-.tb-center { display: flex; align-items: center; gap: 20px; }
+.tb-center { display: flex; align-items: center; gap: 20px; pointer-events: none; }
+.tb-center > * { pointer-events: auto; }
 .tb-player { font-size: 13px; font-weight: 700; color: var(--white); }
 .tb-balance { font-family: var(--mono); font-size: 18px; color: var(--gold-hi); font-weight: 500; letter-spacing: -0.5px; }
 .tb-right { display: flex; align-items: center; gap: 8px; }
@@ -171,7 +176,7 @@ select option { background: var(--bg2); }
 }
 /* Spacer that grows to push betting zone toward vertical center */
 #betting-spacer {
-  transition: flex .35s ease;
+  transition: flex .38s cubic-bezier(.4,0,.2,1);
 }
 body.betting #betting-spacer { flex: 1; }
 body:not(.betting) #betting-spacer { flex: 0; }
@@ -617,17 +622,21 @@ body.betting #dealer-zone .score { display: none; }
 
 /* ── TWO-PHASE LAYOUT ── */
 
-/* ── BETTING ZONE — slides up/away when deal is pressed ── */
+/* ── BETTING ZONE — slides down/away when deal is pressed ── */
 #betting-zone {
   display: flex; flex-direction: column; align-items: center;
   width: 100%;
   gap: 8px; padding: 6px 0 0;
   border-top: 1px solid rgba(201,168,76,.15);
-  transition: opacity .35s ease, max-height .4s cubic-bezier(.4,0,.2,1), padding .4s ease;
+  transition: opacity .32s cubic-bezier(.4,0,.2,1),
+              transform .38s cubic-bezier(.4,0,.2,1),
+              max-height .4s cubic-bezier(.4,0,.2,1),
+              padding .38s cubic-bezier(.4,0,.2,1);
   overflow: hidden;
+  transform-origin: top center;
 }
-body.betting  #betting-zone { opacity: 1; pointer-events: auto; max-height: 500px; }
-body:not(.betting) #betting-zone { opacity: 0; pointer-events: none; max-height: 0; padding: 0; border-color: transparent; }
+body.betting  #betting-zone { opacity: 1; pointer-events: auto; max-height: 500px; transform: translateY(0) scaleY(1); }
+body:not(.betting) #betting-zone { opacity: 0; pointer-events: none; max-height: 0; padding: 0; border-color: transparent; transform: translateY(-8px) scaleY(0.97); }
 #btn-clear-top {
   color: var(--red); border-color: rgba(248,81,73,.3);
 }
@@ -663,10 +672,12 @@ body:not(.betting) #betting-zone { opacity: 0; pointer-events: none; max-height:
 #playing-zone {
   display: flex; flex-direction: column; align-items: center;
   width: 100%;
-  transition: opacity .35s ease .1s, transform .35s ease .1s, max-height .4s cubic-bezier(.4,0,.2,1);
+  transition: opacity .32s cubic-bezier(.4,0,.2,1) .06s,
+              transform .38s cubic-bezier(.4,0,.2,1) .06s,
+              max-height .4s cubic-bezier(.4,0,.2,1);
   overflow: hidden;
 }
-body.betting  #playing-zone { opacity: 0; pointer-events: none; transform: translateY(-6px); max-height: 0; }
+body.betting  #playing-zone { opacity: 0; pointer-events: none; transform: translateY(8px); max-height: 0; }
 body:not(.betting) #playing-zone { opacity: 1; pointer-events: auto; transform: translateY(0); max-height: 1000px; }
 
 #hands-wrap {
@@ -695,7 +706,7 @@ body:not(.betting) #playing-zone { opacity: 1; pointer-events: auto; transform: 
   overflow: visible;
 }
 body.betting  #play-bottom { opacity: 0; pointer-events: none; max-height: 0; padding: 0; border-color: transparent; overflow: hidden; }
-body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 200px; }
+body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 200px; transition: opacity .3s cubic-bezier(.4,0,.2,1) .12s, max-height .38s cubic-bezier(.4,0,.2,1); }
 #play-bottom-inner {
   display: flex; align-items: center; gap: 8px; justify-content: center;
 }
@@ -1064,7 +1075,6 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
       </div>
       <!-- DEALER -->
       <div id="dealer-zone" style="display:flex;flex-direction:column;align-items:center;padding-bottom:4px">
-        <div class="zone-tag">Dealer</div>
         <div class="cards-row" id="dealer-cards" style="justify-content:center"></div>
         <div class="score" id="dealer-score"></div>
       </div>
