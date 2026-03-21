@@ -1533,11 +1533,11 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
 ══════════════════════════════════════════════ -->
 <script>
 // ── ASSET IMAGES ──────────────────────────────────────────────
-const PU_IMG_SALLY  = '';
-const PU_IMG_NET    = '';
-const PU_IMG_SEEKER = '';
-const PU_IMG_GUARD  = '';
-const PU_IMG_NOVAK  = '';
+const PU_IMG_SALLY  = 'pu_sally.png';
+const PU_IMG_NET    = 'pu_safety.png';
+const PU_IMG_SEEKER  = 'pu_seeker.png';
+const PU_IMG_GUARD  = 'pu_guard.png';
+const PU_IMG_NOVAK  = 'pu_novak.png';
 const KFC_LOGO_B64  = '';
 
 // ── CONFIG ──────────────────────────────────────────────
@@ -2757,12 +2757,13 @@ function updateInventoryBar(){
   }
 
   // Power-ups owned
-  const PU_ICONS = {surrender:'🛡',safety:'🕸',seeker:'7️⃣',guard:'👼',novak:'♠️'};
   const PU_LABELS = {surrender:'S.Sally',safety:'Safety Net',seeker:'7-Seeker',guard:'BJ Guard',novak:'BJ Novak'};
+  const PU_IMG_MAP = {surrender:PU_IMG_SALLY,safety:PU_IMG_NET,seeker:PU_IMG_SEEKER,guard:PU_IMG_GUARD,novak:PU_IMG_NOVAK};
   G.puOwned.forEach(id=>{
-    const icon = PU_ICONS[id]||'⚡';
     const label = PU_LABELS[id]||id;
-    items.push(`<span class="inv-item pu">${icon} ${label}</span>`);
+    const img = PU_IMG_MAP[id];
+    const medallion = img ? `<span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:url(${img}) center/cover;vertical-align:middle;margin-right:4px;border:1px solid rgba(255,255,255,.15);flex-shrink:0"></span>` : '';
+    items.push(`<span class="inv-item pu" style="display:inline-flex;align-items:center;padding:2px 8px 2px 4px">${medallion}${label}</span>`);
   });
 
   if(items.length===0){
