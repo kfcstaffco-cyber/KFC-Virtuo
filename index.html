@@ -943,7 +943,7 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
       <label class="field-label">Username</label>
       <input type="text" id="lusername" placeholder="your username" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')document.getElementById('lpin').focus()">
       <label class="field-label">PIN</label>
-      <input type="password" id="lpin" placeholder="" maxlength="8" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+      <input type="password" id="lpin" placeholder="" maxlength="8" autocomplete="new-password" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="btn-primary" onclick="doLogin()">Continue</button>
       <div style="display:flex;gap:8px;margin-top:12px">
 
@@ -2258,13 +2258,13 @@ function saveSession(){
       puOwned:[...G.puOwned],
       ts:Date.now()
     };
-    sessionStorage.setItem(SESSION_KEY, JSON.stringify(snap));
+    localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
   }catch(e){}
 }
 
 function restoreSession(){
   try{
-    const raw=sessionStorage.getItem(SESSION_KEY);
+    const raw=localStorage.getItem(SESSION_KEY);
     if(!raw) return false;
     const snap=JSON.parse(raw);
     // Only restore if recent (within 4 hours)
@@ -2287,8 +2287,13 @@ function restoreSession(){
 }
 
 function clearSession(){
-  sessionStorage.removeItem(SESSION_KEY);
+  localStorage.removeItem(SESSION_KEY);
 }
+
+// Save session to localStorage when window/tab is closed
+window.addEventListener('beforeunload', ()=>{
+  if(G.player && !G.cashedOut) saveSession();
+});
 
 window.onload=()=>{
   // Clear old test data from localStorage
@@ -2308,6 +2313,24 @@ window.onload=()=>{
     // Session found — skip login, go straight to table
     openApp(G.player, G.balance);
     notif('↺ Session restored — welcome back, '+G.player+'!');
+    // Silently re-fetch balance from sheet to catch any changes since last close
+    if(G.url && G.username && G._cachedPin){
+      fetch(G.url+'?action=getBalance&username='+encodeURIComponent(G.username)+'&pin='+encodeURIComponent(G._cachedPin))
+        .then(r=>r.json())
+        .then(d=>{
+          if(d.auth && typeof d.balance==='number' && d.balance!==G._totalBalance){
+            G._totalBalance=d.balance;
+            // Only update in-game balance if not mid-hand and balance differs
+            if(G.phase==='bet'){
+              G.balance=d.balance;
+              G.sessionStart=d.balance;
+              updateUI();
+              notif('Balance updated from sheet: '+fmtKFC(d.balance));
+            }
+          }
+        })
+        .catch(()=>{}); // sheet unreachable — keep cached balance
+    }
   } else {
     setTimeout(()=>{ const u=document.getElementById('lusername'); if(u) u.focus(); },120);
   }
