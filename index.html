@@ -2511,6 +2511,7 @@ function doLogout(skipToStake){
   const wasUsername=G.username;
   const wasBalance=G.balance;
   G.cashedOut=false;
+  G.player=''; G.username=''; // clear identity so beforeunload won't re-save
   clearSession();
   _selectedStakeKey=null;
   document.getElementById('app').style.display='none';
