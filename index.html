@@ -2272,7 +2272,7 @@ function clearSession(){
 window.onload=()=>{
   // Clear old test data from localStorage
   Object.keys(localStorage).filter(k=>k.startsWith('kfc_bal_')).forEach(k=>localStorage.removeItem(k));
-  G.url=localStorage.getItem('kfc_url')||'https://script.google.com/macros/s/AKfycbyQ4iHjWJlIyHuO5Xxj0L6XbGq4YiCzT9YIyzasTsb5YLDjrbOzjxnil5v3uHmutucrmg/exec';
+  G.url=localStorage.getItem('kfc_url')||'https://script.google.com/macros/s/AKfycbwLYx8AnXlntINX6oAMT0mnIaiOSeGEvmPO7KO7RY6slUSIc4j14-FN-1_XBOZ7MfKq/exec';
   if(localStorage.getItem('kfc_sb_col')==='1'){const _sb=document.getElementById('sidebar');const _mn=document.getElementById('main');const _bt=document.getElementById('sidebar-toggle');if(_sb)_sb.classList.add('collapsed');if(_mn)_mn.style.gridTemplateColumns='1fr 0';if(_bt)_bt.textContent='⊟';}
   try{G.pins=JSON.parse(localStorage.getItem('kfc_pins')||'{}');}catch(e){G.pins={};}
   const cfgEl=document.getElementById('cfg-url');
