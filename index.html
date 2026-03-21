@@ -2748,7 +2748,7 @@ function updateInventoryBar(){
     const label = lc==='blood'?'2× Card':'3× Card';
     const icon  = lc==='blood'?'🃏':'🃏';
     const active = G.leverage===`c${i}`;
-    items.push(`<span class="inv-item lev${active?' active':''}" title="Click sidebar to activate">${icon} ${label}</span>`);
+    items.push(`<span class="inv-item lev${active?' active':''}" style="cursor:pointer" title="Click to activate/deactivate" onclick="toggleLev('c${i}')">${icon} ${label}${active?' ✓':''}</span>`);
   });
 
   // Active leverage token
@@ -3625,8 +3625,9 @@ function settle(reason){
         detail=`${pv} vs ${dv}`; // leverage card: lose full stake
       }
     }
-    // Dealer Jester: dealer collects ALL winning hands (unless dealer busted or player has BJ)
-    if(G.dealerJester&&!db&&w>0&&reason!=='player_bj'&&!(pbj&&reason==='normal')){w=-G.mainBet;detail+=' [Dealer Jester]';}
+    // Dealer Jester: dealer collects on wins AND pushes (not bust, not player BJ, not special protected pushes)
+    const _djProtected=reason==='player_bj'||(pbj&&reason==='normal')||reason==='push_guard'||reason==='safety'||reason==='desert_push';
+    if(G.dealerJester&&!db&&w>=0&&!_djProtected){w=-G.mainBet;detail+=' [Dealer Jester]';}
     // Free double-down cap: on loss, player only loses their original stake (pre-double)
     if(w<0&&G._freeDoubleBet>0){
       const originalStake=G.mainBet-G._freeDoubleBet; // what player actually wagered
