@@ -1765,42 +1765,78 @@ function initAudio(){
   function multi(...fns){ return ()=>fns.forEach(f=>f()); }
   // Realistic card deal: short filtered noise burst (cloth) + brief high transient
   SFX.card = ()=>{ctx.resume().then(()=>{try{const t=ctx.currentTime,sr=ctx.sampleRate;const buf=ctx.createBuffer(1,Math.floor(sr*0.1),sr);const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);const src=ctx.createBufferSource();src.buffer=buf;const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=1400;f.Q.value=0.6;const g=ctx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.09,t+0.006);g.gain.exponentialRampToValueAtTime(0.001,t+0.09);src.connect(f);f.connect(g);g.connect(ctx.destination);src.start(t);src.stop(t+0.1);}catch(e){}});};
-  // ── CHIP: ceramic poker chip click ──
+  // ── CHIP: ceramic poker chip click (version C — double-hit + body) ──
   SFX.chip = ()=>{ ctx.resume().then(()=>{ try{
     const t=ctx.currentTime, sr=ctx.sampleRate;
-    // Layer 1: short hard noise burst (the ceramic click transient)
-    const buf=ctx.createBuffer(1,Math.floor(sr*0.035),sr);
-    const bd=buf.getChannelData(0);
-    for(let i=0;i<bd.length;i++) bd[i]=(Math.random()*2-1)*Math.pow(1-(i/bd.length),2.5);
-    const src=ctx.createBufferSource(); src.buffer=buf;
-    const hpf=ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=1800;
-    const bpf=ctx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=3200; bpf.Q.value=1.2;
-    const g=ctx.createGain(); g.gain.setValueAtTime(0.28,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.032);
-    src.connect(hpf); hpf.connect(bpf); bpf.connect(g); g.connect(ctx.destination); src.start(t); src.stop(t+0.04);
-    // Layer 2: bright ceramic ring tone (short, high, sine)
-    const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=2400;
-    const og=ctx.createGain(); og.gain.setValueAtTime(0,t); og.gain.linearRampToValueAtTime(0.06,t+0.002);
-    og.gain.exponentialRampToValueAtTime(0.001,t+0.045);
-    o.connect(og); og.connect(ctx.destination); o.start(t); o.stop(t+0.05);
-    // Layer 3: subtle low body thud
-    const o2=ctx.createOscillator(); o2.type='sine'; o2.frequency.value=280;
-    o2.frequency.linearRampToValueAtTime(160,t+0.025);
-    const og2=ctx.createGain(); og2.gain.setValueAtTime(0.09,t); og2.gain.exponentialRampToValueAtTime(0.001,t+0.04);
-    o2.connect(og2); og2.connect(ctx.destination); o2.start(t); o2.stop(t+0.045);
+    // Double-hit transient
+    for(let hit=0;hit<2;hit++){
+      const dt=hit*0.009;
+      const buf=ctx.createBuffer(1,Math.floor(sr*0.014),sr);
+      const bd=buf.getChannelData(0);
+      for(let i=0;i<bd.length;i++) bd[i]=(Math.random()*2-1)*Math.pow(1-(i/bd.length),5);
+      const src=ctx.createBufferSource(); src.buffer=buf;
+      const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=3800;
+      const g=ctx.createGain(); g.gain.setValueAtTime(hit===0?0.44:0.28,t+dt);
+      g.gain.exponentialRampToValueAtTime(0.001,t+dt+0.012);
+      src.connect(hp); hp.connect(g); g.connect(ctx.destination); src.start(t+dt); src.stop(t+dt+0.016);
+    }
+    // Ceramic ring
+    const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=3800;
+    const og=ctx.createGain(); og.gain.setValueAtTime(0,t); og.gain.linearRampToValueAtTime(0.065,t+0.001);
+    og.gain.exponentialRampToValueAtTime(0.001,t+0.032);
+    o.connect(og); og.connect(ctx.destination); o.start(t); o.stop(t+0.036);
+    // Chest thump
+    const o2=ctx.createOscillator(); o2.type='sine'; o2.frequency.value=380;
+    o2.frequency.linearRampToValueAtTime(180,t+0.04);
+    const og2=ctx.createGain(); og2.gain.setValueAtTime(0,t); og2.gain.linearRampToValueAtTime(0.26,t+0.004);
+    og2.gain.exponentialRampToValueAtTime(0.001,t+0.07);
+    o2.connect(og2); og2.connect(ctx.destination); o2.start(t); o2.stop(t+0.075);
+    // Sub layer
+    const o3=ctx.createOscillator(); o3.type='sine'; o3.frequency.value=120;
+    const og3=ctx.createGain(); og3.gain.setValueAtTime(0,t); og3.gain.linearRampToValueAtTime(0.12,t+0.003);
+    og3.gain.exponentialRampToValueAtTime(0.001,t+0.045);
+    o3.connect(og3); og3.connect(ctx.destination); o3.start(t); o3.stop(t+0.05);
   }catch(e){}});}; 
   SFX.deal    = ()=>{};
   SFX.win     = multi(tone(523,0.12,'sine',0.2), ()=>setTimeout(()=>tone(659,0.12,'sine',0.2)(),120), ()=>setTimeout(()=>tone(784,0.18,'sine',0.2)(),240));
   SFX.lose    = ()=>{}; // silent
-  SFX.cash    = ()=>{
-    try{
-      // Cash register: ching + coins
-      [0,60,120].forEach((t,i)=>{
-        setTimeout(()=>tone(880+(i*220),0.08,'square',0.08)(),t);
-      });
-      setTimeout(()=>noise(0.12,0.05)(),60);
-      setTimeout(()=>tone(1320,0.15,'sine',0.12)(),180);
-    }catch(e){}
-  };
+  SFX.cash = ()=>{ ctx.resume().then(()=>{ try{
+    // Coin cascade + rising fanfare (slot machine jackpot)
+    function coinBurst(startTime){
+      const sr=ctx.sampleRate;
+      const buf=ctx.createBuffer(1,Math.floor(sr*0.04),sr);
+      const d=buf.getChannelData(0);
+      for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-(i/d.length),2);
+      const src=ctx.createBufferSource(); src.buffer=buf;
+      const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=4000+(Math.random()*2000); bp.Q.value=0.8;
+      const vol=0.04+Math.random()*0.06;
+      const g=ctx.createGain(); g.gain.setValueAtTime(vol,startTime); g.gain.exponentialRampToValueAtTime(0.001,startTime+0.035);
+      src.connect(bp); bp.connect(g); g.connect(ctx.destination); src.start(startTime); src.stop(startTime+0.04);
+    }
+    // Coin cascade — 28 hits, denser at start
+    for(let i=0;i<28;i++){
+      const dt=Math.pow(i/28,0.6)*1.2;
+      setTimeout(()=>coinBurst(ctx.currentTime), dt*1000);
+    }
+    // Rising fanfare arpeggio: C E G C E
+    [523,659,784,1047,1319].forEach((f,i)=>{
+      setTimeout(()=>{
+        const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=f;
+        const g=ctx.createGain(); g.gain.setValueAtTime(0,ctx.currentTime);
+        g.gain.linearRampToValueAtTime(0.2,ctx.currentTime+0.01);
+        g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.22);
+        o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.25);
+      },i*110);
+    });
+    // Final big bell
+    setTimeout(()=>{
+      const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=1047;
+      const g=ctx.createGain(); g.gain.setValueAtTime(0,ctx.currentTime);
+      g.gain.linearRampToValueAtTime(0.28,ctx.currentTime+0.008);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.7);
+      o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime+0.75);
+    },580);
+  }catch(e){}});}; 
   // ── BLACKJACK: cash register ding + coin shimmer ──
   SFX.bj = ()=>{ ctx.resume().then(()=>{ try{
     const t=ctx.currentTime;
@@ -3699,7 +3735,7 @@ function settle(reason){
   });
   G.log.push({detail,pl:totalPLForDisplay,bal:G.balance,breakdown});
   renderLog();
-  if(totalPLForDisplay>0){sfx('win');if(totalPLForDisplay>G.s.min*5)sfx('cash');} else if(totalPLForDisplay<0){} else sfx('push');
+  if(totalPLForDisplay>0){if(totalPLForDisplay>G.s.min*5)sfx('cash');else sfx('win');} else if(totalPLForDisplay<0){} else sfx('push');
   // Show missed side bet payouts (including Dealer Bust if it busted)
   if(db){
     const dbCards=G.dealer.length;
