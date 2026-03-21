@@ -1881,6 +1881,7 @@ function finaliseLogin(stakeKey){
   if(!_pendingLogin)return;
   G.stake=stakeKey; G.s=STAKES[stakeKey];
   G._totalBalance=_pendingLogin.totalBalance||_pendingLogin.balance; // full sheet balance
+  G._sessionActive=false; // fresh login — becomes true only after first deal
   document.getElementById('login').style.display='none';
   openApp(_pendingLogin.name, _pendingLogin.balance);
   _pendingLogin=null; _selectedStakeKey=null;
@@ -2467,7 +2468,7 @@ function checkBalanceCap(){
 function openApp(displayName, balance){
   G.player=displayName;
   G.balance=G.sessionStart=balance;
-  G._sessionActive=false; // becomes true only after first deal
+  // _sessionActive intentionally NOT reset here — preserved from restoreSession if restoring
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='flex';
   document.getElementById('app').style.flexDirection='column';
