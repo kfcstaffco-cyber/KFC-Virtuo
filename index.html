@@ -1541,7 +1541,7 @@ const G = {
   safetyTrigger:false, dealerJester:false,
   log:[],
   url:'', pins:{},
-  preDealBal:0, lastMainBet:0, lastSideBets:{}, cashedOut:false, _atCashout:false, insuranceBet:0, _freeDoubleBet:0, _freeLevBet:0,
+  preDealBal:0, lastMainBet:0, lastSideBets:{}, cashedOut:false, _atCashout:false, _sessionActive:false, insuranceBet:0, _freeDoubleBet:0, _freeLevBet:0,
   _bonusPayouts:[], // [{label, pl}] — instant bonus card payouts to show in result
   cutCardTriggered:false, // set when cut card is drawn mid-shoe
 };
@@ -2294,7 +2294,7 @@ function saveSession(){
   try{
     const snap={
       player:G.player, username:G.username,
-      balance:G.balance, sessionStart:G.sessionStart, totalBalance:G._totalBalance||G.balance, cashedOut:G.cashedOut,
+      balance:G.balance, sessionStart:G.sessionStart, totalBalance:G._totalBalance||G.balance, cashedOut:G.cashedOut, sessionActive:G._sessionActive,
       stake:G.stake,
       cachedPin:G._cachedPin||'',
       lastMainBet:G.lastMainBet, lastSideBets:G.lastSideBets,
@@ -2318,10 +2318,11 @@ function restoreSession(){
     // Only restore if recent (within 4 hours) and player hadn't cashed out
     if(!snap||!snap.player||(Date.now()-snap.ts)>4*60*60*1000) return false;
     if(snap.cashedOut) return false; // don't restore after cash out
+    if(!snap.sessionActive) return false; // don't restore if no hand was ever dealt
     // Restore state
     G.player=snap.player; G.username=snap.username||snap.player;
     G._cachedPin=snap.cachedPin||'';
-    G.balance=snap.balance; G.sessionStart=snap.sessionStart||snap.balance; G._totalBalance=snap.totalBalance||snap.balance;
+    G.balance=snap.balance; G.sessionStart=snap.sessionStart||snap.balance; G._totalBalance=snap.totalBalance||snap.balance; G._sessionActive=snap.sessionActive||false;
     G.stake=snap.stake||'low'; G.s=STAKES[G.stake]||STAKES.low;
     G.lastMainBet=snap.lastMainBet||0; G.lastSideBets=snap.lastSideBets||{};
     G.mainBet=snap.mainBet||0;
@@ -2342,7 +2343,7 @@ function clearSession(){
 // Save session to localStorage when window/tab is closed
 window.addEventListener('beforeunload', ()=>{
   // Save mid-session only — not if at cashout screen, already cashed out, or logged out
-  if(G.player && !G.cashedOut && !G._atCashout) saveSession();
+  if(G.player && !G.cashedOut && !G._atCashout && G._sessionActive) saveSession();
 });
 
 window.onload=()=>{
@@ -2409,7 +2410,6 @@ async function doLogin(){
       if(d.error&&d.auth===false){err.textContent=d.error||'Authentication failed';return;}
       if(d.auth){
         err.textContent='';
-        G.player=d.playerName||username;
         G.username=username;
         G._cachedPin=pin;
         _pendingLogin={name:d.playerName||username,balance:d.balance};
@@ -2432,7 +2432,7 @@ async function doLogin(){
   G.username=username;
   G._cachedPin=pin; // cache for re-auth
   const localBal=parseFloat(localStorage.getItem('kfc_bal_'+username)||'5000000');
-  _pendingLogin={name:username,balance:localBal};
+  _pendingLogin={name:username,balance:localBal}; // G.player set only in openApp
   document.getElementById('login-step1').style.display='none';
   goLoginStep(2);
 }
@@ -2457,6 +2457,7 @@ function checkBalanceCap(){
 function openApp(displayName, balance){
   G.player=displayName;
   G.balance=G.sessionStart=balance;
+  G._sessionActive=false; // becomes true only after first deal
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='flex';
   document.getElementById('app').style.flexDirection='column';
@@ -2513,6 +2514,7 @@ function doLogout(skipToStake){
   const wasBalance=G.balance;
   G.cashedOut=false;
   G._atCashout=false;
+  G._sessionActive=false;
   G.player=''; G.username=''; // clear identity so beforeunload won't re-save
   clearSession();
   _selectedStakeKey=null;
@@ -2950,6 +2952,7 @@ function deal(){
   G.arrowCount=0; G.kruegerOn=false; G.desertOn=false; G.goldOn=false;
   G.steelOn=false; G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.plagueOn=false;
   G.safetyTrigger=false; G.dealerJester=false; G.insuranceBet=0; G.arrowCount=0; G._freeDoubleBet=0; G._freeLevBet=0;
+  G._sessionActive=true; // mark session as active after first deal
   G.phase='play'; document.body.classList.remove('betting');
   // Clear previous hand state immediately
   clearMissedSideBets();
