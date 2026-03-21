@@ -1765,7 +1765,29 @@ function initAudio(){
   function multi(...fns){ return ()=>fns.forEach(f=>f()); }
   // Realistic card deal: short filtered noise burst (cloth) + brief high transient
   SFX.card = ()=>{ctx.resume().then(()=>{try{const t=ctx.currentTime,sr=ctx.sampleRate;const buf=ctx.createBuffer(1,Math.floor(sr*0.1),sr);const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);const src=ctx.createBufferSource();src.buffer=buf;const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=1400;f.Q.value=0.6;const g=ctx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.09,t+0.006);g.gain.exponentialRampToValueAtTime(0.001,t+0.09);src.connect(f);f.connect(g);g.connect(ctx.destination);src.start(t);src.stop(t+0.1);}catch(e){}});};
-  SFX.chip    = multi(tone(600,0.07,'sine',0.14), tone(900,0.04,'sine',0.07));
+  // ── CHIP: ceramic poker chip click ──
+  SFX.chip = ()=>{ ctx.resume().then(()=>{ try{
+    const t=ctx.currentTime, sr=ctx.sampleRate;
+    // Layer 1: short hard noise burst (the ceramic click transient)
+    const buf=ctx.createBuffer(1,Math.floor(sr*0.035),sr);
+    const bd=buf.getChannelData(0);
+    for(let i=0;i<bd.length;i++) bd[i]=(Math.random()*2-1)*Math.pow(1-(i/bd.length),2.5);
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const hpf=ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=1800;
+    const bpf=ctx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=3200; bpf.Q.value=1.2;
+    const g=ctx.createGain(); g.gain.setValueAtTime(0.28,t); g.gain.exponentialRampToValueAtTime(0.001,t+0.032);
+    src.connect(hpf); hpf.connect(bpf); bpf.connect(g); g.connect(ctx.destination); src.start(t); src.stop(t+0.04);
+    // Layer 2: bright ceramic ring tone (short, high, sine)
+    const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=2400;
+    const og=ctx.createGain(); og.gain.setValueAtTime(0,t); og.gain.linearRampToValueAtTime(0.06,t+0.002);
+    og.gain.exponentialRampToValueAtTime(0.001,t+0.045);
+    o.connect(og); og.connect(ctx.destination); o.start(t); o.stop(t+0.05);
+    // Layer 3: subtle low body thud
+    const o2=ctx.createOscillator(); o2.type='sine'; o2.frequency.value=280;
+    o2.frequency.linearRampToValueAtTime(160,t+0.025);
+    const og2=ctx.createGain(); og2.gain.setValueAtTime(0.09,t); og2.gain.exponentialRampToValueAtTime(0.001,t+0.04);
+    o2.connect(og2); og2.connect(ctx.destination); o2.start(t); o2.stop(t+0.045);
+  }catch(e){}});}; 
   SFX.deal    = ()=>{};
   SFX.win     = multi(tone(523,0.12,'sine',0.2), ()=>setTimeout(()=>tone(659,0.12,'sine',0.2)(),120), ()=>setTimeout(()=>tone(784,0.18,'sine',0.2)(),240));
   SFX.lose    = ()=>{}; // silent
@@ -1779,9 +1801,62 @@ function initAudio(){
       setTimeout(()=>tone(1320,0.15,'sine',0.12)(),180);
     }catch(e){}
   };
-  SFX.bj      = ()=>{ [0,80,160,240,320].forEach((t,i)=>setTimeout(()=>tone(523+(i*80),0.1,'sine',0.22)(),t)); };
+  // ── BLACKJACK: cash register ding + coin shimmer ──
+  SFX.bj = ()=>{ ctx.resume().then(()=>{ try{
+    const t=ctx.currentTime;
+    // Big bright ding (cash register bell)
+    const bell=ctx.createOscillator(); bell.type='sine'; bell.frequency.value=1047;
+    const bellG=ctx.createGain(); bellG.gain.setValueAtTime(0,t);
+    bellG.gain.linearRampToValueAtTime(0.28,t+0.008);
+    bellG.gain.exponentialRampToValueAtTime(0.001,t+0.7);
+    bell.connect(bellG); bellG.connect(ctx.destination); bell.start(t); bell.stop(t+0.75);
+    // Overtone shimmer
+    const bell2=ctx.createOscillator(); bell2.type='sine'; bell2.frequency.value=2093;
+    const bell2G=ctx.createGain(); bell2G.gain.setValueAtTime(0,t);
+    bell2G.gain.linearRampToValueAtTime(0.12,t+0.006);
+    bell2G.gain.exponentialRampToValueAtTime(0.001,t+0.45);
+    bell2.connect(bell2G); bell2G.connect(ctx.destination); bell2.start(t); bell2.stop(t+0.5);
+    // Coin shimmer burst
+    const coinBuf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.18),ctx.sampleRate);
+    const cd=coinBuf.getChannelData(0);
+    for(let i=0;i<cd.length;i++) cd[i]=(Math.random()*2-1)*Math.pow(1-(i/cd.length),1.2);
+    const cs=ctx.createBufferSource(); cs.buffer=coinBuf;
+    const chpf=ctx.createBiquadFilter(); chpf.type='bandpass'; chpf.frequency.value=5000; chpf.Q.value=0.8;
+    const cg=ctx.createGain(); cg.gain.setValueAtTime(0.06,t+0.04); cg.gain.exponentialRampToValueAtTime(0.001,t+0.22);
+    cs.connect(chpf); chpf.connect(cg); cg.connect(ctx.destination); cs.start(t+0.04); cs.stop(t+0.25);
+    // Rising arpeggio: C E G C (money fanfare)
+    [0,120,240,380].forEach((dt,i)=>{
+      const f=[523,659,784,1047][i];
+      setTimeout(()=>tone(f,0.12,'sine',0.15)(),dt);
+    });
+  }catch(e){}});}; 
   SFX.push    = tone(350,0.15,'sine',0.1);
-  SFX.bust    = multi(tone(200,0.08,'sawtooth',0.15), ()=>setTimeout(()=>tone(160,0.2,'sawtooth',0.12)(),80));
+  // ── BUST: deep low piano note ──
+  SFX.bust = ()=>{ ctx.resume().then(()=>{ try{
+    const t=ctx.currentTime;
+    // Low piano key: triangle wave with natural piano-like decay
+    const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=98; // G2 — deep & foreboding
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(0.32,t+0.006); // hard attack
+    g.gain.exponentialRampToValueAtTime(0.08,t+0.12);  // quick initial drop
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.9);  // long piano-style sustain decay
+    o.connect(g); g.connect(ctx.destination); o.start(t); o.stop(t+0.95);
+    // Subtle hammer knock (piano hammer on string texture)
+    const hBuf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.018),ctx.sampleRate);
+    const hd=hBuf.getChannelData(0);
+    for(let i=0;i<hd.length;i++) hd[i]=(Math.random()*2-1)*Math.pow(1-(i/hd.length),3);
+    const hs=ctx.createBufferSource(); hs.buffer=hBuf;
+    const hlpf=ctx.createBiquadFilter(); hlpf.type='lowpass'; hlpf.frequency.value=600;
+    const hg=ctx.createGain(); hg.gain.setValueAtTime(0.14,t); hg.gain.exponentialRampToValueAtTime(0.001,t+0.018);
+    hs.connect(hlpf); hlpf.connect(hg); hg.connect(ctx.destination); hs.start(t); hs.stop(t+0.02);
+    // Low octave harmonic
+    const o2=ctx.createOscillator(); o2.type='triangle'; o2.frequency.value=49; // G1
+    const g2=ctx.createGain();
+    g2.gain.setValueAtTime(0,t); g2.gain.linearRampToValueAtTime(0.12,t+0.008);
+    g2.gain.exponentialRampToValueAtTime(0.001,t+0.55);
+    o2.connect(g2); g2.connect(ctx.destination); o2.start(t); o2.stop(t+0.6);
+  }catch(e){}});}; 
   SFX.buy     = multi(tone(660,0.06,'sine',0.15), ()=>setTimeout(()=>tone(880,0.1,'sine',0.15)(),70));
   SFX.button  = tone(480,0.05,'sine',0.1);
   SFX.notif   = tone(700,0.07,'sine',0.12);
