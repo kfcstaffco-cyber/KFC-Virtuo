@@ -2368,10 +2368,10 @@ window.onload=()=>{
       fetch(G.url+'?action=getBalance&username='+encodeURIComponent(G.username)+'&pin='+encodeURIComponent(G._cachedPin))
         .then(r=>r.json())
         .then(d=>{
-          if(d.auth && typeof d.balance==='number' && d.balance!==G._totalBalance){
+          if(d.auth && typeof d.balance==='number'){
             G._totalBalance=d.balance;
-            // Only update in-game balance if not mid-hand and balance differs
-            if(G.phase==='bet'){
+            // Always update balance from sheet on restore — sheet is source of truth
+            if(G.phase==='bet' && d.balance!==G.balance){
               G.balance=d.balance;
               G.sessionStart=d.balance;
               updateUI();
@@ -2728,7 +2728,7 @@ function updateBetPanel(){
   c.innerHTML=html;
   const total=G.mainBet+st;
   document.getElementById('bet-total-tag').textContent=total>0?fmtKFC(total):'';
-  if(G.phase==='bet') saveSession(); // persist current bets
+  if(G.phase==='bet' && !G._atCashout) saveSession(); // persist current bets
 }
 
 function clearBets(){
@@ -3932,7 +3932,6 @@ function closeResult(){
   const ms=document.getElementById('msg-strip');
   if(ms){ms.className='';ms.textContent='Place your bet';}
   msg('Place your bet');
-  saveSession(); // persist session after every completed hand
   if(G.cutCardTriggered){
     G.cutCardTriggered=false;
     G.deck=buildShoe();
@@ -3968,6 +3967,8 @@ function closeResult(){
       G.cashedOut=false;
       showCashout();
     },600);
+  } else {
+    saveSession(); // only save if session is continuing normally
   }
 }
 
