@@ -540,19 +540,48 @@ body:not(.betting) #betting-spacer { flex: 0; }
 
   /* ── TOPBAR ── */
   #topbar {
-    height: 48px;
-    padding: 0 10px;
+    height: auto;
+    padding: 0;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
   }
   .tb-logo { display: none; }
-  .tb-balance { font-size: 15px; }
-  .tb-center { gap: 10px; }
+  /* Row 1: name + balance + stake badge */
+  .tb-center {
+    position: static;
+    transform: none;
+    left: auto;
+    justify-content: center;
+    width: 100%;
+    padding: 8px 12px 4px;
+    gap: 8px;
+    pointer-events: auto;
+    border-bottom: 1px solid var(--line);
+    order: 1;
+    box-sizing: border-box;
+  }
+  .tb-balance { font-size: 16px; }
   .tb-player { font-size: 11px; }
   .badge { font-size: 8px; padding: 2px 5px; }
-  /* Prevent topbar center from overflowing into buttons */
-  .tb-center {
-    max-width: calc(100vw - 140px);
-    overflow: hidden;
+  /* Row 2: action buttons */
+  .tb-right {
+    order: 2;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 4px 10px;
+    box-sizing: border-box;
   }
+  /* Make stake/cashout buttons smaller on mobile */
+  .tb-right .btn-ghost {
+    font-size: 9px;
+    padding: 5px 10px;
+    letter-spacing: 1px;
+  }
+  #sync-badge { display: none; }
 
   /* ── TABLE AREA ── */
   #table-area {
@@ -2771,7 +2800,7 @@ async function doLogin(){
 
   // Try sheet auth first
   if(G.url){
-    err.textContent='Connecting to sheet...';
+    err.textContent='Connecting...';
     try{
       const r=await fetch(G.url+'?action=getBalance&username='+encodeURIComponent(username)+'&pin='+encodeURIComponent(pin));
       if(!r.ok) throw new Error('HTTP '+r.status);
@@ -4420,7 +4449,7 @@ function showCashout(){
     syncEl.textContent='⚠ 50 Billion KFC cap reached — you must cash out before playing again.';
     syncEl.style.color='var(--red)';
   } else {
-    syncEl.textContent=G.url?'Will sync to Google Sheet.':'No sheet connected — saved locally.';
+    syncEl.textContent=G.url?'':'No sheet connected — saved locally.';
     syncEl.style.color='';
   }
   // Reset to pre-confirm state
