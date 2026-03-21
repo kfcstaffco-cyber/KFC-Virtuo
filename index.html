@@ -2347,9 +2347,13 @@ function clearSession(){
 }
 
 // Save session to localStorage when window/tab is closed
-window.addEventListener('beforeunload', ()=>{
-  // Save mid-session only — not if at cashout screen, already cashed out, or logged out
-  if(G.player && !G.cashedOut && !G._atCashout && G._sessionActive) saveSession();
+window.addEventListener('beforeunload', (e)=>{
+  // Only act when mid-session (hand has been dealt, not cashed out, not at cashout screen)
+  if(G.player && !G.cashedOut && !G._atCashout && G._sessionActive){
+    saveSession(); // persist session so it can be restored on return
+    e.preventDefault(); // trigger browser leave confirmation
+    e.returnValue = ''; // required for Chrome
+  }
 });
 
 window.onload=()=>{
