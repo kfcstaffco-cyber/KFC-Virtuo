@@ -926,6 +926,54 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
   text-align: center; font-family: var(--mono); font-size: 7px;
   color: rgba(201,168,76,0.7); line-height: 1; pointer-events: none;
 }
+
+/* ── ALL-IN ANIMATION ─────────────────────────── */
+#allin-splash {
+  position: fixed;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%) scale(0.4);
+  z-index: 9999;
+  pointer-events: none;
+  display: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+#allin-splash.show {
+  display: flex;
+  animation: allinPop 1.6s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+#allin-text {
+  font-family: var(--head);
+  font-size: clamp(52px, 12vw, 96px);
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--gold-hi);
+  text-shadow:
+    0 0 30px rgba(201,168,76,0.9),
+    0 0 60px rgba(201,168,76,0.6),
+    0 0 100px rgba(201,168,76,0.3),
+    0 4px 0 rgba(0,0,0,0.8);
+  line-height: 1;
+}
+#allin-sub {
+  font-family: var(--mono);
+  font-size: clamp(11px, 2.5vw, 15px);
+  letter-spacing: 0.5em;
+  text-transform: uppercase;
+  color: rgba(201,168,76,0.7);
+  text-shadow: 0 0 20px rgba(201,168,76,0.5);
+}
+@keyframes allinPop {
+  0%   { transform: translate(-50%,-50%) scale(0.3); opacity: 0; }
+  15%  { transform: translate(-50%,-50%) scale(1.12); opacity: 1; }
+  25%  { transform: translate(-50%,-50%) scale(0.96); opacity: 1; }
+  35%  { transform: translate(-50%,-50%) scale(1.04); opacity: 1; }
+  50%  { transform: translate(-50%,-50%) scale(1);    opacity: 1; }
+  75%  { transform: translate(-50%,-50%) scale(1);    opacity: 1; }
+  100% { transform: translate(-50%,-50%) scale(1.05); opacity: 0; }
+}
 </style>
 </head>
 <body class="betting">
@@ -2246,7 +2294,7 @@ function saveSession(){
   try{
     const snap={
       player:G.player, username:G.username,
-      balance:G.balance, sessionStart:G.sessionStart, totalBalance:G._totalBalance||G.balance,
+      balance:G.balance, sessionStart:G.sessionStart, totalBalance:G._totalBalance||G.balance, cashedOut:G.cashedOut,
       stake:G.stake,
       cachedPin:G._cachedPin||'',
       lastMainBet:G.lastMainBet, lastSideBets:G.lastSideBets,
@@ -2267,8 +2315,9 @@ function restoreSession(){
     const raw=localStorage.getItem(SESSION_KEY);
     if(!raw) return false;
     const snap=JSON.parse(raw);
-    // Only restore if recent (within 4 hours)
+    // Only restore if recent (within 4 hours) and player hadn't cashed out
     if(!snap||!snap.player||(Date.now()-snap.ts)>4*60*60*1000) return false;
+    if(snap.cashedOut) return false; // don't restore after cash out
     // Restore state
     G.player=snap.player; G.username=snap.username||snap.player;
     G._cachedPin=snap.cachedPin||'';
@@ -2860,6 +2909,15 @@ function switchTab(t){
 }
 
 // ── DEAL ──────────────────────────────────────────────
+
+function showAllIn(){
+  const el = document.getElementById('allin-splash');
+  if(!el) return;
+  el.classList.remove('show');
+  void el.offsetWidth; // force reflow to restart animation
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'), 1700);
+}
 function deal(){
   if(!G._audioReady)initAudio();
   if(G.phase!=='bet')return;
@@ -2875,6 +2933,7 @@ function deal(){
   G._earlySBPL=0; G._earlySBResults=[];
   G.lastMainBet=G.mainBet; G.lastSideBets={...G.sideBets};
   G.balance-=totalDeducted+puCost; updateUI();
+  if(G.balance===0) setTimeout(showAllIn, 200); // all-in!
   G._handStartBal=G.balance; // snapshot AFTER deductions — so P&L display is net of all costs
   G.hands=[[]]; G.cur=0; G.splits=0; G.dealer=[];
   G.holeRevealed=false;
@@ -3982,6 +4041,7 @@ function showCashout(){
 
 async function confirmCashout(){
   G.cashedOut=true;
+  clearSession(); // prevent accidental restore after cashout
   document.getElementById('co-actions-pre').style.display='none';
   const post=document.getElementById('co-actions-post');
   post.style.display='flex';
@@ -4030,6 +4090,7 @@ async function confirmCashout(){
     badge.style.color='var(--green)';
   }
   G.sessionStart=G.balance;
+  G._totalBalance=G.balance; // update total balance after cashout
   G.log=[]; renderLog();
 }
 
@@ -4065,5 +4126,11 @@ function notif(txt){
   clearTimeout(nTimer); nTimer=setTimeout(()=>el.classList.remove('show'),2400);
 }
 </script>
+
+<!-- ALL-IN SPLASH -->
+<div id="allin-splash">
+  <div id="allin-text">ALL IN</div>
+  <div id="allin-sub">Everything on the line</div>
+</div>
 </body>
 </html>
