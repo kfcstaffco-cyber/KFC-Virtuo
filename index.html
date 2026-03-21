@@ -944,7 +944,7 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
       <input type="text" id="lusername" placeholder="your username" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')document.getElementById('lpin').focus()">
       <label class="field-label">PIN</label>
       <input type="password" id="lpin" placeholder="••••" maxlength="8" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
-      <button class="btn-primary" onclick="doLogin()">Continue →</button>
+      <button class="btn-primary" onclick="doLogin()">Continue</button>
       <div style="display:flex;gap:8px;margin-top:12px">
         <button class="btn-ghost" style="flex:1" onclick="openModal('settings-modal')">⚙ Settings</button>
       </div>
@@ -952,14 +952,14 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
     </div>
     <!-- Step 2: Stake selection (shown first after credentials) -->
     <div id="login-step2" style="display:none">
-      <button class="btn-ghost" onclick="goLoginStep(1)" style="padding:6px 12px;margin-bottom:16px;font-size:11px">← Back</button>
+      <button class="btn-ghost" onclick="goLoginStep(1)" style="padding:6px 12px;margin-bottom:16px;font-size:11px">Back</button>
       <div style="font-family:var(--sans);font-weight:800;font-size:15px;color:var(--gold-hi);letter-spacing:3px;text-align:center;margin-bottom:4px;text-transform:uppercase">Select Stake</div>
       <div id="login-bal-display" style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-bottom:16px;letter-spacing:1px"></div>
       <div id="login-stake-list" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto"></div>
     </div>
     <!-- Step 3: Buy-in amount -->
-    <    <div id="login-step-buyin" style="display:none">
-      <button class="btn-ghost" onclick="goLoginStep(2)" style="padding:6px 12px;margin-bottom:16px;font-size:11px">← Back</button>
+    <div id="login-step-buyin" style="display:none">
+      <button class="btn-ghost" onclick="goLoginStep(2)" style="padding:6px 12px;margin-bottom:16px;font-size:11px">Back</button>
       <div class="field-label" style="text-align:center;letter-spacing:4px;margin-bottom:24px">BUY IN</div>
       <div class="field-label" style="margin-bottom:4px">Your Balance</div>
       <div id="buyin-current-bal" style="font-family:var(--mono);font-size:14px;color:var(--white);font-weight:500;margin-bottom:20px;padding:10px 12px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius)"></div>
@@ -1327,7 +1327,7 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
     </div>
     <div style="display:flex;gap:8px">
       <button class="btn-ghost" style="flex:1" onclick="cancelStampedBoost()">Skip</button>
-      <button class="btn-primary" style="flex:2" onclick="confirmStampedBoost()">Boost & Continue →</button>
+      <button class="btn-primary" style="flex:2" onclick="confirmStampedBoost()">Boost & Continue</button>
     </div>
   </div>
 </div>
@@ -1339,7 +1339,7 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
     <div class="result-detail" id="r-detail" style="margin-bottom:12px"></div>
     <div id="r-breakdown" style="font-family:var(--mono);font-size:11px;margin-bottom:14px"></div>
     <div class="result-bal" id="r-bal" style="display:none"></div>
-    <button class="btn-primary" onclick="closeResult()">Continue →</button>
+    <button class="btn-primary" onclick="closeResult()">Continue</button>
   </div>
 </div>
 
