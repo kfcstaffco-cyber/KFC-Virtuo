@@ -1765,10 +1765,10 @@ function initAudio(){
   function multi(...fns){ return ()=>fns.forEach(f=>f()); }
   // Realistic card deal: short filtered noise burst (cloth) + brief high transient
   SFX.card = ()=>{ctx.resume().then(()=>{try{const t=ctx.currentTime,sr=ctx.sampleRate;const buf=ctx.createBuffer(1,Math.floor(sr*0.1),sr);const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);const src=ctx.createBufferSource();src.buffer=buf;const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=1400;f.Q.value=0.6;const g=ctx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.09,t+0.006);g.gain.exponentialRampToValueAtTime(0.001,t+0.09);src.connect(f);f.connect(g);g.connect(ctx.destination);src.start(t);src.stop(t+0.1);}catch(e){}});};
-  // ── CHIP: ceramic poker chip click (version C — double-hit + body) ──
+  // ── CHIP: ceramic poker chip click (double-hit, no body) ──
   SFX.chip = ()=>{ ctx.resume().then(()=>{ try{
     const t=ctx.currentTime, sr=ctx.sampleRate;
-    // Double-hit transient
+    // Double-hit transient — sharp, dry, ceramic
     for(let hit=0;hit<2;hit++){
       const dt=hit*0.009;
       const buf=ctx.createBuffer(1,Math.floor(sr*0.014),sr);
@@ -1780,22 +1780,11 @@ function initAudio(){
       g.gain.exponentialRampToValueAtTime(0.001,t+dt+0.012);
       src.connect(hp); hp.connect(g); g.connect(ctx.destination); src.start(t+dt); src.stop(t+dt+0.016);
     }
-    // Ceramic ring
+    // Ceramic ring only — no low end
     const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=3800;
     const og=ctx.createGain(); og.gain.setValueAtTime(0,t); og.gain.linearRampToValueAtTime(0.065,t+0.001);
     og.gain.exponentialRampToValueAtTime(0.001,t+0.032);
     o.connect(og); og.connect(ctx.destination); o.start(t); o.stop(t+0.036);
-    // Chest thump
-    const o2=ctx.createOscillator(); o2.type='sine'; o2.frequency.value=380;
-    o2.frequency.linearRampToValueAtTime(180,t+0.04);
-    const og2=ctx.createGain(); og2.gain.setValueAtTime(0,t); og2.gain.linearRampToValueAtTime(0.26,t+0.004);
-    og2.gain.exponentialRampToValueAtTime(0.001,t+0.07);
-    o2.connect(og2); og2.connect(ctx.destination); o2.start(t); o2.stop(t+0.075);
-    // Sub layer
-    const o3=ctx.createOscillator(); o3.type='sine'; o3.frequency.value=120;
-    const og3=ctx.createGain(); og3.gain.setValueAtTime(0,t); og3.gain.linearRampToValueAtTime(0.12,t+0.003);
-    og3.gain.exponentialRampToValueAtTime(0.001,t+0.045);
-    o3.connect(og3); og3.connect(ctx.destination); o3.start(t); o3.stop(t+0.05);
   }catch(e){}});}; 
   SFX.deal    = ()=>{};
   SFX.win     = multi(tone(523,0.12,'sine',0.2), ()=>setTimeout(()=>tone(659,0.12,'sine',0.2)(),120), ()=>setTimeout(()=>tone(784,0.18,'sine',0.2)(),240));
@@ -2477,6 +2466,8 @@ function saveSession(){
       phase:G.phase==='bet'?'bet':'bet', // always restore to bet phase
       levCards:G.levCards,
       puOwned:[...G.puOwned],
+      deck:G.deck||[],
+      shoeTotal:G._shoeTotal||0,
       ts:Date.now()
     };
     localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
@@ -2504,6 +2495,7 @@ function restoreSession(){
     G.log=snap.log||[];
     G.levCards=snap.levCards||[];
     G.puOwned=new Set(snap.puOwned||[]);
+    if(snap.deck&&snap.deck.length>0){ G.deck=snap.deck; G._shoeTotal=snap.shoeTotal||snap.deck.length; }
     G.phase='bet';
     return true;
   }catch(e){ return false; }
