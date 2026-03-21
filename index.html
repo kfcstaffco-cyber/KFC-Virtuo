@@ -2800,7 +2800,7 @@ async function doLogin(){
 
   // Try sheet auth first
   if(G.url){
-    err.textContent='Connecting...';
+    err.textContent='Connecting to sheet...';
     try{
       const r=await fetch(G.url+'?action=getBalance&username='+encodeURIComponent(username)+'&pin='+encodeURIComponent(pin));
       if(!r.ok) throw new Error('HTTP '+r.status);
@@ -2991,7 +2991,7 @@ function updateInventoryBar(){
   G.puOwned.forEach(id=>{
     const label = PU_LABELS[id]||id;
     const img = PU_IMG_MAP[id];
-    const medallion = img ? `<span style="display:inline-block;width:22px;height:22px;border-radius:50%;background:url(${img}) center/108%;vertical-align:middle;margin-right:4px;border:2px solid #111;box-shadow:0 0 0 1px rgba(255,255,255,.08);flex-shrink:0"></span>` : '';
+    const medallion = img ? `<span style="display:inline-block;width:22px;height:22px;border-radius:50%;background-image:url(${img});background-size:108%;background-position:center;background-repeat:no-repeat;vertical-align:middle;margin-right:4px;border:2px solid #111;box-shadow:0 0 0 1px rgba(255,255,255,.08);flex-shrink:0"></span>` : '';
     items.push(`<span class="inv-item pu" style="display:inline-flex;align-items:center;padding:2px 8px 2px 4px">${medallion}${label}</span>`);
   });
 
@@ -4449,7 +4449,7 @@ function showCashout(){
     syncEl.textContent='⚠ 50 Billion KFC cap reached — you must cash out before playing again.';
     syncEl.style.color='var(--red)';
   } else {
-    syncEl.textContent=G.url?'':'No sheet connected — saved locally.';
+    syncEl.textContent=G.url?'Will sync to Google Sheet.':'No sheet connected — saved locally.';
     syncEl.style.color='';
   }
   // Reset to pre-confirm state
@@ -4490,7 +4490,7 @@ async function confirmCashout(){
       const r=await fetch(G.url+'?'+params.toString());
       const d=await r.json();
       if(d.ok||d.balance!==undefined){
-        setSyncBadge('live','SYNCED'); notif('Synced ✓');
+        setSyncBadge('live','SYNCED'); notif('Synced to sheet ✓');
         badge.textContent='✓ Synced — ready to leave';
         badge.style.color='var(--green)';
       } else {
