@@ -4017,6 +4017,7 @@ function showCashout(){
   const rm=document.getElementById('result-modal');
   if(G.phase!=='bet'&&!(rm&&rm.classList.contains('open'))){notif('Finish hand first');return;}
   if(rm&&rm.classList.contains('open')) closeResult();
+  clearSession(); // clear saved session the moment cashout screen opens — prevent restore on close
   const pl=G.balance-G.sessionStart;
   const el=document.getElementById('co-pl');
   el.textContent=(pl>=0?'+':'')+fmtKFC(pl);
