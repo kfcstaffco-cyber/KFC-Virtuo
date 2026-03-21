@@ -4490,7 +4490,7 @@ async function confirmCashout(){
       const r=await fetch(G.url+'?'+params.toString());
       const d=await r.json();
       if(d.ok||d.balance!==undefined){
-        setSyncBadge('live','SYNCED'); notif('Synced to sheet ✓');
+        setSyncBadge('live','SYNCED'); notif('Synced ✓');
         badge.textContent='✓ Synced — ready to leave';
         badge.style.color='var(--green)';
       } else {
