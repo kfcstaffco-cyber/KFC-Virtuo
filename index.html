@@ -1410,7 +1410,7 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
   <div class="modal" style="min-width:380px">
     <div style="font-size:11px;letter-spacing:4px;color:var(--muted);text-transform:uppercase;margin-bottom:20px">Select Stake</div>
     <div class="stake-list" id="stake-list"></div>
-    <div style="margin-top:16px"><button class="btn-ghost" style="width:100%" onclick="closeModal('stake-modal')">Cancel</button></div>
+    <div style="margin-top:16px"><button class="btn-ghost" style="width:100%" onclick="closeModal('stake-modal')">Back</button></div>
   </div>
 </div>
 
@@ -1787,10 +1787,16 @@ function buildLoginStakeList(){
     btn.onmouseout=()=>{btn.style.borderColor='var(--line2)';btn.style.background='var(--bg2)';};
     btn.onclick=()=>{_selectedStakeKey=key;goLoginStep(3);};
     if(!canAfford){
-      btn.style.opacity='0.4';
-      btn.title='Need at least '+fmt(s.min)+' KFC';
+      btn.style.opacity='0.35';
+      btn.style.cursor='not-allowed';
+      btn.style.color='var(--muted)';
+      btn.style.background='var(--bg1)';
+      btn.style.borderColor='rgba(255,255,255,0.05)';
+      btn.style.filter='grayscale(0.4)';
       btn.onmouseover=null; btn.onmouseout=null;
-      btn.onclick=()=>notif('Need '+fmtKFC(s.min)+' to play '+s.label);
+      btn.onclick=null;
+      // Add lock icon
+      btn.innerHTML='<span style="color:var(--muted)">'+s.label+' Stakes</span><span style="font-family:var(--mono);font-size:10px;color:rgba(255,255,255,0.2)">min '+fmt(s.min)+'</span>';
     }
     c.appendChild(btn);
   });
