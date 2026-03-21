@@ -572,6 +572,17 @@ body.betting #dealer-zone .score { display: none; }
   border: 1px solid #1A3348 !important;
   overflow: hidden;
 }
+.shoe-card.sc4::before {
+  content: "";
+  position: absolute; inset: 0;
+  background-image: url("KFC_LOGO.png");
+  background-size: 80%;
+  background-repeat: no-repeat;
+  background-position: center;
+  mix-blend-mode: screen;
+  opacity: 0.75;
+  z-index: 1;
+}
 .shoe-card.sc4::after {
   content: '';
   position: absolute; inset: 4px;
@@ -2275,7 +2286,7 @@ function clearSession(){
 window.onload=()=>{
   // Clear old test data from localStorage
   Object.keys(localStorage).filter(k=>k.startsWith('kfc_bal_')).forEach(k=>localStorage.removeItem(k));
-  G.url=localStorage.getItem('kfc_url')||'https://script.google.com/macros/s/AKfycbwLYx8AnXlntINX6oAMT0mnIaiOSeGEvmPO7KO7RY6slUSIc4j14-FN-1_XBOZ7MfKq/exec';
+  G.url=localStorage.getItem('kfc_url')||'https://script.google.com/macros/s/AKfycbxWkLGdmcDA0NSAFlYI50NKdcthNij6jiGkvNzUzNO4sDfBQWWshPTavbBbHPsYStFx/exec';
   if(localStorage.getItem('kfc_sb_col')==='1'){const _sb=document.getElementById('sidebar');const _mn=document.getElementById('main');const _bt=document.getElementById('sidebar-toggle');if(_sb)_sb.classList.add('collapsed');if(_mn)_mn.style.gridTemplateColumns='1fr 0';if(_bt)_bt.textContent='⊟';}
   try{G.pins=JSON.parse(localStorage.getItem('kfc_pins')||'{}');}catch(e){G.pins={};}
   const cfgEl=document.getElementById('cfg-url');
