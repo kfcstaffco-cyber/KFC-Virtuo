@@ -943,10 +943,10 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
       <label class="field-label">Username</label>
       <input type="text" id="lusername" placeholder="your username" autocomplete="off" autocapitalize="off" spellcheck="false" onkeydown="if(event.key==='Enter')document.getElementById('lpin').focus()">
       <label class="field-label">PIN</label>
-      <input type="password" id="lpin" placeholder="••••" maxlength="8" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
+      <input type="password" id="lpin" placeholder="" maxlength="8" autocomplete="off" onkeydown="if(event.key==='Enter')doLogin()">
       <button class="btn-primary" onclick="doLogin()">Continue</button>
       <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn-ghost" style="flex:1" onclick="openModal('settings-modal')">⚙ Settings</button>
+
       </div>
       <div class="err" id="lerr"></div>
     </div>
@@ -1478,7 +1478,7 @@ const BONUS_CARDS = [
 
 // ── STATE ──────────────────────────────────────────────
 const G = {
-  player:'', username:'', balance:0, sessionStart:0,
+  player:'', username:'', balance:0, sessionStart:0, _totalBalance:0,
   stake:'low', s: STAKES.low,
   deck:[], shoe:4,
   hands:[[]], cur:0, splits:0,
@@ -1808,6 +1808,12 @@ function confirmBuyIn(){
   if(_pendingLogin.balance>0&&raw>_pendingLogin.balance){
     if(errEl)errEl.textContent='Not enough (have '+fmtKFC(_pendingLogin.balance)+')';return;
   }
+  // Cap check uses TOTAL balance from sheet, not just buy-in amount
+  const totalBal = _pendingLogin.totalBalance||_pendingLogin.balance;
+  if(totalBal>=BALANCE_CAP){
+    if(errEl)errEl.textContent='50B cap reached — cash out required';return;
+  }
+  _pendingLogin.totalBalance=_pendingLogin.balance; // preserve full sheet balance
   _pendingLogin.balance=raw;
   finaliseLogin(_selectedStakeKey);
 }
@@ -1820,6 +1826,7 @@ function setBuyIn(amount){
 function finaliseLogin(stakeKey){
   if(!_pendingLogin)return;
   G.stake=stakeKey; G.s=STAKES[stakeKey];
+  G._totalBalance=_pendingLogin.totalBalance||_pendingLogin.balance; // full sheet balance
   document.getElementById('login').style.display='none';
   openApp(_pendingLogin.name, _pendingLogin.balance);
   _pendingLogin=null; _selectedStakeKey=null;
@@ -2239,7 +2246,7 @@ function saveSession(){
   try{
     const snap={
       player:G.player, username:G.username,
-      balance:G.balance, sessionStart:G.sessionStart,
+      balance:G.balance, sessionStart:G.sessionStart, totalBalance:G._totalBalance||G.balance,
       stake:G.stake,
       cachedPin:G._cachedPin||'',
       lastMainBet:G.lastMainBet, lastSideBets:G.lastSideBets,
@@ -2265,7 +2272,7 @@ function restoreSession(){
     // Restore state
     G.player=snap.player; G.username=snap.username||snap.player;
     G._cachedPin=snap.cachedPin||'';
-    G.balance=snap.balance; G.sessionStart=snap.sessionStart||snap.balance;
+    G.balance=snap.balance; G.sessionStart=snap.sessionStart||snap.balance; G._totalBalance=snap.totalBalance||snap.balance;
     G.stake=snap.stake||'low'; G.s=STAKES[G.stake]||STAKES.low;
     G.lastMainBet=snap.lastMainBet||0; G.lastSideBets=snap.lastSideBets||{};
     G.mainBet=snap.mainBet||0;
@@ -2286,7 +2293,7 @@ function clearSession(){
 window.onload=()=>{
   // Clear old test data from localStorage
   Object.keys(localStorage).filter(k=>k.startsWith('kfc_bal_')).forEach(k=>localStorage.removeItem(k));
-  G.url=localStorage.getItem('kfc_url')||'https://script.google.com/macros/s/AKfycbxWkLGdmcDA0NSAFlYI50NKdcthNij6jiGkvNzUzNO4sDfBQWWshPTavbBbHPsYStFx/exec';
+  G.url=localStorage.getItem('kfc_url')||'https://script.google.com/macros/s/AKfycbxVBsAacaJtFf5oAAhP8ShNtuxXv_2DnEAoDyo0oXJPg8yHpzRZL9UPPg-qTpDTvOH0/exec';
   if(localStorage.getItem('kfc_sb_col')==='1'){const _sb=document.getElementById('sidebar');const _mn=document.getElementById('main');const _bt=document.getElementById('sidebar-toggle');if(_sb)_sb.classList.add('collapsed');if(_mn)_mn.style.gridTemplateColumns='1fr 0';if(_bt)_bt.textContent='⊟';}
   try{G.pins=JSON.parse(localStorage.getItem('kfc_pins')||'{}');}catch(e){G.pins={};}
   const cfgEl=document.getElementById('cfg-url');
@@ -2479,6 +2486,7 @@ function doLogout(skipToStake){
     document.getElementById('lpin').value='';
     document.getElementById('lusername').value='';
     document.getElementById('lerr').textContent='';
+    G._cachedPin=''; // clear cached PIN on logout
     setTimeout(()=>document.getElementById('lusername').focus(),100);
   }
 }
@@ -3970,7 +3978,7 @@ async function confirmCashout(){
         player:    G.player,
         balance:   String(G.balance),
         sessionPL: String(G.balance-G.sessionStart),
-        buyIn:     String(G.sessionStart),  // session starting balance
+        buyIn:     String(G._totalBalance||G.sessionStart),  // full balance from sheet
         date:      new Date().toISOString(),
         stake:     G.s.label,
         pin:       G._cachedPin||''
