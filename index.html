@@ -2572,7 +2572,7 @@ async function doLogin(){
 
   // Try sheet auth first
   if(G.url){
-    err.textContent='Connecting to sheet...';
+    err.textContent='Connecting...';
     try{
       const r=await fetch(G.url+'?action=getBalance&username='+encodeURIComponent(username)+'&pin='+encodeURIComponent(pin));
       if(!r.ok) throw new Error('HTTP '+r.status);
