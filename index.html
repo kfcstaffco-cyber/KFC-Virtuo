@@ -4423,26 +4423,46 @@ function addSlot(idx){
 function renderAll(){
   // Dealer
   const dc=document.getElementById('dealer-cards');
-  dc.innerHTML='';
   const holeIdx=G.dealer.length-1; // hole card is always the last card
-  G.dealer.forEach((c,i)=>{
-    const el=document.createElement('div');
-    const down=i===holeIdx&&G.phase==='play'&&!G.holeRevealed; // hole hidden during play unless revealed
-    // down takes priority — even bonus cards stay hidden as hole card
-    if(down){
-      el.className='card down';
-    } else if(c.bonus){
-      el.className='card bonus';
-      el.dataset.bonusId=c.bonus.id;
-      el.innerHTML=bonusCardInner(c.bonus,c.repIdx);
-      applyBonusStyle(el,c.bonus);
-    } else {
-      el.className='card '+(RED.includes(c.s)?'red':'black')+' up';
-      el.innerHTML=cardInner(c);
-    }
-    el.style.animationDelay=G._dealStagger?(i===0?'0.3s':'0.9s'):'0s';
-    dc.appendChild(el);
-  });
+  const alreadyDealerRendered=dc.children.length;
+  const needsFullDealerRender=G._dealStagger || alreadyDealerRendered===0 || alreadyDealerRendered>G.dealer.length;
+  if(needsFullDealerRender){
+    dc.innerHTML='';
+    G.dealer.forEach((c,i)=>{
+      const el=document.createElement('div');
+      const down=i===holeIdx&&G.phase==='play'&&!G.holeRevealed;
+      if(down){
+        el.className='card down';
+      } else if(c.bonus){
+        el.className='card bonus';
+        el.dataset.bonusId=c.bonus.id;
+        el.innerHTML=bonusCardInner(c.bonus,c.repIdx);
+        applyBonusStyle(el,c.bonus);
+      } else {
+        el.className='card '+(RED.includes(c.s)?'red':'black')+' up';
+        el.innerHTML=cardInner(c);
+      }
+      el.style.animationDelay=G._dealStagger?(i===0?'0.3s':'0.9s'):'0s';
+      dc.appendChild(el);
+    });
+  } else if(alreadyDealerRendered<G.dealer.length){
+    // Only append newly drawn dealer cards — don't re-animate existing ones
+    G.dealer.slice(alreadyDealerRendered).forEach(c=>{
+      const el=document.createElement('div');
+      const down=false; // newly appended cards during play are always face-up
+      if(c.bonus){
+        el.className='card bonus';
+        el.dataset.bonusId=c.bonus.id;
+        el.innerHTML=bonusCardInner(c.bonus,c.repIdx);
+        applyBonusStyle(el,c.bonus);
+      } else {
+        el.className='card '+(RED.includes(c.s)?'red':'black')+' up';
+        el.innerHTML=cardInner(c);
+      }
+      el.style.animationDelay='0s';
+      dc.appendChild(el);
+    });
+  }
   // Player — skip re-render during dealer phase to prevent animation reset
   if(G.phase==='dealer'){renderScores();return;}
   G.hands.forEach((hand,hi)=>{
