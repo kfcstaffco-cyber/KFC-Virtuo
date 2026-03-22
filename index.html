@@ -1559,6 +1559,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
         <div id="betting-deal-row" style="justify-content:center">
           <button class="shortcut-btn" id="btn-same-bet" onclick="sameBet()">↺ Same Bet</button>
           <button class="shortcut-btn" id="btn-all-sides" onclick="allSideBets()">⊕ All Side Bets</button>
+          <button class="shortcut-btn" id="btn-copy-h1h2" onclick="copyH1toH2()" style="display:none">⇉ Copy H1</button>
           <button class="shortcut-btn" id="btn-clear-top" onclick="clearBets()">✕ Clear</button>
         </div>
         <!-- 2. Chips -->
@@ -1994,7 +1995,7 @@ const G = {
   _hand2Active:false, mainBet2:0, sideBets2:{},
   log:[],
   url:'', pins:{},
-  preDealBal:0, lastMainBet:0, lastSideBets:{}, cashedOut:false, _atCashout:false, _sessionActive:false, insuranceBet:0, _freeDoubleBet:0, _freeLevBet:0,
+  preDealBal:0, lastMainBet:0, lastSideBets:{}, lastMainBet2:0, lastSideBets2:{}, cashedOut:false, _atCashout:false, _sessionActive:false, insuranceBet:0, _freeDoubleBet:0, _freeLevBet:0,
   _bonusPayouts:[], // [{label, pl}] — instant bonus card payouts to show in result
   cutCardTriggered:false, // set when cut card is drawn mid-shoe
 };
@@ -3388,6 +3389,8 @@ function clearBets(){
   G.mainBet=0;
   SB_NAMES.forEach(n=>G.sideBets[n]=0);
   G.leverage=null;
+  // Also clear hand 2 if active
+  if(G._hand2Active){ clearHand2(); }
   updateBetPanel();   // updates bet circle + deal btn
   buildSideBets();
   buildLevPanel();
@@ -3402,24 +3405,34 @@ function sameBet(){
   if(!G.lastMainBet&&Object.values(G.lastSideBets||{}).every(v=>!v)){notif('No previous bet to restore');return;}
   G.mainBet=G.lastMainBet||0;
   SB_NAMES.forEach(n=>G.sideBets[n]=(G.lastSideBets&&G.lastSideBets[n])||0);
-  updateBetPanel(); buildSideBets(); updateSBCircles(); sfx('chip'); notif('↺ Last bet restored');
+  // Restore hand 2 if it was active last round
+  if(G._hand2Active&&G.lastMainBet2>0){
+    G.mainBet2=G.lastMainBet2;
+    SB_NAMES.forEach(n=>G.sideBets2[n]=(G.lastSideBets2&&G.lastSideBets2[n])||0);
+    if(typeof updateHand2Panel==='function') updateHand2Panel();
+  }
+  updateBetPanel(); buildSideBets(); updateSBCircles(); sfx('chip');
+  notif(G._hand2Active&&G.lastMainBet2>0?'↺ Both hands restored':'↺ Last bet restored');
 }
 function allSideBets(){
   if(G.phase!=='bet'){notif('Finish the hand first');return;}
   if(G.mainBet<=0){notif('Place a main bet first');return;}
   const sMin=G.s.sMin;
-  const maxSB=G.s.max; // same cap as main bet max
-  // Find the current uniform value (if all same), else treat as 0
+  const maxSB=G.s.max;
   const vals=SB_NAMES.map(n=>G.sideBets[n]||0);
   const curVal=vals.every(v=>v===vals[0])?vals[0]:0;
-  // Each press adds one sMin, wrapping back to sMin after hitting max
   let nextVal=curVal+sMin;
-  if(nextVal>maxSB) nextVal=sMin; // wrap around
+  if(nextVal>maxSB) nextVal=sMin;
   SB_NAMES.forEach(n=>G.sideBets[n]=nextVal);
+  // If hand 2 is active and has a bet, also apply to hand 2
+  if(G._hand2Active&&(G.mainBet2||0)>0){
+    SB_NAMES.forEach(n=>G.sideBets2[n]=nextVal);
+    if(typeof updateHand2Panel==='function') updateHand2Panel();
+  }
   updateBetPanel();
   updateSBCircles();
   sfx('chip');
-  notif('Side bets: '+fmtKFC(nextVal)+' each');
+  notif('Side bets: '+fmtKFC(nextVal)+' each'+(G._hand2Active&&(G.mainBet2||0)>0?' (both hands)':''));
 }
 
 // ── SIDE BETS ──────────────────────────────────────────────
@@ -3597,6 +3610,7 @@ function deal(){
   G.preDealBal=G.balance;
   G._earlySBPL=0; G._earlySBResults=[];
   G.lastMainBet=G.mainBet; G.lastSideBets={...G.sideBets};
+  if(G._hand2Active){ G.lastMainBet2=G.mainBet2||0; G.lastSideBets2={...G.sideBets2||{}}; }
   G.balance-=totalDeducted+puCost; updateUI();
   if(G.balance===0) setTimeout(showAllIn, 200); // all-in!
   G._handStartBal=G.balance; // snapshot AFTER deductions — so P&L display is net of all costs
@@ -4990,6 +5004,9 @@ function toggleHand2(){
   if(lbl){ lbl.classList.toggle('active',G._hand2Active); }
   if(sec){ sec.classList.toggle('visible',G._hand2Active); }
   document.body.classList.toggle('hand2-active', G._hand2Active);
+  // Show/hide the Copy H1→H2 button
+  const copyBtn=document.getElementById('btn-copy-h1h2');
+  if(copyBtn) copyBtn.style.display=G._hand2Active?'':'none';
   updateHand2Panel();
   updateBetPanel(); // refresh deal button state
 }
@@ -5044,6 +5061,17 @@ function updateHand2Panel(){
   if(G.phase==='bet' && !G._atCashout) saveSession();
 }
 
+
+function copyH1toH2(){
+  if(!G._hand2Active||G.phase!=='bet') return;
+  if(G.mainBet<=0){notif('Place Hand 1 bet first');return;}
+  G.mainBet2=G.mainBet;
+  if(!G.sideBets2) G.sideBets2={};
+  SB_NAMES.forEach(n=>G.sideBets2[n]=G.sideBets[n]||0);
+  if(typeof updateHand2Panel==='function') updateHand2Panel();
+  sfx('chip');
+  notif('Hand 1 bet copied to Hand 2');
+}
 function cycleH2SB(name){
   if(!G._hand2Active||G.phase!=='bet') return;
   if(!G.sideBets2) G.sideBets2={};
