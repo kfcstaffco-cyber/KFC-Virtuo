@@ -2618,7 +2618,7 @@ function evaluateEarlySideBets(){
   G.preDealBal+=earlyNetPL;
   G._earlySBPL=(G._earlySBPL||0)+earlyNetPL;
   // Evaluate early side bets for hand 2 if active
-  if(_deal2&&G.sideBets2&&G.hands[1]&&G.hands[1].length>=2){
+  if(G._hand2Active&&G.hands.length>1&&G.sideBets2&&G.hands[1]&&G.hands[1].length>=2){
     let h2EarlyPL=0;
     const h2w=[];
     ['Perfect Pairs','21+3','Crazy 7s'].forEach(name=>{
@@ -4066,7 +4066,7 @@ function settle(reason){
   G.hands.forEach((h,hi)=>{
     const pv=hv(h); const pb=isBust(h); const pbj=isBJ(h);
     // For second seat (hi===1, no splits), use mainBet2; splits use mainBet
-    const _isHand2Seat = hi===1 && G._hand2Active && G.splits===0;
+    const _isHand2Seat = hi===1 && G._hand2Active && G.hands.length>1 && G.splits===0;
     const _betForHand = _isHand2Seat ? G.mainBet2 : G.mainBet;
     const lm=hi===0?getLevMult():1;
     let w=0;
@@ -4159,7 +4159,7 @@ function settle(reason){
   let sidePL=0;
   const sbAnnouncements=[];
   // Hand 2 Dealer Bust side bet
-  if((G._hand2Active&&G.hands.length>1)&&G.sideBets2&&G.sideBets2['Dealer Bust']>0){
+  if(G._hand2Active&&G.hands.length>1&&G.sideBets2&&G.sideBets2['Dealer Bust']>0){
     const h2dbOrig=G.sideBets2['Dealer Bust'];
     const h2dbRes=calcSide('Dealer Bust',h2dbOrig,db,false);
     sidePL+=h2dbRes.pl;
@@ -4355,8 +4355,10 @@ function calcSide(name,amount,dealerBust,isFreeStake){
 function resetCards(){
   document.getElementById('dealer-cards').innerHTML='';
   const hw=document.getElementById('hands-wrap');
+  // Use G.hands.length to determine actual number of seats being dealt this round
+  const _twoSeats = G.hands && G.hands.length > 1;
   let slotsHtml='<div class="hand-slot active" id="slot-0"><div class="zone-tag" style="text-align:center">'+(G._hand2Active?'Hand 1':'Your hand')+'</div><div class="cards-row" id="cards-0" style="justify-content:center"></div><div class="score" id="score-0"></div></div>';
-  if(G._hand2Active) slotsHtml+='<div class="hand-slot hand2-seat" id="slot-1"><div class="zone-tag" style="text-align:center">Hand 2</div><div class="cards-row" id="cards-1" style="justify-content:center"></div><div class="score" id="score-1"></div></div>';
+  if(_twoSeats) slotsHtml+='<div class="hand-slot hand2-seat" id="slot-1"><div class="zone-tag" style="text-align:center">Hand 2</div><div class="cards-row" id="cards-1" style="justify-content:center"></div><div class="score" id="score-1"></div></div>';
   hw.innerHTML=slotsHtml;
 }
 
