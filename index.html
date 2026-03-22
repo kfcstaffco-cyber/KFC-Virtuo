@@ -3281,7 +3281,27 @@ function makeChipSVG(v,lbl){
     <text x="26" y="26" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-weight="900" font-size="${fs}" fill="#111">${lbl}</text>
   </svg>`;
 }
-function buildChips_orig(){['chip-row','chip-strip'].forEach(rowId=>{const c=document.getElementById(rowId);if(!c)return;c.innerHTML='';G.s.chips.forEach(v=>{const lbl=v>=1e9?(v/1e9).toFixed(v%1e9===0?0:1)+'B':v>=1e6?(v/1e6).toFixed(v%1e6===0?0:1)+'M':v>=1e3?(v/1e3).toFixed(v%1e3===0?0:1)+'K':String(v);const col=chipColor(v);const btn=document.createElement('button');btn.className='chip '+col;btn.setAttribute('data-val',lbl);btn.innerHTML=makeChipSVG(v,lbl);btn.title=fmt(v)+' KFC';btn.onclick=()=>{if(!G._audioReady)initAudio();if(G.phase==='bet'){const newBet=G.mainBet+v;if(newBet>G.s.max){if(G.mainBet<G.s.max){G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}G.mainBet=newBet;updateBetPanel();sfx('chip');flyChipToCircle(btn,col,lbl);btn.style.transform='translateY(-5px) scale(1.15)';setTimeout(()=>{btn.style.transform='';},200);}};c.appendChild(btn);});});}
+function buildChips(){['chip-row','chip-strip'].forEach(rowId=>{const c=document.getElementById(rowId);if(!c)return;c.innerHTML='';G.s.chips.forEach(v=>{const lbl=v>=1e9?(v/1e9).toFixed(v%1e9===0?0:1)+'B':v>=1e6?(v/1e6).toFixed(v%1e6===0?0:1)+'M':v>=1e3?(v/1e3).toFixed(v%1e3===0?0:1)+'K':String(v);const col=chipColor(v);const btn=document.createElement('button');btn.className='chip '+col;btn.setAttribute('data-val',lbl);btn.innerHTML=makeChipSVG(v,lbl);btn.title=fmt(v)+' KFC';btn.onclick=()=>{
+  if(!G._audioReady)initAudio();
+  if(G.phase==='bet'){
+    if(typeof _h2ChipTarget!=='undefined'&&_h2ChipTarget&&G._hand2Active){
+      // Route chip to hand 2
+      const newBet2=(G.mainBet2||0)+v;
+      if(newBet2>G.s.max){if((G.mainBet2||0)<G.s.max){G.mainBet2=G.s.max;if(typeof updateHand2Panel==='function')updateHand2Panel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}
+      G.mainBet2=newBet2;
+      if(typeof updateHand2Panel==='function')updateHand2Panel();
+      sfx('chip');
+      btn.style.transform='translateY(-5px) scale(1.15)';setTimeout(()=>{btn.style.transform='';},200);
+    } else {
+      // Route chip to hand 1 (original behaviour)
+      const newBet=G.mainBet+v;
+      if(newBet>G.s.max){if(G.mainBet<G.s.max){G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}
+      G.mainBet=newBet;updateBetPanel();sfx('chip');
+      flyChipToCircle(btn,col,lbl);
+      btn.style.transform='translateY(-5px) scale(1.15)';setTimeout(()=>{btn.style.transform='';},200);
+    }
+  }
+};c.appendChild(btn);});});}
 
 function updateBetPanel(){
   const bsa=document.getElementById('bet-strip-amount');
@@ -4929,53 +4949,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   }
 });
 
-// Intercept chip clicks to route to hand2 when targeted
-const _origBuildChips = buildChips;
-// Patch chip onclick at chip click time (simpler: check _h2ChipTarget in onclick)
-// We'll patch buildChips to check the flag
-// Redirect buildChips to patched version
-const buildChips = buildChipsPatched;
-
-function buildChipsPatched(){
-  ['chip-row','chip-strip'].forEach(rowId=>{
-    const c=document.getElementById(rowId);
-    if(!c)return;
-    c.innerHTML='';
-    G.s.chips.forEach(v=>{
-      const lbl=v>=1e9?(v/1e9).toFixed(v%1e9===0?0:1)+'B':v>=1e6?(v/1e6).toFixed(v%1e6===0?0:1)+'M':v>=1e3?(v/1e3).toFixed(v%1e3===0?0:1)+'K':String(v);
-      const col=chipColor(v);
-      const btn=document.createElement('button');
-      btn.className='chip '+col;
-      btn.setAttribute('data-val',lbl);
-      btn.innerHTML=makeChipSVG(v,lbl);
-      btn.title=fmt(v)+' KFC';
-      btn.onclick=()=>{
-        if(!G._audioReady)initAudio();
-        if(G.phase==='bet'){
-          if(_h2ChipTarget && G._hand2Active){
-            // Route to hand2
-            const newBet2=(G.mainBet2||0)+v;
-            if(newBet2>G.s.max){ if((G.mainBet2||0)<G.s.max){G.mainBet2=G.s.max;updateHand2Panel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}
-            G.mainBet2=newBet2;
-            updateHand2Panel();
-            sfx('chip');
-            btn.style.transform='translateY(-5px) scale(1.15)';
-            setTimeout(()=>{btn.style.transform='';},200);
-          } else {
-            // Route to hand1 (original behaviour)
-            const newBet=G.mainBet+v;
-            if(newBet>G.s.max){if(G.mainBet<G.s.max){G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}
-            G.mainBet=newBet;updateBetPanel();sfx('chip');
-            flyChipToCircle(btn,col,lbl);
-            btn.style.transform='translateY(-5px) scale(1.15)';
-            setTimeout(()=>{btn.style.transform='';},200);
-          }
-        }
-      };
-      c.appendChild(btn);
-    });
-  });
-}
 
 function updateHand2Panel(){
   if(!G.sideBets2) G.sideBets2={};
