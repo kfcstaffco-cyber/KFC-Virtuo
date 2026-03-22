@@ -1339,28 +1339,29 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
   display: flex; gap: 8px; justify-content: center; align-items: center;
 }
 #hand2-bet-circle {
-  width: 86px; height: 86px; border-radius: 50%;
+  width: 76px; height: 76px; border-radius: 50%;
   border: 2px solid rgba(201,168,76,0.3);
   background: rgba(10,11,13,0.6);
   backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
-  position: relative;
-  box-shadow: 0 0 20px rgba(201,168,76,0.08), inset 0 0 20px rgba(0,0,0,0.4);
-  transition: border-color .3s, box-shadow .3s;
-  opacity: 0.35; cursor: default;
+  position: relative; transition: border-color .3s, box-shadow .3s, opacity .3s;
+  box-shadow: 0 0 10px rgba(201,168,76,0.06), inset 0 0 20px rgba(0,0,0,0.4);
+  opacity: 0.35; cursor: pointer;
 }
 #hand2-bet-circle.visible {
   opacity: 1;
-  border-color: rgba(201,168,76,0.6);
-  box-shadow: 0 0 30px rgba(201,168,76,0.15), inset 0 0 20px rgba(0,0,0,0.4);
+  border-color: rgba(201,168,76,0.8);
+  box-shadow: 0 0 40px rgba(201,168,76,0.2), inset 0 0 20px rgba(0,0,0,0.4);
 }
 #hand2-bet-circle-inner {
   position: absolute; inset: 8px; border-radius: 50%;
-  border: 1px dashed rgba(201,168,76,0.15); pointer-events: none;
+  border: 1px dashed rgba(201,168,76,0.2); pointer-events: none; transition: border-color .3s;
 }
+#hand2-bet-circle.visible #hand2-bet-circle-inner { border-color: rgba(201,168,76,0.3); }
 #hand2-bet-circle-amt {
   font-family: var(--mono); font-size: 10px; font-weight: 700;
-  color: var(--gold-hi); z-index: 1; text-align: center; padding: 0 3px; line-height: 1.2;
+  color: var(--gold-hi); text-shadow: 0 0 8px rgba(201,168,76,0.4);
+  letter-spacing: 0.5px; z-index: 1; text-align: center; padding: 0 3px; line-height: 1.2;
 }
 #hand2-circle-label {
   font-family: var(--mono); font-size: 7px; letter-spacing: 1.5px;
@@ -3031,7 +3032,7 @@ async function doLogin(){
   err.textContent='';
   G.username=username;
   G._cachedPin=pin; // cache for re-auth
-  const localBal=parseFloat(localStorage.getItem('kfc_bal_'+username)||'5000000');
+  const localBal=parseFloat(localStorage.getItem('kfc_bal_'+username)||'0');
   _pendingLogin={name:username,balance:localBal}; // G.player set only in openApp
   document.getElementById('login-step1').style.display='none';
   goLoginStep(2);
@@ -4359,15 +4360,29 @@ function renderAll(){
   G.hands.forEach((hand,hi)=>{
     let cr=document.getElementById('cards-'+hi);
     if(!cr){addSlot(hi);cr=document.getElementById('cards-'+hi);}
-    cr.innerHTML='';
-    hand.forEach((c,ci)=>{
-      const el=document.createElement('div');
-      el.className='card '+(c.bonus?'bonus':(RED.includes(c.s)?'red':'black')+' up');
-      el.style.animationDelay=G._dealStagger?(ci===0?'0s':'0.6s'):'0s';
-      if(c.bonus){el.dataset.bonusId=c.bonus.id;el.innerHTML=bonusCardInner(c.bonus,c.repIdx);applyBonusStyle(el,c.bonus);}
-      else el.innerHTML=cardInner(c);
-      cr.appendChild(el);
-    });
+    const alreadyRendered=cr.children.length;
+    if(!G._dealStagger && alreadyRendered>0 && alreadyRendered<=hand.length){
+      // Only append new cards — don't re-animate existing ones
+      hand.slice(alreadyRendered).forEach((c,newIdx)=>{
+        const el=document.createElement('div');
+        el.className='card '+(c.bonus?'bonus':(RED.includes(c.s)?'red':'black')+' up');
+        el.style.animationDelay='0s';
+        if(c.bonus){el.dataset.bonusId=c.bonus.id;el.innerHTML=bonusCardInner(c.bonus,c.repIdx);applyBonusStyle(el,c.bonus);}
+        else el.innerHTML=cardInner(c);
+        cr.appendChild(el);
+      });
+    } else {
+      // Full re-render (initial deal with stagger, or split which changes card count)
+      cr.innerHTML='';
+      hand.forEach((c,ci)=>{
+        const el=document.createElement('div');
+        el.className='card '+(c.bonus?'bonus':(RED.includes(c.s)?'red':'black')+' up');
+        el.style.animationDelay=G._dealStagger?(ci===0?'0s':'0.6s'):'0s';
+        if(c.bonus){el.dataset.bonusId=c.bonus.id;el.innerHTML=bonusCardInner(c.bonus,c.repIdx);applyBonusStyle(el,c.bonus);}
+        else el.innerHTML=cardInner(c);
+        cr.appendChild(el);
+      });
+    }
     const slot=document.getElementById('slot-'+hi);
     if(slot)slot.className='hand-slot'+(hi===G.cur&&G.phase==='play'?' active':'');
   });
