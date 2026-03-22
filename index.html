@@ -2618,7 +2618,7 @@ function evaluateEarlySideBets(){
   G.preDealBal+=earlyNetPL;
   G._earlySBPL=(G._earlySBPL||0)+earlyNetPL;
   // Evaluate early side bets for hand 2 if active
-  if(G._hand2Active&&G.sideBets2&&G.hands[1]&&G.hands[1].length>=2){
+  if(_deal2&&G.sideBets2&&G.hands[1]&&G.hands[1].length>=2){
     let h2EarlyPL=0;
     const h2w=[];
     ['Perfect Pairs','21+3','Crazy 7s'].forEach(name=>{
@@ -2899,6 +2899,7 @@ function saveSession(){
       hand2Active:G._hand2Active||false,
       mainBet2:G.mainBet2||0,
       sideBets2:{...G.sideBets2||{}},
+      chartPts:[..._chartPts],
       ts:Date.now()
     };
     localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
@@ -2928,9 +2929,27 @@ function restoreSession(){
     G.puOwned=new Set(snap.puOwned||[]);
     if(snap.deck&&snap.deck.length>0){ G.deck=snap.deck; G._shoeTotal=snap.shoeTotal||snap.deck.length; }
     if(snap.hand2Active){ G._hand2Active=true; G.mainBet2=snap.mainBet2||0; G.sideBets2=snap.sideBets2||{}; }
+    // Restore chart points
+    if(snap.chartPts&&snap.chartPts.length>0){
+      _chartPts.length=0;
+      snap.chartPts.forEach(p=>_chartPts.push(p));
+    }
     G.phase='bet';
     return true;
   }catch(e){ return false; }
+}
+
+function _afterRestoreChart(){
+  // Called after restoreSession to re-draw chart from saved points
+  if(_chartPts.length>1){
+    const bar=document.getElementById('session-chart-bar');
+    const label=document.getElementById('chart-pl-label');
+    const canvas=document.getElementById('session-chart-canvas');
+    if(bar) bar.classList.add('visible');
+    const total=_chartPts[_chartPts.length-1];
+    if(label){ label.textContent=(total>=0?'+':'')+fmtKFC(total); label.className=total>0?'pos':total<0?'neg':'zero'; }
+    if(canvas) setTimeout(()=>_drawChart(canvas),100);
+  }
 }
 
 function clearSession(){
@@ -2965,6 +2984,7 @@ window.onload=()=>{
     // Session found — skip login, go straight to table
     openApp(G.player, G.balance);
     notif('↺ Session restored — welcome back, '+G.player+'!');
+    _afterRestoreChart();
     // Silently re-fetch balance from sheet to catch any changes since last close
     if(G.url && G.username && G._cachedPin){
       fetch(G.url+'?action=getBalance&username='+encodeURIComponent(G.username)+'&pin='+encodeURIComponent(G._cachedPin))
@@ -3567,7 +3587,7 @@ function deal(){
   if(G.mainBet<=0){notif('Place a bet first');return;}
   if(G.mainBet<G.s.min){notif('Min bet is '+fmtKFC(G.s.min));return;}
   const totalDeducted=G.mainBet+Object.values(G.sideBets).reduce((a,b)=>a+b,0)+(G.leverage==='2x'?G.s.min*2:0)
-    +(G._hand2Active?(G.mainBet2+Object.values(G.sideBets2||{}).reduce((a,b)=>a+b,0)):0);
+    +((G._hand2Active&&(G.mainBet2||0)>=G.s.min)?(G.mainBet2+Object.values(G.sideBets2||{}).reduce((a,b)=>a+b,0)):0);
   if(G.balance<totalDeducted){notif('Insufficient balance');return;}
   let puCost=0;
   G.puPending.forEach(id=>{const pu=POWERUPS.find(p=>p.id===id);if(pu)puCost+=G.s.min*(pu.ratio||5);});
@@ -3578,8 +3598,9 @@ function deal(){
   G.balance-=totalDeducted+puCost; updateUI();
   if(G.balance===0) setTimeout(showAllIn, 200); // all-in!
   G._handStartBal=G.balance; // snapshot AFTER deductions — so P&L display is net of all costs
-  // Second hand setup: if active, initialise as empty array (cards dealt below)
-  G.hands=G._hand2Active ? [[], []] : [[]]; G.cur=0; G.splits=0; G.dealer=[];
+  // Second hand setup: only activate if mainBet2 meets minimum
+  const _deal2 = G._hand2Active && (G.mainBet2||0) >= G.s.min;
+  G.hands=_deal2 ? [[], []] : [[]]; G.cur=0; G.splits=0; G.dealer=[];
   G.holeRevealed=false;
   G._bonusPayouts=[];
   G._goldCardBet=0;
@@ -3604,7 +3625,7 @@ function deal(){
   G.hands[0].push(p1,p2); G.dealer.push(d1,d2);
   // Second hand — deal 2 more cards if active
   let h2p1=null, h2p2=null;
-  if(G._hand2Active){ h2p1=draw(); h2p2=draw(); G.hands[1].push(h2p1,h2p2); }
+  if(_deal2){ h2p1=draw(); h2p2=draw(); G.hands[1].push(h2p1,h2p2); }
   // Render with staggered animation delays: p1=0s, d1=0.3s, p2=0.6s, d2=0.9s
   G._dealStagger=true;
   renderAll();
@@ -3614,7 +3635,7 @@ function deal(){
   // Process bonuses
   [p1,p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i);});
   // Bonus processing for second hand
-  if(G._hand2Active&&h2p1&&h2p2){ [h2p1,h2p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i);}); }
+  if(_deal2&&h2p1&&h2p2){ [h2p1,h2p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i);}); }
   // Jester replacement
   [p1,p2].forEach((c,i)=>{
     if(c.bonus&&c.bonus.jester){
@@ -4040,6 +4061,8 @@ function settle(reason){
     if(e) Object.assign(e,updates);
   }
 
+  // Per-seat P&L tracking (for 2-hand log display)
+  const _handResults = [];
   G.hands.forEach((h,hi)=>{
     const pv=hv(h); const pb=isBust(h); const pbj=isBJ(h);
     // For second seat (hi===1, no splits), use mainBet2; splits use mainBet
@@ -4100,6 +4123,7 @@ function settle(reason){
       const originalStake=_betForHand-G._freeDoubleBet; // what player actually wagered
       w=Math.max(w,-originalStake); // loss capped at original stake
     }
+    _handResults.push({hi, w, detail: detail||(pb?'Bust':String(pv)), bet: _betForHand});
     mainPL+=w;
     if(hi===0&&!detail)detail=String(pv);
   });
@@ -4135,7 +4159,7 @@ function settle(reason){
   let sidePL=0;
   const sbAnnouncements=[];
   // Hand 2 Dealer Bust side bet
-  if(G._hand2Active&&G.sideBets2&&G.sideBets2['Dealer Bust']>0){
+  if((G._hand2Active&&G.hands.length>1)&&G.sideBets2&&G.sideBets2['Dealer Bust']>0){
     const h2dbOrig=G.sideBets2['Dealer Bust'];
     const h2dbRes=calcSide('Dealer Bust',h2dbOrig,db,false);
     sidePL+=h2dbRes.pl;
@@ -4182,7 +4206,15 @@ function settle(reason){
   updateUI();
 
   // Build full breakdown for log and result modal
-  const breakdown={main:{bet:G.mainBet,pl:mainPL,detail},sbs:[],bonus:G._bonusPayouts||[],plague:G._plagueDeducted||0,levCost,total:totalPLForDisplay};
+  // Build per-hand breakdown when 2 seats played
+  const _hasHand2 = G.hands.length > 1 && G._hand2Active;
+  const _h1Res = _handResults[0]||{w:mainPL,detail};
+  const _h2Res = _hasHand2 ? _handResults[1] : null;
+  const breakdown={
+    main:{bet:G.mainBet,pl:_h1Res.w,detail:_h1Res.detail},
+    hand2: _h2Res ? {bet:G.mainBet2,pl:_h2Res.w,detail:_h2Res.detail} : null,
+    sbs:[],bonus:G._bonusPayouts||[],plague:G._plagueDeducted||0,levCost,total:totalPLForDisplay
+  };
   // Early SBs (PP, 21+3, C7s)
   (G._earlySBResults||[]).forEach(r=>{
     breakdown.sbs.push({name:r.name,bet:r.bet,pl:r.pl,won:r.won});
@@ -4201,7 +4233,11 @@ function settle(reason){
       breakdown.sbs.push({name:'Dealer Bust (Gold Card — free)',bet:goldExtra,pl:gwon?gwon.pl:0,won:!!gwon,free:true});
     }
   });
-  G.log.push({detail,pl:totalPLForDisplay,bal:G.balance,breakdown});
+  // For 2-hand sessions, build a combined detail string for the log
+  const _logDetail = _hasHand2
+    ? `H1: ${_h1Res.detail} / H2: ${_h2Res.detail}`
+    : detail;
+  G.log.push({detail:_logDetail,pl:totalPLForDisplay,bal:G.balance,breakdown});
   renderLog();
   // Update session P&L chart — running total of all hands this session
   const _sessionRunningPL = G.log.reduce((a,e)=>a+e.pl, 0);
@@ -4556,7 +4592,12 @@ function showResult(pl,detail,bal){
       if(bd.levCost>0){
         bkHtml+=`<div class="r-row l"><span>2× Token cost</span><span>-${fmtKFC(bd.levCost)}</span></div>`;
       }
-      bkHtml+=`<div class="r-row ${bd.main.pl>0?'w':bd.main.pl<0?'l':'p'}"><span>Main result</span><span>${bd.main.pl>=0?'+':''}${fmtKFC(bd.main.pl)}</span></div>`;
+      if(bd.hand2){
+        bkHtml+=`<div class="r-row ${bd.main.pl>0?'w':bd.main.pl<0?'l':'p'}"><span>Hand 1 (${fmtKFC(bd.main.bet)})</span><span>${bd.main.pl>=0?'+':''}${fmtKFC(bd.main.pl)} — ${bd.main.detail||''}</span></div>`;
+        bkHtml+=`<div class="r-row ${bd.hand2.pl>0?'w':bd.hand2.pl<0?'l':'p'}"><span>Hand 2 (${fmtKFC(bd.hand2.bet)})</span><span>${bd.hand2.pl>=0?'+':''}${fmtKFC(bd.hand2.pl)} — ${bd.hand2.detail||''}</span></div>`;
+      } else {
+        bkHtml+=`<div class="r-row ${bd.main.pl>0?'w':bd.main.pl<0?'l':'p'}"><span>Main result</span><span>${bd.main.pl>=0?'+':''}${fmtKFC(bd.main.pl)}</span></div>`;
+      }
       // Bonus card entries
       if(bd.bonus&&bd.bonus.length>0){
         bd.bonus.forEach(b=>{
@@ -4656,12 +4697,15 @@ function renderLog(){
   const c=document.getElementById('log');
   const rows=[...G.log].reverse(); // show ALL hands, newest first
   if(!rows.length){c.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--muted);padding:8px 0">No hands yet</div>';return;}
-  c.innerHTML=rows.map(e=>`
-    <div class="log-row">
-      <div class="log-detail">${e.detail}</div>
+  c.innerHTML=rows.map(e=>{
+    // For 2-hand entries, wrap long detail
+    const isMulti = e.detail && e.detail.startsWith('H1:');
+    return `<div class="log-row${isMulti?' log-row-multi':''}">
+      <div class="log-detail" style="${isMulti?'white-space:normal;font-size:9px':''}">${e.detail}</div>
       <div class="log-pl ${e.pl>0?'w':e.pl<0?'l':'p'}">${e.pl>=0?'+':''}${fmt(e.pl)}</div>
       <div class="log-bal">${fmt(e.bal)}</div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
 }
 
 // ── STAKE ──────────────────────────────────────────────
