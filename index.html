@@ -4637,6 +4637,9 @@ function closeResult(){
   G._handStartBal=0;
   G.mainBet=0;
   SB_NAMES.forEach(n=>G.sideBets[n]=0);
+  // Also reset hand2 bets so they must be re-placed each round
+  G.mainBet2=0;
+  if(G.sideBets2) SB_NAMES.forEach(n=>G.sideBets2[n]=0);
   G.leverage=null;
   updateSBCircles(); // reset all SB circles to inactive after round
   // Blood Jester: if a leverage card (not 2x token) was used this hand, consume it
@@ -4646,6 +4649,7 @@ function closeResult(){
   }
   resetCards();
   updateBetPanel();
+  if(typeof updateHand2Panel==='function') updateHand2Panel();
   buildSideBets();
   buildLevPanel();
   buildPuPanel();
