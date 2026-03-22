@@ -1262,6 +1262,136 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
   72%  { transform: translate(-50%,-50%) scale(1) rotate(0deg);    opacity: 1; }
   100% { transform: translate(-50%,-50%) scale(1.08); opacity: 0; }
 }
+
+/* ─────────────────────────────────────────────
+   SESSION P&L CHART
+───────────────────────────────────────────── */
+#session-chart-bar {
+  width: 100%; height: 48px;
+  background: var(--bg1);
+  border-bottom: 1px solid var(--line);
+  position: sticky; top: 56px; z-index: 99;
+  display: none; /* hidden until first hand */
+  align-items: center; padding: 0 16px;
+  gap: 12px; box-sizing: border-box;
+}
+#session-chart-bar.visible { display: flex; }
+#chart-pl-label {
+  font-family: var(--mono); font-size: 11px; font-weight: 600;
+  letter-spacing: 0.5px; white-space: nowrap; min-width: 80px;
+  transition: color .4s;
+}
+#chart-pl-label.pos { color: var(--green); }
+#chart-pl-label.neg { color: var(--red); }
+#chart-pl-label.zero { color: var(--muted); }
+#chart-canvas-wrap {
+  flex: 1; height: 36px; position: relative; overflow: hidden;
+}
+#session-chart-canvas {
+  width: 100%; height: 100%; display: block;
+}
+@media (max-width: 720px) {
+  #session-chart-bar { top: auto; position: relative; height: 40px; padding: 0 10px; gap: 8px; }
+  #chart-pl-label { font-size: 10px; min-width: 70px; }
+  #chart-canvas-wrap { height: 30px; }
+}
+
+
+/* ─────────────────────────────────────────────
+   SECOND HAND SEAT
+───────────────────────────────────────────── */
+#hand2-toggle-wrap {
+  display: flex; justify-content: center; align-items: center;
+  margin: 6px 0 2px;
+}
+#btn-hand2-toggle {
+  width: 28px; height: 28px; border-radius: 50%;
+  border: 1px solid var(--line2);
+  background: transparent; color: var(--muted);
+  font-size: 16px; line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s; padding: 0;
+}
+#btn-hand2-toggle:hover { border-color: var(--gold-lo); color: var(--gold-hi); background: rgba(201,168,76,.06); }
+#btn-hand2-toggle.active { border-color: var(--red); color: var(--red); background: rgba(248,81,73,.06); }
+#hand2-label {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 2px;
+  color: var(--muted); text-transform: uppercase; margin-left: 8px;
+  transition: color .2s;
+}
+#hand2-label.active { color: var(--gold-lo); }
+
+/* Second bet circle - mirrors the first */
+#hand2-bet-section {
+  display: none;
+  flex-direction: column; align-items: center;
+  width: 100%; padding: 6px 0 0;
+  border-top: 1px solid rgba(201,168,76,.1);
+  margin-top: 4px;
+  animation: fadeSlideIn .25s ease both;
+}
+#hand2-bet-section.visible { display: flex; }
+@keyframes fadeSlideIn {
+  from { opacity:0; transform: translateY(-6px); }
+  to   { opacity:1; transform: translateY(0); }
+}
+#hand2-sb-circles {
+  display: flex; gap: 8px; justify-content: center; align-items: center;
+}
+#hand2-bet-circle {
+  width: 86px; height: 86px; border-radius: 50%;
+  border: 2px solid rgba(201,168,76,0.3);
+  background: rgba(10,11,13,0.6);
+  backdrop-filter: blur(4px);
+  display: flex; align-items: center; justify-content: center;
+  position: relative;
+  box-shadow: 0 0 20px rgba(201,168,76,0.08), inset 0 0 20px rgba(0,0,0,0.4);
+  transition: border-color .3s, box-shadow .3s;
+  opacity: 0.35; cursor: default;
+}
+#hand2-bet-circle.visible {
+  opacity: 1;
+  border-color: rgba(201,168,76,0.6);
+  box-shadow: 0 0 30px rgba(201,168,76,0.15), inset 0 0 20px rgba(0,0,0,0.4);
+}
+#hand2-bet-circle-inner {
+  position: absolute; inset: 8px; border-radius: 50%;
+  border: 1px dashed rgba(201,168,76,0.15); pointer-events: none;
+}
+#hand2-bet-circle-amt {
+  font-family: var(--mono); font-size: 10px; font-weight: 700;
+  color: var(--gold-hi); z-index: 1; text-align: center; padding: 0 3px; line-height: 1.2;
+}
+#hand2-circle-label {
+  font-family: var(--mono); font-size: 7px; letter-spacing: 1.5px;
+  color: var(--muted); text-transform: uppercase; margin-top: 3px;
+}
+/* Hand 2 sb circles same as main */
+.h2-sb-circle {
+  width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border: 2px solid var(--line2);
+  background: rgba(14,15,18,0.7); cursor: pointer; transition: all .2s;
+  position: relative; aspect-ratio: 1; max-width: 46px; backdrop-filter: blur(4px);
+}
+.h2-sb-circle:hover { border-color: var(--gold-lo); background: rgba(201,168,76,.06); }
+.h2-sb-circle.active {
+  border-color: var(--gold-hi); background: rgba(201,168,76,.15);
+  box-shadow: 0 0 12px rgba(201,168,76,.25);
+}
+.h2-sb-circle .sb-circle-label { font-family: var(--sans); font-size: 7px; font-weight: 800; color: var(--muted2); letter-spacing: 1px; text-transform: uppercase; }
+.h2-sb-circle.active .sb-circle-label { color: var(--gold-hi); }
+.h2-sb-circle .sb-circle-amt { font-family: var(--mono); font-size: 9px; color: var(--muted); font-weight: 600; }
+.h2-sb-circle.active .sb-circle-amt { color: var(--gold-hi); }
+/* Chip clicks go to hand2 when active */
+body.hand2-active #chip-strip .chip { position: relative; }
+/* Hand 2 hand slot styling */
+#slot-1.hand2-seat { border-left: 1px solid rgba(201,168,76,.2); margin-left: 4px; padding-left: 8px; }
+@media (max-width: 720px) {
+  #hand2-bet-circle { width: 70px !important; height: 70px !important; }
+  .h2-sb-circle { width: 40px !important; height: 40px !important; max-width: 40px !important; }
+}
+
 </style>
 </head>
 <body class="betting">
@@ -1324,6 +1454,14 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
       <div class="badge" id="sync-badge">LOCAL</div>
       <button class="btn-ghost" onclick="openModal('stake-modal')">Stake</button>
       <button class="btn-ghost" onclick="showCashout()">Cash Out</button>
+    </div>
+  </div>
+
+  <!-- SESSION P&L CHART BAR -->
+  <div id="session-chart-bar">
+    <div id="chart-pl-label" class="zero">+0</div>
+    <div id="chart-canvas-wrap">
+      <canvas id="session-chart-canvas"></canvas>
     </div>
   </div>
 
@@ -1466,6 +1604,41 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
             <span class="sb-circle-label">DB</span>
             <span class="sb-circle-amt" id="sbcamt-Dealer_Bust">—</span>
             <div class="sb-payout-tip"><div class="tip-title">Payouts</div><div class="tip-row"><span>3 cards</span><span class="tip-win">1:1</span></div><div class="tip-row"><span>4 cards</span><span class="tip-win">2:1</span></div><div class="tip-row"><span>5 cards</span><span class="tip-win">6:1</span></div><div class="tip-row"><span>6 cards</span><span class="tip-win">12:1</span></div><div class="tip-row"><span>7 cards</span><span class="tip-win">25:1</span></div><div class="tip-row"><span>8+ cards</span><span class="tip-win">50:1</span></div></div>
+          </div>
+        </div>
+
+        <!-- ── SECOND HAND TOGGLE ── -->
+        <div id="hand2-toggle-wrap">
+          <button id="btn-hand2-toggle" onclick="toggleHand2()" title="Add second hand">+</button>
+          <span id="hand2-label">2nd Hand</span>
+        </div>
+
+        <!-- ── SECOND HAND BET SECTION ── -->
+        <div id="hand2-bet-section">
+          <div id="hand2-sb-circles">
+            <div class="h2-sb-circle" id="h2sbc-Perfect_Pairs" onclick="cycleH2SB('Perfect Pairs')">
+              <span class="sb-circle-label">PP</span>
+              <span class="sb-circle-amt" id="h2sbcamt-Perfect_Pairs">—</span>
+            </div>
+            <div class="h2-sb-circle" id="h2sbc-21p3" onclick="cycleH2SB('21+3')">
+              <span class="sb-circle-label">21+3</span>
+              <span class="sb-circle-amt" id="h2sbcamt-21p3">—</span>
+            </div>
+            <div style="display:flex;flex-direction:column;align-items:center">
+              <div id="hand2-bet-circle">
+                <div id="hand2-bet-circle-inner"></div>
+                <span id="hand2-bet-circle-amt"></span>
+              </div>
+              <div id="hand2-circle-label">Hand 2</div>
+            </div>
+            <div class="h2-sb-circle" id="h2sbc-Crazy_7s" onclick="cycleH2SB('Crazy 7s')">
+              <span class="sb-circle-label">C7s</span>
+              <span class="sb-circle-amt" id="h2sbcamt-Crazy_7s">—</span>
+            </div>
+            <div class="h2-sb-circle" id="h2sbc-Dealer_Bust" onclick="cycleH2SB('Dealer Bust')">
+              <span class="sb-circle-label">DB</span>
+              <span class="sb-circle-amt" id="h2sbcamt-Dealer_Bust">—</span>
+            </div>
           </div>
         </div>
       </div><!-- end #betting-zone -->
@@ -1826,6 +1999,7 @@ const G = {
   // bonus card flags
   arrowCount:0, kruegerOn:false, desertOn:false, goldOn:false, steelOn:false, stampedOn:false, stampedInitialBet:0, stampedCardsViewed:0,
   safetyTrigger:false, dealerJester:false,
+  _hand2Active:false, mainBet2:0, sideBets2:{},
   log:[],
   url:'', pins:{},
   preDealBal:0, lastMainBet:0, lastSideBets:{}, cashedOut:false, _atCashout:false, _sessionActive:false, insuranceBet:0, _freeDoubleBet:0, _freeLevBet:0,
@@ -2424,6 +2598,7 @@ function showSideBetWin(label, pl){
 function evaluateEarlySideBets(){
   // Evaluate side bets that resolve on initial 2 cards (PP, 21+3, C7s)
   // Dealer Bust is evaluated in settle()
+  // Also evaluates hand2 side bets if active
   const earlyBets=['Perfect Pairs','21+3','Crazy 7s'];
   const wins=[];
   let earlyNetPL=0; // net of wins AND losses
@@ -2441,6 +2616,29 @@ function evaluateEarlySideBets(){
   // (losses reduce preDealBal so balance formula stays correct)
   G.preDealBal+=earlyNetPL;
   G._earlySBPL=(G._earlySBPL||0)+earlyNetPL;
+  // Evaluate early side bets for hand 2 if active
+  if(G._hand2Active&&G.sideBets2&&G.hands[1]&&G.hands[1].length>=2){
+    let h2EarlyPL=0;
+    const h2w=[];
+    ['Perfect Pairs','21+3','Crazy 7s'].forEach(name=>{
+      const amt=(G.sideBets2[name]||0);
+      if(amt<=0) return;
+      // For hand2: use G.hands[1] cards. calcSide uses G.hands[0] internals,
+      // so temporarily swap cards for calculation
+      const _saved=G.hands[0];
+      const _savedDealer=G.dealer.slice();
+      G.hands[0]=G.hands[1];
+      const res=calcSide(name,amt,false,false);
+      G.hands[0]=_saved;
+      G.dealer=_savedDealer;
+      h2EarlyPL+=res.pl;
+      if(res.pl>0) h2w.push({name,label:res.label,pl:res.pl});
+      G.sideBets2[name]=0;
+    });
+    G.preDealBal+=h2EarlyPL;
+    G._earlySBPL=(G._earlySBPL||0)+h2EarlyPL;
+    h2w.forEach((w,i)=>setTimeout(()=>showSideBetWin('[H2] '+w.label,w.pl),i*600+300));
+  }
   G._earlySBResults=G._earlySBResults||[];
   earlyBets.forEach(name=>{
     const orig=G.lastSideBets&&G.lastSideBets[name]||0;
@@ -2697,6 +2895,9 @@ function saveSession(){
       puOwned:[...G.puOwned],
       deck:G.deck||[],
       shoeTotal:G._shoeTotal||0,
+      hand2Active:G._hand2Active||false,
+      mainBet2:G.mainBet2||0,
+      sideBets2:{...G.sideBets2||{}},
       ts:Date.now()
     };
     localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
@@ -2725,6 +2926,7 @@ function restoreSession(){
     G.levCards=snap.levCards||[];
     G.puOwned=new Set(snap.puOwned||[]);
     if(snap.deck&&snap.deck.length>0){ G.deck=snap.deck; G._shoeTotal=snap.shoeTotal||snap.deck.length; }
+    if(snap.hand2Active){ G._hand2Active=true; G.mainBet2=snap.mainBet2||0; G.sideBets2=snap.sideBets2||{}; }
     G.phase='bet';
     return true;
   }catch(e){ return false; }
@@ -2901,6 +3103,7 @@ function openApp(displayName, balance){
 // loadBalance merged into doLogin/openApp
 
 function doLogout(skipToStake){
+  resetSessionChart();
   if(G.phase!=='bet'){notif('Finish your hand first');return;}
   if(!G.cashedOut){
     notif('Please cash out before leaving');
@@ -3078,7 +3281,7 @@ function makeChipSVG(v,lbl){
     <text x="26" y="26" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-weight="900" font-size="${fs}" fill="#111">${lbl}</text>
   </svg>`;
 }
-function buildChips(){['chip-row','chip-strip'].forEach(rowId=>{const c=document.getElementById(rowId);if(!c)return;c.innerHTML='';G.s.chips.forEach(v=>{const lbl=v>=1e9?(v/1e9).toFixed(v%1e9===0?0:1)+'B':v>=1e6?(v/1e6).toFixed(v%1e6===0?0:1)+'M':v>=1e3?(v/1e3).toFixed(v%1e3===0?0:1)+'K':String(v);const col=chipColor(v);const btn=document.createElement('button');btn.className='chip '+col;btn.setAttribute('data-val',lbl);btn.innerHTML=makeChipSVG(v,lbl);btn.title=fmt(v)+' KFC';btn.onclick=()=>{if(!G._audioReady)initAudio();if(G.phase==='bet'){const newBet=G.mainBet+v;if(newBet>G.s.max){if(G.mainBet<G.s.max){G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}G.mainBet=newBet;updateBetPanel();sfx('chip');flyChipToCircle(btn,col,lbl);btn.style.transform='translateY(-5px) scale(1.15)';setTimeout(()=>{btn.style.transform='';},200);}};c.appendChild(btn);});});}
+function buildChips_orig(){['chip-row','chip-strip'].forEach(rowId=>{const c=document.getElementById(rowId);if(!c)return;c.innerHTML='';G.s.chips.forEach(v=>{const lbl=v>=1e9?(v/1e9).toFixed(v%1e9===0?0:1)+'B':v>=1e6?(v/1e6).toFixed(v%1e6===0?0:1)+'M':v>=1e3?(v/1e3).toFixed(v%1e3===0?0:1)+'K':String(v);const col=chipColor(v);const btn=document.createElement('button');btn.className='chip '+col;btn.setAttribute('data-val',lbl);btn.innerHTML=makeChipSVG(v,lbl);btn.title=fmt(v)+' KFC';btn.onclick=()=>{if(!G._audioReady)initAudio();if(G.phase==='bet'){const newBet=G.mainBet+v;if(newBet>G.s.max){if(G.mainBet<G.s.max){G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}G.mainBet=newBet;updateBetPanel();sfx('chip');flyChipToCircle(btn,col,lbl);btn.style.transform='translateY(-5px) scale(1.15)';setTimeout(()=>{btn.style.transform='';},200);}};c.appendChild(btn);});});}
 
 function updateBetPanel(){
   const bsa=document.getElementById('bet-strip-amount');
@@ -3133,6 +3336,8 @@ function updateBetPanel(){
   const total=G.mainBet+st;
   document.getElementById('bet-total-tag').textContent=total>0?fmtKFC(total):'';
   if(G.phase==='bet' && !G._atCashout) saveSession(); // persist current bets
+  // Keep hand2 panel in sync
+  if(typeof updateHand2Panel==='function') updateHand2Panel();
 }
 
 function clearBets(){
@@ -3340,7 +3545,8 @@ function deal(){
   if(G.balance>=BALANCE_CAP){notif('⚠ 50B cap — cash out first');showCashout();return;}
   if(G.mainBet<=0){notif('Place a bet first');return;}
   if(G.mainBet<G.s.min){notif('Min bet is '+fmtKFC(G.s.min));return;}
-  const totalDeducted=G.mainBet+Object.values(G.sideBets).reduce((a,b)=>a+b,0)+(G.leverage==='2x'?G.s.min*2:0);
+  const totalDeducted=G.mainBet+Object.values(G.sideBets).reduce((a,b)=>a+b,0)+(G.leverage==='2x'?G.s.min*2:0)
+    +(G._hand2Active?(G.mainBet2+Object.values(G.sideBets2||{}).reduce((a,b)=>a+b,0)):0);
   if(G.balance<totalDeducted){notif('Insufficient balance');return;}
   let puCost=0;
   G.puPending.forEach(id=>{const pu=POWERUPS.find(p=>p.id===id);if(pu)puCost+=G.s.min*(pu.ratio||5);});
@@ -3351,7 +3557,8 @@ function deal(){
   G.balance-=totalDeducted+puCost; updateUI();
   if(G.balance===0) setTimeout(showAllIn, 200); // all-in!
   G._handStartBal=G.balance; // snapshot AFTER deductions — so P&L display is net of all costs
-  G.hands=[[]]; G.cur=0; G.splits=0; G.dealer=[];
+  // Second hand setup: if active, initialise as empty array (cards dealt below)
+  G.hands=G._hand2Active ? [[], []] : [[]]; G.cur=0; G.splits=0; G.dealer=[];
   G.holeRevealed=false;
   G._bonusPayouts=[];
   G._goldCardBet=0;
@@ -3365,6 +3572,7 @@ function deal(){
   G.safetyTrigger=false; G.dealerJester=false; G.insuranceBet=0; G.arrowCount=0; G._freeDoubleBet=0; G._freeLevBet=0;
   G._sessionActive=true; // mark session as active after first deal
   G.phase='play'; document.body.classList.remove('betting');
+  _h2ChipTarget=false; setH2ChipTarget(false);
   // Clear previous hand state immediately
   clearMissedSideBets();
   const _ms=document.getElementById('msg-strip');if(_ms){_ms.className='';_ms.textContent='';}
@@ -3373,6 +3581,9 @@ function deal(){
   // Draw all 4 cards at once — stagger via CSS animation-delay
   const p1=draw(),p2=draw(),d1=draw(),d2=draw();
   G.hands[0].push(p1,p2); G.dealer.push(d1,d2);
+  // Second hand — deal 2 more cards if active
+  let h2p1=null, h2p2=null;
+  if(G._hand2Active){ h2p1=draw(); h2p2=draw(); G.hands[1].push(h2p1,h2p2); }
   // Render with staggered animation delays: p1=0s, d1=0.3s, p2=0.6s, d2=0.9s
   G._dealStagger=true;
   renderAll();
@@ -3381,6 +3592,8 @@ function deal(){
   [0,300,600,900].forEach(t=>setTimeout(()=>sfx('card'),t));
   // Process bonuses
   [p1,p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i);});
+  // Bonus processing for second hand
+  if(G._hand2Active&&h2p1&&h2p2){ [h2p1,h2p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i);}); }
   // Jester replacement
   [p1,p2].forEach((c,i)=>{
     if(c.bonus&&c.bonus.jester){
@@ -3808,11 +4021,14 @@ function settle(reason){
 
   G.hands.forEach((h,hi)=>{
     const pv=hv(h); const pb=isBust(h); const pbj=isBJ(h);
+    // For second seat (hi===1, no splits), use mainBet2; splits use mainBet
+    const _isHand2Seat = hi===1 && G._hand2Active && G.splits===0;
+    const _betForHand = _isHand2Seat ? G.mainBet2 : G.mainBet;
     const lm=hi===0?getLevMult():1;
     let w=0;
     if(reason==='surrender'){
       const freeLev3=G.leverage&&G.leverage.startsWith('c');
-      w=-Math.floor(G.mainBet/2); // surrender: lose half of actual betdetail='Surrender ½';
+      w=-Math.floor(_betForHand/2); detail='Surrender ½';
     }
     else if(reason==='push_guard')      {w=0;detail='BJ Guard — Push';}
     else if(reason==='push_player_bj'){w=0;detail='Both BJ — Push';}
@@ -3821,26 +4037,26 @@ function settle(reason){
     else if(pb)                    {
       // If free leverage card: only lose original stake (leverage was free)
       const freeLev=G.leverage&&G.leverage.startsWith('c');
-      w=-G.mainBet; // leverage card: lose full stake on bust
+      w=-_betForHand; // leverage card: lose full stake on bust
       detail='Bust'+(freeLev?' [Lev card — lose stake only]':'');
     }
-    else if(reason==='player_bj')  {const r=G.puOwned.has('novak')||G.steelOn?2:1.5;w=Math.floor(G.mainBet*r*lm);detail=`Blackjack ${r}:1${G.steelOn?' (Steel)':''}`;}
+    else if(reason==='player_bj')  {const r=G.puOwned.has('novak')||G.steelOn?2:1.5;w=Math.floor(_betForHand*r*lm);detail=`Blackjack ${r}:1${G.steelOn?' (Steel)':''}`;}
     else if(reason==='dealer_bj'){
       const freeLev4=G.leverage&&G.leverage.startsWith('c');
-      w=-G.mainBet;detail='Dealer BJ'; // leverage card: lose full stake
+      w=-_betForHand;detail='Dealer BJ'; // leverage card: lose full stake
     }
     else if(pbj&&reason==='normal'){
       // Split hand BJ (ace + 10-value in exactly 2 cards) — pays BJ rate
       if(isBJ(G.dealer)){w=0;detail='Push — both BJ';}
-      else{const r=G.puOwned.has('novak')||G.steelOn?2:1.5;w=Math.floor(G.mainBet*r*lm);detail=`Blackjack ${r}:1 (split)${G.steelOn?' (Steel)':''}`;sfx('bj');}
+      else{const r=G.puOwned.has('novak')||G.steelOn?2:1.5;w=Math.floor(_betForHand*r*lm);detail=`Blackjack ${r}:1 (split)${G.steelOn?' (Steel)':''}`;sfx('bj');}
     }
     else if(db){
-      w=G.mainBet*lm;
+      w=_betForHand*lm;
       const levDesc=lm>1?(G.leverage.startsWith('c')?' ('+lm+'× free card)':' ('+lm+'× token)'):'' ;
       detail='Dealer Bust'+levDesc;
     }
     else if(pv>dv){
-      w=G.mainBet*lm;
+      w=_betForHand*lm;
       const levDescW=lm>1?(G.leverage.startsWith('c')?' ('+lm+'× card)':' ('+lm+'× token)'):'';
       detail=`${pv} vs ${dv}`+levDescW;
     }
@@ -3851,16 +4067,16 @@ function settle(reason){
       else{
         // If free leverage card: only lose original stake
         const freeLev2=G.leverage&&G.leverage.startsWith('c');
-        w=-G.mainBet;
+        w=-_betForHand;
         detail=`${pv} vs ${dv}`; // leverage card: lose full stake
       }
     }
     // Dealer Jester: dealer collects on wins AND pushes (not bust, not player BJ, not special protected pushes)
     const _djProtected=reason==='player_bj'||(pbj&&reason==='normal')||reason==='push_guard'||reason==='safety'||reason==='desert_push';
-    if(G.dealerJester&&!db&&w>=0&&!_djProtected){w=-G.mainBet;detail+=' [Dealer Jester]';}
+    if(G.dealerJester&&!db&&w>=0&&!_djProtected){w=-_betForHand;detail+=' [Dealer Jester]';}
     // Free double-down cap: on loss, player only loses their original stake (pre-double)
-    if(w<0&&G._freeDoubleBet>0){
-      const originalStake=G.mainBet-G._freeDoubleBet; // what player actually wagered
+    if(w<0&&G._freeDoubleBet>0&&!_isHand2Seat){
+      const originalStake=_betForHand-G._freeDoubleBet; // what player actually wagered
       w=Math.max(w,-originalStake); // loss capped at original stake
     }
     mainPL+=w;
@@ -3897,6 +4113,14 @@ function settle(reason){
   // Side bets — Dealer Bust only (PP/21+3/C7s already settled in evaluateEarlySideBets)
   let sidePL=0;
   const sbAnnouncements=[];
+  // Hand 2 Dealer Bust side bet
+  if(G._hand2Active&&G.sideBets2&&G.sideBets2['Dealer Bust']>0){
+    const h2dbOrig=G.sideBets2['Dealer Bust'];
+    const h2dbRes=calcSide('Dealer Bust',h2dbOrig,db,false);
+    sidePL+=h2dbRes.pl;
+    if(h2dbRes.label&&h2dbRes.pl>0) sbAnnouncements.push({name:'Dealer Bust H2',label:'[H2] '+h2dbRes.label,pl:h2dbRes.pl,amount:h2dbOrig});
+    G.sideBets2['Dealer Bust']=0;
+  }
   SB_NAMES.forEach(n=>{
     if(n!=='Dealer Bust') return; // early bets already settled
     const orig=G.lastSideBets&&G.lastSideBets[n]||0;
@@ -3958,6 +4182,9 @@ function settle(reason){
   });
   G.log.push({detail,pl:totalPLForDisplay,bal:G.balance,breakdown});
   renderLog();
+  // Update session P&L chart — running total of all hands this session
+  const _sessionRunningPL = G.log.reduce((a,e)=>a+e.pl, 0);
+  updateSessionChart(_sessionRunningPL);
   if(totalPLForDisplay>0){if(totalPLForDisplay>G.s.min*5)sfx('cash');else sfx('win');} else if(totalPLForDisplay<0){} else sfx('push');
   // Show missed side bet payouts (including Dealer Bust if it busted)
   if(db){
@@ -4071,7 +4298,9 @@ function calcSide(name,amount,dealerBust,isFreeStake){
 function resetCards(){
   document.getElementById('dealer-cards').innerHTML='';
   const hw=document.getElementById('hands-wrap');
-  hw.innerHTML='<div class="hand-slot active" id="slot-0"><div class="zone-tag" style="text-align:center">Your hand</div><div class="cards-row" id="cards-0" style="justify-content:center"></div><div class="score" id="score-0"></div></div>';
+  let slotsHtml='<div class="hand-slot active" id="slot-0"><div class="zone-tag" style="text-align:center">'+(G._hand2Active?'Hand 1':'Your hand')+'</div><div class="cards-row" id="cards-0" style="justify-content:center"></div><div class="score" id="score-0"></div></div>';
+  if(G._hand2Active) slotsHtml+='<div class="hand-slot hand2-seat" id="slot-1"><div class="zone-tag" style="text-align:center">Hand 2</div><div class="cards-row" id="cards-1" style="justify-content:center"></div><div class="score" id="score-1"></div></div>';
+  hw.innerHTML=slotsHtml;
 }
 
 function addSlot(idx){
@@ -4449,7 +4678,7 @@ function showCashout(){
     syncEl.textContent='⚠ 50 Billion KFC cap reached — you must cash out before playing again.';
     syncEl.style.color='var(--red)';
   } else {
-    syncEl.textContent=G.url?'':'No sheet connected — saved locally.';
+    syncEl.textContent='';
     syncEl.style.color='';
   }
   // Reset to pre-confirm state
@@ -4490,7 +4719,7 @@ async function confirmCashout(){
       const r=await fetch(G.url+'?'+params.toString());
       const d=await r.json();
       if(d.ok||d.balance!==undefined){
-        setSyncBadge('live','SYNCED'); notif('Data Synced ✓');
+        setSyncBadge('live','SYNCED'); notif('Session Saved');
         badge.textContent='✓ Synced — ready to leave';
         badge.style.color='var(--green)';
       } else {
@@ -4513,6 +4742,7 @@ async function confirmCashout(){
   G.sessionStart=G.balance;
   G._totalBalance=G.balance; // update total balance after cashout
   G.log=[]; renderLog();
+  resetSessionChart();
 }
 
 // ── SETTINGS ──────────────────────────────────────────────
@@ -4546,6 +4776,266 @@ function notif(txt){
   el.textContent=txt; el.classList.add('show');
   clearTimeout(nTimer); nTimer=setTimeout(()=>el.classList.remove('show'),2400);
 }
+
+// ── SESSION P&L CHART ──────────────────────────────────────────
+const _chartPts = [0]; // running P&L points, starts at 0
+
+function updateSessionChart(newPL) {
+  _chartPts.push(newPL);
+
+  const bar = document.getElementById('session-chart-bar');
+  const label = document.getElementById('chart-pl-label');
+  const canvas = document.getElementById('session-chart-canvas');
+  if (!bar || !label || !canvas) return;
+
+  bar.classList.add('visible');
+
+  // Update label
+  const total = _chartPts[_chartPts.length - 1];
+  label.textContent = (total >= 0 ? '+' : '') + fmtKFC(total);
+  label.className = total > 0 ? 'pos' : total < 0 ? 'neg' : 'zero';
+
+  // Draw chart
+  _drawChart(canvas);
+}
+
+function _drawChart(canvas) {
+  const pts = _chartPts;
+  const wrap = document.getElementById('chart-canvas-wrap');
+  if (!wrap) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = wrap.clientWidth;
+  const H = wrap.clientHeight;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, W, H);
+
+  if (pts.length < 2) {
+    // Just a dot at centre
+    ctx.beginPath();
+    ctx.arc(W / 2, H / 2, 2, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(201,168,76,0.5)';
+    ctx.fill();
+    return;
+  }
+
+  const min = Math.min(...pts);
+  const max = Math.max(...pts);
+  const range = max - min || 1;
+  const pad = 4;
+
+  const xOf = i => (i / (pts.length - 1)) * W;
+  const yOf = v => H - pad - ((v - min) / range) * (H - pad * 2);
+
+  // Zero line
+  const zy = yOf(0);
+  ctx.beginPath();
+  ctx.moveTo(0, zy);
+  ctx.lineTo(W, zy);
+  ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Gradient fill
+  const lastY = yOf(pts[pts.length - 1]);
+  const grad = ctx.createLinearGradient(0, 0, 0, H);
+  const isPos = pts[pts.length - 1] >= 0;
+  if (isPos) {
+    grad.addColorStop(0, 'rgba(52,211,153,0.25)');
+    grad.addColorStop(1, 'rgba(52,211,153,0.01)');
+  } else {
+    grad.addColorStop(0, 'rgba(248,81,73,0.01)');
+    grad.addColorStop(1, 'rgba(248,81,73,0.25)');
+  }
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(pts[0]));
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(xOf(i), yOf(pts[i]));
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Main line — colour by last value
+  ctx.beginPath();
+  ctx.moveTo(xOf(0), yOf(pts[0]));
+  for (let i = 1; i < pts.length; i++) ctx.lineTo(xOf(i), yOf(pts[i]));
+  ctx.strokeStyle = isPos ? 'rgba(52,211,153,0.85)' : 'rgba(248,81,73,0.85)';
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // End dot
+  ctx.beginPath();
+  ctx.arc(xOf(pts.length - 1), yOf(pts[pts.length - 1]), 3, 0, Math.PI * 2);
+  ctx.fillStyle = isPos ? 'rgba(52,211,153,1)' : 'rgba(248,81,73,1)';
+  ctx.fill();
+}
+
+function resetSessionChart() {
+  _chartPts.length = 0;
+  _chartPts.push(0);
+  const bar = document.getElementById('session-chart-bar');
+  if (bar) bar.classList.remove('visible');
+}
+
+
+// ── SECOND HAND ──────────────────────────────────────────────────
+
+function toggleHand2(){
+  G._hand2Active = !G._hand2Active;
+  if(!G._hand2Active){
+    G.mainBet2=0;
+    SB_NAMES.forEach(n=>{ if(G.sideBets2) G.sideBets2[n]=0; });
+  }
+  if(!G.sideBets2) G.sideBets2={};
+  const btn=document.getElementById('btn-hand2-toggle');
+  const lbl=document.getElementById('hand2-label');
+  const sec=document.getElementById('hand2-bet-section');
+  if(btn){ btn.textContent=G._hand2Active?'×':'+'; btn.classList.toggle('active',G._hand2Active); }
+  if(lbl){ lbl.classList.toggle('active',G._hand2Active); }
+  if(sec){ sec.classList.toggle('visible',G._hand2Active); }
+  document.body.classList.toggle('hand2-active', G._hand2Active);
+  updateHand2Panel();
+  updateBetPanel(); // refresh deal button state
+}
+
+// Chip clicks: when hand2 is active and user holds Shift, or a hand2 chip mode
+// Simpler: chips always go to hand1; separate +/- buttons for hand2 circle
+// Clicking the hand2 bet circle toggles chip-target mode
+let _h2ChipTarget = false;
+function setH2ChipTarget(on){
+  _h2ChipTarget = on;
+  const circle = document.getElementById('hand2-bet-circle');
+  if(circle) circle.style.outline = on ? '2px solid var(--gold-hi)' : '';
+}
+
+// Make hand2 circle clickable to receive chips
+document.addEventListener('DOMContentLoaded', ()=>{
+  const h2c = document.getElementById('hand2-bet-circle');
+  if(h2c){
+    h2c.style.cursor='pointer';
+    h2c.addEventListener('click', ()=>{
+      if(!G._hand2Active||G.phase!=='bet') return;
+      _h2ChipTarget = !_h2ChipTarget;
+      setH2ChipTarget(_h2ChipTarget);
+    });
+  }
+});
+
+// Intercept chip clicks to route to hand2 when targeted
+const _origBuildChips = buildChips;
+// Patch chip onclick at chip click time (simpler: check _h2ChipTarget in onclick)
+// We'll patch buildChips to check the flag
+// Redirect buildChips to patched version
+const buildChips = buildChipsPatched;
+
+function buildChipsPatched(){
+  ['chip-row','chip-strip'].forEach(rowId=>{
+    const c=document.getElementById(rowId);
+    if(!c)return;
+    c.innerHTML='';
+    G.s.chips.forEach(v=>{
+      const lbl=v>=1e9?(v/1e9).toFixed(v%1e9===0?0:1)+'B':v>=1e6?(v/1e6).toFixed(v%1e6===0?0:1)+'M':v>=1e3?(v/1e3).toFixed(v%1e3===0?0:1)+'K':String(v);
+      const col=chipColor(v);
+      const btn=document.createElement('button');
+      btn.className='chip '+col;
+      btn.setAttribute('data-val',lbl);
+      btn.innerHTML=makeChipSVG(v,lbl);
+      btn.title=fmt(v)+' KFC';
+      btn.onclick=()=>{
+        if(!G._audioReady)initAudio();
+        if(G.phase==='bet'){
+          if(_h2ChipTarget && G._hand2Active){
+            // Route to hand2
+            const newBet2=(G.mainBet2||0)+v;
+            if(newBet2>G.s.max){ if((G.mainBet2||0)<G.s.max){G.mainBet2=G.s.max;updateHand2Panel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}
+            G.mainBet2=newBet2;
+            updateHand2Panel();
+            sfx('chip');
+            btn.style.transform='translateY(-5px) scale(1.15)';
+            setTimeout(()=>{btn.style.transform='';},200);
+          } else {
+            // Route to hand1 (original behaviour)
+            const newBet=G.mainBet+v;
+            if(newBet>G.s.max){if(G.mainBet<G.s.max){G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}
+            G.mainBet=newBet;updateBetPanel();sfx('chip');
+            flyChipToCircle(btn,col,lbl);
+            btn.style.transform='translateY(-5px) scale(1.15)';
+            setTimeout(()=>{btn.style.transform='';},200);
+          }
+        }
+      };
+      c.appendChild(btn);
+    });
+  });
+}
+
+function updateHand2Panel(){
+  if(!G.sideBets2) G.sideBets2={};
+  const amt = document.getElementById('hand2-bet-circle-amt');
+  const circle = document.getElementById('hand2-bet-circle');
+  if(amt) amt.textContent = (G.mainBet2||0)>0 ? fmtKFC(G.mainBet2) : '';
+  if(circle) circle.classList.toggle('visible', (G.mainBet2||0)>0);
+  // Update deal button — require hand2 has min bet too if active
+  const dealBtn=document.getElementById('btn-deal-top');
+  if(dealBtn){
+    const hand1ok = G.mainBet>=G.s.min;
+    const hand2ok = !G._hand2Active || (G.mainBet2||0)>=G.s.min;
+    dealBtn.disabled = !hand1ok || !hand2ok;
+    dealBtn.style.opacity = (!hand1ok||!hand2ok)?'0.45':'1';
+  }
+  // Update H2 SB circles
+  SB_NAMES.forEach(n=>{
+    const key=n.replace(/ /g,'_').replace(/\+/g,'p');
+    const amtEl=document.getElementById('h2sbcamt-'+key);
+    const circEl=document.getElementById('h2sbc-'+key);
+    const val=(G.sideBets2&&G.sideBets2[n])||0;
+    if(amtEl) amtEl.textContent=val>0?fmtKFC(val):'—';
+    if(circEl) circEl.classList.toggle('active', val>0);
+  });
+  if(G.phase==='bet' && !G._atCashout) saveSession();
+}
+
+function cycleH2SB(name){
+  if(!G._hand2Active||G.phase!=='bet') return;
+  if(!G.sideBets2) G.sideBets2={};
+  const cur=G.sideBets2[name]||0;
+  const steps=[0, G.s.min, G.s.min*2, G.s.min*5];
+  const next=steps[(steps.indexOf(cur)+1)%steps.length];
+  G.sideBets2[name]=next;
+  updateHand2Panel();
+  sfx('chip');
+}
+
+function clearHand2(){
+  G.mainBet2=0;
+  if(G.sideBets2) SB_NAMES.forEach(n=>G.sideBets2[n]=0);
+  _h2ChipTarget=false;
+  setH2ChipTarget(false);
+  updateHand2Panel();
+}
+
+function resetHand2State(){
+  G._hand2Active=false;
+  G.mainBet2=0;
+  G.sideBets2={};
+  _h2ChipTarget=false;
+  const btn=document.getElementById('btn-hand2-toggle');
+  const lbl=document.getElementById('hand2-label');
+  const sec=document.getElementById('hand2-bet-section');
+  if(btn){btn.textContent='+';btn.classList.remove('active');}
+  if(lbl){lbl.classList.remove('active');}
+  if(sec){sec.classList.remove('visible');}
+  document.body.classList.remove('hand2-active');
+}
+
 </script>
 
 <!-- ALL-IN SPLASH -->
