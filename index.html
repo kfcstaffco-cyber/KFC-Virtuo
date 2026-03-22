@@ -2017,7 +2017,7 @@ const G = {
   hands:[[]], cur:0, splits:0,
   dealer:[],
   mainBet:0, sideBets:{},
-  leverage:null, levCards:[],
+  leverage:null, levCards:[], _levCardsPending:[],
   holeRevealed: false,
   puOwned:new Set(), puPending:new Set(), puActive:null,
   phase:'bet', // bet | play | dealer | done
@@ -2917,6 +2917,7 @@ function saveSession(){
       log:G.log.slice(-50), // keep last 50 log entries
       phase:G.phase==='bet'?'bet':'bet', // always restore to bet phase
       levCards:G.levCards,
+      levCardsPending:G._levCardsPending||[],
       puOwned:[...G.puOwned],
       deck:G.deck||[],
       shoeTotal:G._shoeTotal||0,
@@ -2950,6 +2951,7 @@ function restoreSession(){
     G.leverage=snap.leverage||null;
     G.log=snap.log||[];
     G.levCards=snap.levCards||[];
+    G._levCardsPending=snap.levCardsPending||[];
     G.puOwned=new Set(snap.puOwned||[]);
     if(snap.deck&&snap.deck.length>0){ G.deck=snap.deck; G._shoeTotal=snap.shoeTotal||snap.deck.length; }
     if(snap.hand2Active){ G._hand2Active=true; G.mainBet2=0; G.sideBets2={}; } // always start fresh bets on restore
@@ -3652,6 +3654,7 @@ function deal(){
   G.holeRevealed=false;
   G._bonusPayouts=[];
   G._goldCardBet=0;
+  G._levCardsPending=[]; // cards earned THIS hand go here; promoted to levCards at closeResult
   // Track Blood Jester card usage — record index before clearing leverage
   G._usedLevCardIdx=undefined;
   if(G.leverage&&G.leverage.startsWith('c')){
@@ -3816,10 +3819,9 @@ function onBonusCard(bc, cardIndex){
       bonusToast(bc,'Blackjack pays 2:1 this hand');
       break;
     case 'blood':
-      if(!G.levCards.includes('blood'))G.levCards.push('blood');
-      G._bonusPayouts.push({label:'Blood Jester — 2× leverage card earned',pl:0,type:'info'});
-      bonusToast(bc,'2× leverage card earned');
-      buildLevPanel();
+      G._levCardsPending.push('blood');
+      G._bonusPayouts.push({label:'Blood Jester — 2× leverage card earned (next round)',pl:0,type:'info'});
+      bonusToast(bc,'2× leverage card earned — usable next round!');
       break;
     case 'plague':{
       G.plagueOn=true;
@@ -4695,6 +4697,12 @@ function closeResult(){
     G.levCards.splice(G._usedLevCardIdx,1);
     G._usedLevCardIdx=undefined;
   }
+  // Promote any jester cards earned this round — now usable from next round
+  if(G._levCardsPending&&G._levCardsPending.length>0){
+    G._levCardsPending.forEach(lc=>G.levCards.push(lc));
+    G._levCardsPending=[];
+    notif('🃏 Jester card(s) now available — use before next deal!');
+  }
   resetCards();
   updateBetPanel();
   if(typeof updateHand2Panel==='function') updateHand2Panel();
@@ -4711,13 +4719,13 @@ function closeResult(){
     G.deck=buildShoe();
     G.puOwned.clear();
     G.puPending.clear();
-    G.levCards=[];
+    G.levCards=[]; G._levCardsPending=[];
     buildPuPanel(); buildLevPanel();
     notif('🔀 End of shoe — reshuffling. Power-ups & jester cards reset.');
   } else if(G.deck.length<40){
     G.puOwned.clear();
     G.puPending.clear();
-    G.levCards=[]; // Jester cards expire at end of shoe
+    G.levCards=[]; G._levCardsPending=[]; // Jester cards expire at end of shoe
     buildPuPanel();
     notif('New shoe — power-ups & jester cards reset');
   }
@@ -4787,7 +4795,7 @@ function selectStake(key){
   const s=STAKES[key];
   if(!confirm('Switch to '+s.label+' Stakes?\nMin bet: '+fmt(s.min)+' KFC\nAll power-ups will reset.')) return;
   G.stake=key; G.s=STAKES[key];
-  G.puOwned.clear(); G.levCards=[];
+  G.puOwned.clear(); G.levCards=[]; G._levCardsPending=[];
   updateUI(); buildChips(); buildSideBets(); buildLevPanel(); buildPuPanel(); buildStakeList();
   closeModal('stake-modal');
   notif('Switched to '+s.label+' Stakes');
@@ -5083,7 +5091,7 @@ function updateHand2Panel(){
   if(!G.sideBets2) G.sideBets2={};
   const amt = document.getElementById('hand2-bet-circle-amt');
   const circle = document.getElementById('hand2-bet-circle');
-  if(amt) amt.textContent = (G.mainBet2||0)>0 ? fmtKFC(G.mainBet2) : '';
+  if(amt) amt.textContent = (G.mainBet2||0)>0 ? fmt(G.mainBet2) : '';
   if(circle) circle.classList.toggle('visible', (G.mainBet2||0)>0);
   // Update deal button — require hand2 has min bet too if active
   const dealBtn=document.getElementById('btn-deal-top');
@@ -5099,7 +5107,7 @@ function updateHand2Panel(){
     const amtEl=document.getElementById('h2sbcamt-'+key);
     const circEl=document.getElementById('h2sbc-'+key);
     const val=(G.sideBets2&&G.sideBets2[n])||0;
-    if(amtEl) amtEl.textContent=val>0?fmtKFC(val):'—';
+    if(amtEl) amtEl.textContent=val>0?fmt(val):'—';
     if(circEl) circEl.classList.toggle('active', val>0);
   });
   if(G.phase==='bet' && !G._atCashout) saveSession();
