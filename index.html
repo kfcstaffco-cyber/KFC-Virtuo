@@ -2919,7 +2919,7 @@ function restoreSession(){
     G.levCards=snap.levCards||[];
     G.puOwned=new Set(snap.puOwned||[]);
     if(snap.deck&&snap.deck.length>0){ G.deck=snap.deck; G._shoeTotal=snap.shoeTotal||snap.deck.length; }
-    if(snap.hand2Active){ G._hand2Active=true; G.mainBet2=snap.mainBet2||0; G.sideBets2=snap.sideBets2||{}; }
+    if(snap.hand2Active){ G._hand2Active=true; G.mainBet2=0; G.sideBets2={}; } // always start fresh bets on restore
     // Restore chart points
     if(snap.chartPts&&snap.chartPts.length>0){
       _chartPts.length=0;
@@ -3089,6 +3089,17 @@ function openApp(displayName, balance){
   document.body.classList.add('betting');
   updateBetPanel();
   updateSBCircles();
+  // Sync hand2 toggle UI if it was active in previous session
+  if(G._hand2Active){
+    const _h2btn=document.getElementById('btn-hand2-toggle');
+    const _h2lbl=document.getElementById('hand2-label');
+    const _h2sec=document.getElementById('hand2-bet-section');
+    if(_h2btn){_h2btn.textContent='×';_h2btn.classList.add('active');}
+    if(_h2lbl) _h2lbl.classList.add('active');
+    if(_h2sec) _h2sec.classList.add('visible');
+    document.body.classList.add('hand2-active');
+    if(typeof updateHand2Panel==='function') updateHand2Panel();
+  }
   // Balance checks
   if(G.balance>=BALANCE_CAP){
     setTimeout(()=>{
