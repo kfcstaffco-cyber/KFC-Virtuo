@@ -2800,7 +2800,7 @@ async function doLogin(){
 
   // Try sheet auth first
   if(G.url){
-    err.textContent='Connecting to sheet...';
+    err.textContent='Connecting...';
     try{
       const r=await fetch(G.url+'?action=getBalance&username='+encodeURIComponent(username)+'&pin='+encodeURIComponent(pin));
       if(!r.ok) throw new Error('HTTP '+r.status);
@@ -4449,7 +4449,7 @@ function showCashout(){
     syncEl.textContent='⚠ 50 Billion KFC cap reached — you must cash out before playing again.';
     syncEl.style.color='var(--red)';
   } else {
-    syncEl.textContent=G.url?'Will sync to Google Sheet.':'No sheet connected — saved locally.';
+    syncEl.textContent=G.url?'':'No sheet connected — saved locally.';
     syncEl.style.color='';
   }
   // Reset to pre-confirm state
@@ -4490,7 +4490,7 @@ async function confirmCashout(){
       const r=await fetch(G.url+'?'+params.toString());
       const d=await r.json();
       if(d.ok||d.balance!==undefined){
-        setSyncBadge('live','SYNCED'); notif('Synced to sheet ✓');
+        setSyncBadge('live','SYNCED'); notif('Data Synced ✓');
         badge.textContent='✓ Synced — ready to leave';
         badge.style.color='var(--green)';
       } else {
