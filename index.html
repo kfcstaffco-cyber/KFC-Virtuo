@@ -575,13 +575,31 @@ body:not(.betting) #betting-spacer { flex: 0; }
     padding: 4px 10px;
     box-sizing: border-box;
   }
-  /* Make stake/cashout buttons smaller on mobile */
+  /* Cashout/sidebar buttons on mobile */
   .tb-right .btn-ghost {
     font-size: 9px;
     padding: 5px 10px;
     letter-spacing: 1px;
   }
   #sync-badge { display: none; }
+
+  /* ── HAND 2 SECTION ── */
+  #hand2-bet-section { padding: 4px 0 0; }
+  #hand2-sb-circles { gap: 4px; }
+  #hand2-bet-circle { width: 64px !important; height: 64px !important; }
+  .h2-sb-circle { width: 38px !important; height: 38px !important; max-width: 38px !important; }
+  .h2-sb-circle .sb-circle-label { font-size: 6px !important; }
+  .h2-sb-circle .sb-circle-amt { font-size: 8px !important; }
+  #hand2-toggle-wrap { margin: 4px 0 0; }
+  #btn-hand2-toggle { width: 24px; height: 24px; font-size: 14px; }
+
+  /* ── SHORTCUTS ROW ── */
+  #bet-shortcuts { gap: 4px; overflow-x: auto; flex-wrap: nowrap; }
+  .shortcut-btn { padding: 4px 6px; font-size: 7.5px; letter-spacing: 0.8px; flex-shrink: 0; }
+
+  /* ── CHART IN SHOE AREA ── */
+  #chart-pl-label { font-size: 9px; }
+  #chart-canvas-wrap { height: 28px; }
 
   /* ── TABLE AREA ── */
   #table-area {
@@ -1105,12 +1123,10 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
 
 /* Arrow card announcement over double button */
 #arrow-toast {
-  position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%);
-  background: rgba(34,85,170,0.95); border: 1.5px solid #2255AA;
-  color: #fff; font-family: var(--mono); font-size: 9px; font-weight: 700;
-  padding: 4px 8px; border-radius: 4px; white-space: nowrap;
-  pointer-events: none; display: none; z-index: 100;
-  letter-spacing: 1px;
+  display: none;
+  font-family: var(--mono); font-size: 8px; font-weight: 700;
+  color: #7ab4ff; letter-spacing: 1px; margin-left: 4px;
+  white-space: nowrap;
 }
 #btn-double { position: relative; }
 
@@ -1275,11 +1291,28 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
 #chart-pl-label.pos { color: var(--green); }
 #chart-pl-label.neg { color: var(--red); }
 #chart-pl-label.zero { color: var(--muted); }
+#chart-pl-label.flash-pos { animation: plFlashPos .6s ease; }
+#chart-pl-label.flash-neg { animation: plFlashNeg .6s ease; }
+@keyframes plFlashPos {
+  0%   { transform: scale(1);    color: var(--green); }
+  30%  { transform: scale(1.18); color: #6ee7b7; }
+  100% { transform: scale(1);    color: var(--green); }
+}
+@keyframes plFlashNeg {
+  0%   { transform: scale(1);    color: var(--red); }
+  30%  { transform: scale(1.18); color: #fca5a5; }
+  100% { transform: scale(1);    color: var(--red); }
+}
 #chart-canvas-wrap {
   height: 38px; position: relative; overflow: hidden;
 }
 #session-chart-canvas {
   width: 100%; height: 100%; display: block;
+  transition: opacity .15s;
+}
+@keyframes chartLineDraw {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 @media (max-width: 720px) {
   #chart-pl-label { font-size: 10px; }
@@ -1443,7 +1476,6 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <div class="tb-right">
       <button class="btn-ghost" id="sidebar-toggle" onclick="toggleSidebar()" style="font-size:11px;padding:6px 10px;letter-spacing:1px" title="Toggle sidebar">⊞</button>
       <div class="badge" id="sync-badge">LOCAL</div>
-      <button class="btn-ghost" onclick="openModal('stake-modal')">Stake</button>
       <button class="btn-ghost" onclick="showCashout()">Cash Out</button>
     </div>
   </div>
@@ -4892,13 +4924,25 @@ function updateSessionChart(newPL) {
   bar.style.display = 'flex';
   bar.classList.add('visible');
 
-  // Update label
+  // Update label with flash animation
   const total = _chartPts[_chartPts.length - 1];
+  const prev = _chartPts.length > 1 ? _chartPts[_chartPts.length - 2] : 0;
+  const changed = total !== prev;
   label.textContent = (total >= 0 ? '+' : '') + fmtKFC(total);
-  label.className = total > 0 ? 'pos' : total < 0 ? 'neg' : 'zero';
+  const colorClass = total > 0 ? 'pos' : total < 0 ? 'neg' : 'zero';
+  // Trigger flash by removing and re-adding animation class
+  label.className = colorClass;
+  if (changed && colorClass !== 'zero') {
+    void label.offsetWidth; // force reflow
+    label.classList.add(total > prev ? 'flash-pos' : 'flash-neg');
+    label.addEventListener('animationend', () => label.classList.remove('flash-pos','flash-neg'), {once:true});
+  }
 
-  // Draw chart
-  _drawChart(canvas);
+  // Brief fade-out then redraw for the sparkline
+  if (canvas) {
+    canvas.style.opacity = '0';
+    setTimeout(() => { canvas.style.opacity = '1'; _drawChart(canvas); }, 80);
+  }
 }
 
 function _drawChart(canvas) {
