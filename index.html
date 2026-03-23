@@ -1657,7 +1657,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
         <div id="play-actions">
           <button class="act stand"   id="btn-stand"  onclick="stand()"  disabled>Stand</button>
           <button class="act hit"     id="btn-hit"    onclick="hitGuard()"    disabled>Hit</button>
-          <button class="act double"  id="btn-double" onclick="dbl()"    disabled>Double<span id="arrow-toast">🏹 FREE</span></button>
+          <button class="act double"  id="btn-double" onclick="dblGuard()"    disabled>Double<span id="arrow-toast">🏹 FREE</span></button>
           <button class="act split"   id="btn-split"  onclick="split()"  disabled style="display:none">Split</button>
           <button class="act" id="btn-insurance-yes" onclick="takeInsurance()"    style="display:none;background:rgba(63,185,80,.12);border-color:var(--green);color:var(--green);font-size:10px">Insurance ✓</button>
           <button class="act" id="btn-insurance-no"  onclick="declineInsurance()" style="display:none;font-size:10px">No Ins.</button>
@@ -2002,6 +2002,20 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <div style="display:flex;gap:8px">
       <button class="btn-ghost" style="flex:1" onclick="cancelHit()">Cancel</button>
       <button class="btn-primary" style="flex:1;background:var(--red);border-color:var(--red)" onclick="confirmHit()">Yes, Hit</button>
+    </div>
+  </div>
+</div>
+
+<!-- DOUBLE CONFIRM -->
+<div class="overlay" id="dbl-confirm-modal">
+  <div class="modal" style="min-width:300px;max-width:320px;text-align:center">
+    <div style="font-size:11px;letter-spacing:4px;color:var(--blue);text-transform:uppercase;margin-bottom:16px">Are you sure?</div>
+    <div style="font-family:var(--mono);font-size:13px;color:var(--white);margin-bottom:4px">Double down for <span id="dbl-confirm-val" style="color:var(--blue);font-weight:700"></span>?</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:4px">Total at risk: <span id="dbl-confirm-total"></span></div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:24px">Hand value: <span id="dbl-confirm-hand" style="color:var(--white)"></span></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost" style="flex:1" onclick="cancelDbl()">Cancel</button>
+      <button class="btn-primary" style="flex:1" onclick="confirmDbl()">Yes, Double</button>
     </div>
   </div>
 </div>
@@ -4828,11 +4842,11 @@ function renderScores(){
     if(!el)return;
     const v=hv(h);
     const bust=isBust(h); const bj=isBJ(h);
-    // Detect soft hand: hand contains an ace AND hv() is counting it as 11
-    // hardSum = value if all aces counted as 1
-    const hasAce=h.some(c=>!c.bonus&&c.r==='A');
+    // Detect soft hand: hand contains an ace (including bonus card aces) AND hv() counts it as 11
+    // hardSum = value with all aces counted as 1
+    const hasAce=h.some(c=>cardRank(c)==='A');
     const hardSum=h.reduce((s,c)=>{
-      if(!c.bonus&&c.r==='A') return s+1;
+      if(cardRank(c)==='A') return s+1;
       return s+cv(c);
     },0);
     const isSoft=!bust&&!bj&&hasAce&&v===hardSum+10&&v<=21;
@@ -4843,8 +4857,9 @@ function renderScores(){
 }
 
 function setActions(playing){
-  // Dismiss hit-confirm modal if open when actions change
+  // Dismiss hit/dbl confirm modals if open when actions change
   closeModal('hit-confirm-modal');
+  closeModal('dbl-confirm-modal');
   // Legacy hidden buttons
   const legacyIds=['btn-deal','btn-hit','btn-stand','btn-double','btn-split'];
   const legacyStates=[playing,!playing,!playing,!playing,!playing];
@@ -5256,7 +5271,7 @@ document.addEventListener('keydown', function(e){
       }
       break;
     case 'd': case 'D':
-      if(G.phase==='play'){ const b=document.getElementById('btn-double'); if(b&&!b.disabled) dbl(); }
+      if(G.phase==='play'){ const b=document.getElementById('btn-double'); if(b&&!b.disabled) dblGuard(); }
       break;
     case 'p': case 'P':
       if(G.phase==='play'){ const b=document.getElementById('btn-split'); if(b&&!b.disabled&&b.style.display!=='none') split(); }
@@ -5367,6 +5382,26 @@ function renderSessionStats(){
     stat('Win Streak',s.maxStreak+'⬆')+
     stat('Lose Streak',s.maxLoseStreak+'⬇');
 }
+
+// ── DOUBLE GUARD ──────────────────────────────────────────────
+function dblGuard(){
+  if(G.phase!=='play') return;
+  // Free double (arrow card) — no confirm needed, no extra cost
+  if(G.arrowCount>0){ dbl(); return; }
+  const h=G.hands[G.cur];
+  const v=h?hv(h):0;
+  // Confirm when bet is large OR hand value is 17+
+  if(G.mainBet>=G.s.min*5 || v>=17){
+    document.getElementById('dbl-confirm-val').textContent=fmtKFC(G.mainBet);
+    document.getElementById('dbl-confirm-total').textContent=fmtKFC(G.mainBet*2);
+    document.getElementById('dbl-confirm-hand').textContent=v;
+    openModal('dbl-confirm-modal');
+  } else {
+    dbl();
+  }
+}
+function confirmDbl(){ closeModal('dbl-confirm-modal'); dbl(); }
+function cancelDbl(){ closeModal('dbl-confirm-modal'); }
 
 // ── HIT GUARD (18+) ──────────────────────────────────────────────
 function hitGuard(){
