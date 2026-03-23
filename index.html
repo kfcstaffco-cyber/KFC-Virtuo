@@ -2099,7 +2099,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <div id="co-actions-pre" style="display:flex;gap:8px;flex-direction:column">
       <div style="display:flex;gap:8px">
         <button class="btn-primary" style="flex:1" onclick="confirmCashout()">Confirm & Sync</button>
-        <button class="btn-ghost" onclick="if(G.balance>=BALANCE_CAP){notif('Must cash out — 50B cap reached');}else{G._atCashout=false;closeModal('cashout-modal');}">Stay</button>
+        <button class="btn-ghost" onclick="if(G.balance>=BALANCE_CAP){notif('Balance cap reached — cash out first');}else{G._atCashout=false;closeModal('cashout-modal');}">Stay</button>
       </div>
       <button class="btn-ghost" style="width:100%;margin-top:4px;border-color:rgba(248,81,73,0.4);color:var(--red)" onclick="doLogout(G.balance<=0);closeModal('cashout-modal')">Leave Table</button>
     </div>
@@ -2107,7 +2107,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <div id="co-actions-post" style="display:none;flex-direction:column;gap:8px">
       <div id="co-confirmed-badge" style="font-family:var(--mono);font-size:11px;color:var(--green);letter-spacing:1px;text-align:center;padding:8px 0">✓ Synced — ready to leave</div>
       <button class="btn-primary" style="width:100%" onclick="doLogout(G.balance<=0);closeModal('cashout-modal')">Leave Table</button>
-      <button class="btn-ghost" style="width:100%" onclick="if(G.balance>=BALANCE_CAP){notif('Must cash out — 50B cap reached');}else{G._atCashout=false;closeModal('cashout-modal');}">Stay &amp; Play More</button>
+      <button class="btn-ghost" style="width:100%" onclick="if(G.balance>=BALANCE_CAP){notif('Balance cap reached — cash out first');}else{G._atCashout=false;closeModal('cashout-modal');}">Stay &amp; Play More</button>
     </div>
   </div>
 </div>
@@ -2272,7 +2272,7 @@ function draw(){
   if(c&&c.cutCard){
     // Cut card drawn — flag reshuffle before next hand, draw next real card
     G.cutCardTriggered=true;
-    notif('✂ Cut card — shoe will reshuffle after this hand');
+    notif('Cut card drawn — shoe reshuffles after this hand');
     return G.deck.pop()||draw();
   }
   return c;
@@ -2701,7 +2701,7 @@ function confirmStampedBoost(){
     return;
   }
   if(boost>G.stampedInitialBet){notif('Exceeds max boost');return;}
-  if(G.balance<boost){notif('Insufficient balance');return;}
+  if(G.balance<boost){notif('Not enough balance');return;}
   G.balance-=boost;
   G.preDealBal-=boost;
   G.mainBet+=boost;
@@ -2712,7 +2712,7 @@ function confirmStampedBoost(){
   if(existingStamped){existingStamped.label=`Stamped Card — bet boosted +${fmtKFC(boost)}`;existingStamped.pl=0;existingStamped.type='info';}
   else{G._bonusPayouts.push({label:`Stamped Card — bet boosted +${fmtKFC(boost)}`,pl:0,type:'info'});}
   updateUI();updateBetPanel();sfx('chip');
-  notif('Bet boosted to '+fmtKFC(G.mainBet)+'!');
+  notif('Bet boosted → '+fmtKFC(G.mainBet));
   if(G._pendingBJ){G._pendingBJ=false;setTimeout(()=>settle('player_bj'),400);}
   else if(G._pendingStand){G._pendingStand=false;advOrEnd();}
 }
@@ -2876,7 +2876,7 @@ function evaluateEarlySideBets(){
   updateSBCircles();
   wins.forEach((w,i)=>setTimeout(()=>showSideBetWin(w.label,w.pl),i*600+300));
   if(wins.length===0&&earlyBets.some(n=>(G.lastSideBets&&G.lastSideBets[n]>0))){
-    setTimeout(()=>notif('Side bets: no win'),400);
+    setTimeout(()=>notif('Side bets — no win this hand'),400);
   }
   updateBetPanel();
 }
@@ -2889,8 +2889,8 @@ function offerInsurance(){
 function takeInsurance(){
   const maxIns=Math.floor(G.mainBet/2);
   closeModal('insurance-modal');
-  if(G.balance<maxIns){notif('Insufficient balance');}
-  else { G.balance-=maxIns; G.insuranceBet=maxIns; updateUI(); notif('Insurance placed: '+fmtKFC(maxIns)); }
+  if(G.balance<maxIns){notif('Not enough balance');}
+  else { G.balance-=maxIns; G.insuranceBet=maxIns; updateUI(); notif('Insurance placed — '+fmtKFC(maxIns)); }
   _afterInsurance();
 }
 function declineInsurance(){
@@ -2902,26 +2902,26 @@ function _afterInsurance(){
   // Now peek dealer hole card
   if(isBJ(G.dealer)){
     revealHole(); renderAll();
-    if(G.puOwned.has('guard')){notif('BJ Guard — Push!');setTimeout(()=>settle('push_guard'),500);return;}
-    if(isBJ(G.hands[0])){msg('Push — both BJ','push');setTimeout(()=>settle('push_player_bj'),500);return;}
-    msg('Dealer Blackjack','lose');setTimeout(()=>settle('dealer_bj'),500);return;
+    if(G.puOwned.has('guard')){notif('BJ GUARD — PUSH');setTimeout(()=>settle('push_guard'),500);return;}
+    if(isBJ(G.hands[0])){msg('PUSH — BOTH BLACKJACK','push');setTimeout(()=>settle('push_player_bj'),500);return;}
+    msg('DEALER BLACKJACK','lose');setTimeout(()=>settle('dealer_bj'),500);return;
   }
   // Dealer does not have BJ — insurance lost (already deducted), continue play
-  if(G.insuranceBet>0) notif('No dealer BJ — insurance lost');
+  if(G.insuranceBet>0) notif('No dealer blackjack — insurance lost');
   // Check if player has BJ
   if(isBJ(G.hands[0])){
     if(G.stampedOn){
-      msg('Blackjack! Boost your bet first!','bj'); sfx('bj');
+      msg('BLACKJACK! BOOST YOUR BET','bj'); sfx('bj');
       revealHole(); renderAll();
       showStampedBoost();
       G._pendingBJ=true;
       setActions(false);
       return;
     }
-    msg('Blackjack!','bj'); sfx('bj'); showBJ(); revealHole(); renderAll();
+    msg('BLACKJACK!','bj'); sfx('bj'); showBJ(); revealHole(); renderAll();
     setTimeout(()=>settle('player_bj'),500); return;
   }
-  setActions(true); msg('Your turn');
+  setActions(true); msg('YOUR TURN');
 }
 function hideInsurance(){
   closeModal('insurance-modal');
@@ -3222,7 +3222,7 @@ window.onload=()=>{
   if(restoreSession()){
     // Session found — skip login, go straight to table
     openApp(G.player, G.balance);
-    notif('↺ Session restored — welcome back, '+G.player+'!');
+    notif('Session restored — welcome back, '+G.player);
     _afterRestoreChart();
     // Silently re-fetch balance from sheet to catch any changes since last close
     if(G.url && G.username && G._cachedPin){
@@ -3236,7 +3236,7 @@ window.onload=()=>{
             G._totalBalance=d.balance;
             if(G.phase==='bet' && d.balance!==prevTotal){
               // Wallet changed while away (e.g. admin top-up) — notify but keep session balance
-              notif('Wallet updated: '+fmtKFC(d.balance));
+              notif('Balance synced — '+fmtKFC(d.balance));
             }
           }
         })
@@ -3302,7 +3302,7 @@ const BALANCE_CAP = 50_000_000_000; // 50 Billion KFC hard cap
 function checkBalanceCap(){
   if(G.balance>=BALANCE_CAP){
     setTimeout(()=>{
-      notif('⚠ Balance cap reached — cash out required');
+      notif('Balance cap reached — cash out required');
       G.cashedOut=false;
       showCashout();
       // Show a prominent modal message
@@ -3330,7 +3330,7 @@ function openApp(displayName, balance){
   renderLog();
   setSyncBadge(G.url?'live':'', G.url?'LIVE':'LOCAL');
   if(!G.deck||G.deck.length===0) G.deck=buildShoe();
-  msg('Place your bet');
+  msg('PLACE YOUR BET');
   const db2=document.getElementById('btn-deal'); if(db2) db2.disabled=true;
   // Set initial betting phase
   G.phase='bet';
@@ -3353,20 +3353,20 @@ function openApp(displayName, balance){
   // Balance checks
   if(G.balance>=BALANCE_CAP){
     setTimeout(()=>{
-      notif('⚠ 50B cap reached — cash out required');
+      notif('50B balance cap reached — cash out required');
       G.cashedOut=false;
       showCashout();
     },1500);
   } else if(G.balance<=0){
     G.balance=0;
     setTimeout(()=>{
-      notif('Balance liquidated — session over');
+      notif('Balance at zero — session over');
       G.cashedOut=false;
       showCashout();
     },2300);
   } else if(G.balance<G.s.min){
     setTimeout(()=>{
-      notif('Balance too low for this stake');
+      notif('Balance too low for this stake — cash out or switch');
       G.cashedOut=false;
       showCashout();
     },2300);
@@ -3377,9 +3377,9 @@ function openApp(displayName, balance){
 
 function doLogout(skipToStake){
   resetSessionChart();
-  if(G.phase!=='bet'){notif('Finish your hand first');return;}
+  if(G.phase!=='bet'){notif('Finish the current hand first');return;}
   if(!G.cashedOut){
-    notif('Please cash out before leaving');
+    notif('Please cash out before leaving the table');
     openModal('cashout-modal');
     return;
   }
@@ -3572,7 +3572,7 @@ function buildChips(){['chip-row','chip-strip'].forEach(rowId=>{const c=document
     if(typeof _h2ChipTarget!=='undefined'&&_h2ChipTarget&&G._hand2Active){
       // Route chip to hand 2
       const newBet2=(G.mainBet2||0)+v;
-      if(newBet2>G.s.max){if((G.mainBet2||0)<G.s.max){G.mainBet2=G.s.max;if(typeof updateHand2Panel==='function')updateHand2Panel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}
+      if(newBet2>G.s.max){if((G.mainBet2||0)<G.s.max){G.mainBet2=G.s.max;if(typeof updateHand2Panel==='function')updateHand2Panel();sfx('chip');}notif('Max bet is '+fmtKFC(G.s.max));return;}
       G.mainBet2=newBet2;
       if(typeof updateHand2Panel==='function')updateHand2Panel();
       sfx('chip');
@@ -3580,7 +3580,7 @@ function buildChips(){['chip-row','chip-strip'].forEach(rowId=>{const c=document
     } else {
       // Route chip to hand 1 (original behaviour)
       const newBet=G.mainBet+v;
-      if(newBet>G.s.max){if(G.mainBet<G.s.max){G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet: '+fmtKFC(G.s.max));return;}
+      if(newBet>G.s.max){if(G.mainBet<G.s.max){G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet is '+fmtKFC(G.s.max));return;}
       G.mainBet=newBet;updateBetPanel();sfx('chip');
       flyChipToCircle(btn,col,lbl);
       btn.style.transform='translateY(-5px) scale(1.15)';setTimeout(()=>{btn.style.transform='';},200);
@@ -3662,7 +3662,7 @@ function clearBets(){
   sfx('button');
 }
 function sameBet(){
-  if(G.phase!=='bet'){notif('Finish the hand first');return;}
+  if(G.phase!=='bet'){notif('Finish the current hand first');return;}
   if(!G.lastMainBet&&Object.values(G.lastSideBets||{}).every(v=>!v)){notif('No previous bet to restore');return;}
   G.mainBet=G.lastMainBet||0;
   SB_NAMES.forEach(n=>G.sideBets[n]=(G.lastSideBets&&G.lastSideBets[n])||0);
@@ -3676,8 +3676,8 @@ function sameBet(){
   notif(G._hand2Active&&G.lastMainBet2>0?'↺ Both hands restored':'↺ Last bet restored');
 }
 function allSideBets(){
-  if(G.phase!=='bet'){notif('Finish the hand first');return;}
-  if(G.mainBet<=0){notif('Place a main bet first');return;}
+  if(G.phase!=='bet'){notif('Finish the current hand first');return;}
+  if(G.mainBet<=0){notif('Place your main bet first');return;}
   const sMin=G.s.sMin;
   const maxSB=G.s.max;
   const vals=SB_NAMES.map(n=>G.sideBets[n]||0);
@@ -3693,7 +3693,7 @@ function allSideBets(){
   updateBetPanel();
   updateSBCircles();
   sfx('chip');
-  notif('Side bets: '+fmtKFC(nextVal)+' each'+(G._hand2Active&&(G.mainBet2||0)>0?' (both hands)':''));
+  notif('Side bets set — '+fmtKFC(nextVal)+' each'+(G._hand2Active&&(G.mainBet2||0)>0?' (both hands)':''));
 }
 
 // ── SIDE BETS ──────────────────────────────────────────────
@@ -3717,8 +3717,8 @@ function buildSideBets(){
 }
 
 function cycleSB(name){
-  if(G.phase!=='bet'){notif('Finish the hand first'); return;}
-  if(G.mainBet<=0){notif('Place a main bet first'); return;}
+  if(G.phase!=='bet'){notif('Finish the current hand first'); return;}
+  if(G.mainBet<=0){notif('Place your main bet first'); return;}
   const steps=[0,G.s.sMin,G.s.sMin*2,G.s.sMin*5,G.s.min];
   const cur=G.sideBets[name]||0;
   const ni=steps.findIndex(v=>v>cur);
@@ -3787,7 +3787,7 @@ function buildLevPanel(){
 function toggleLev(key){
   // Jester cards (c0, c1…) may only be evoked during the betting phase
   if(key.startsWith('c') && G.phase!=='bet'){
-    notif('Jester cards must be evoked before dealing');
+    notif('Jester cards can only be evoked before dealing');
     return;
   }
   G.leverage=G.leverage===key?null:key;
@@ -3811,14 +3811,14 @@ function buildPuPanel(){
 }
 
 function buyPu(pu,cost){
-  if(G.puOwned.has(pu.id)){notif(pu.label+' already active');return;}
-  if(G.puOwned.size>=2){notif('Max 2 power-ups active at once');return;}
+  if(G.puOwned.has(pu.id)){notif(pu.label+' is already active');return;}
+  if(G.puOwned.size>=2){notif('Max 2 power-ups active at a time');return;}
   const stakeIdx=STAKE_ORDER.indexOf(G.stake); const minIdx=STAKE_ORDER.indexOf(pu.minStake);
   if(stakeIdx < minIdx){notif('Unlocks at '+pu.minStake.charAt(0).toUpperCase()+pu.minStake.slice(1)+' stakes');return;}
-  if(G.phase==='play'||G.phase==='dealer'){notif('Buy before the hand');return;}
-  if(G.balance<cost){notif('Insufficient balance');return;}
+  if(G.phase==='play'||G.phase==='dealer'){notif('Power-ups must be bought before dealing');return;}
+  if(G.balance<cost){notif('Not enough balance');return;}
   G.balance-=cost; G.puOwned.add(pu.id); updateUI(); buildPuPanel();
-  sfx('buy'); notif('✓ '+pu.label+' active this shoe!');
+  sfx('buy'); notif(pu.label+' activated — good for this shoe');
 }
 
 const PU_IMAGES={
@@ -3869,12 +3869,12 @@ function showBJ(){
 function deal(){
   if(!G._audioReady)initAudio();
   if(G.phase!=='bet')return;
-  if(G.balance>=BALANCE_CAP){notif('⚠ 50B cap — cash out first');showCashout();return;}
+  if(G.balance>=BALANCE_CAP){notif('50B balance cap reached — cash out first');showCashout();return;}
   if(G.mainBet<=0){notif('Place a bet first');return;}
-  if(G.mainBet<G.s.min){notif('Min bet is '+fmtKFC(G.s.min));return;}
+  if(G.mainBet<G.s.min){notif('Minimum bet is '+fmtKFC(G.s.min));return;}
   const totalDeducted=G.mainBet+Object.values(G.sideBets).reduce((a,b)=>a+b,0)+(G.leverage==='2x'?G.s.min*2:0)
     +((G._hand2Active&&(G.mainBet2||0)>=G.s.min)?(G.mainBet2+Object.values(G.sideBets2||{}).reduce((a,b)=>a+b,0)):0);
-  if(G.balance<totalDeducted){notif('Insufficient balance');return;}
+  if(G.balance<totalDeducted){notif('Not enough balance');return;}
   let puCost=0;
   G.puPending.forEach(id=>{const pu=POWERUPS.find(p=>p.id===id);if(pu)puCost+=G.s.min*(pu.ratio||5);});
   G.puPending.clear();
@@ -3953,8 +3953,8 @@ function deal(){
     if(isBJ(G.hands[0])&&isBJ(G.dealer)){
       // Both BJ — no insurance needed, immediate push
       revealHole();
-      if(G.puOwned.has('guard')){notif('BJ Guard — Push!');renderAll();setTimeout(()=>settle('push_guard'),500);return;}
-      msg('Push — both BJ','push');renderAll();setTimeout(()=>settle('push_player_bj'),500);return;
+      if(G.puOwned.has('guard')){notif('BJ GUARD — PUSH');renderAll();setTimeout(()=>settle('push_guard'),500);return;}
+      msg('PUSH — BOTH BLACKJACK','push');renderAll();setTimeout(()=>settle('push_player_bj'),500);return;
     }
     // Player has BJ — no point offering insurance (outcome is win or push regardless)
     if(isBJ(G.hands[0])){
@@ -3963,13 +3963,13 @@ function deal(){
       // Resolve immediately: if dealer has BJ it's a push, otherwise player BJ wins
       revealHole(); renderAll();
       if(isBJ(G.dealer)){
-        msg('Push — both BJ','push'); setTimeout(()=>settle('push_player_bj'),500);
+        msg('PUSH — BOTH BLACKJACK','push'); setTimeout(()=>settle('push_player_bj'),500);
       } else {
         if(G.stampedOn){
-          msg('Blackjack! Boost your bet first!','bj'); sfx('bj');
+          msg('BLACKJACK! BOOST YOUR BET','bj'); sfx('bj');
           evaluateEarlySideBets(); showStampedBoost(); G._pendingBJ=true;
         } else {
-          msg('Blackjack!','bj'); sfx('bj'); showBJ(); setTimeout(()=>settle('player_bj'),500);
+          msg('BLACKJACK!','bj'); sfx('bj'); showBJ(); setTimeout(()=>settle('player_bj'),500);
         }
       }
       return;
@@ -3983,14 +3983,14 @@ function deal(){
   // No Ace showing — safe to check dealer BJ immediately
   if(isBJ(G.dealer)){
     revealHole();
-    if(G.puOwned.has('guard')){notif('BJ Guard — Push!');renderAll();setTimeout(()=>settle('push_guard'),500);return;}
-    if(isBJ(G.hands[0])){msg('Push — both BJ','push');renderAll();setTimeout(()=>settle('push_player_bj'),500);return;}
-    msg('Dealer Blackjack','lose');renderAll();setTimeout(()=>settle('dealer_bj'),500);return;
+    if(G.puOwned.has('guard')){notif('BJ GUARD — PUSH');renderAll();setTimeout(()=>settle('push_guard'),500);return;}
+    if(isBJ(G.hands[0])){msg('PUSH — BOTH BLACKJACK','push');renderAll();setTimeout(()=>settle('push_player_bj'),500);return;}
+    msg('DEALER BLACKJACK','lose');renderAll();setTimeout(()=>settle('dealer_bj'),500);return;
   }
   if(isBJ(G.hands[0])){
     // If stamped card is active, let player boost before BJ payout
     if(G.stampedOn){
-      msg('Blackjack! Boost your bet first!','bj'); sfx('bj');
+      msg('BLACKJACK! BOOST YOUR BET','bj'); sfx('bj');
       revealHole(); renderAll();
       evaluateEarlySideBets();
       showStampedBoost();
@@ -3998,11 +3998,11 @@ function deal(){
       setActions(false);
       return;
     }
-    msg('Blackjack!','bj');sfx('bj');showBJ();revealHole();renderAll();setTimeout(()=>settle('player_bj'),500);return;
+    msg('BLACKJACK!','bj');sfx('bj');showBJ();revealHole();renderAll();setTimeout(()=>settle('player_bj'),500);return;
   }
   evaluateEarlySideBets();
   setTimeout(()=>showMissedSideBets(false,0),400);
-  setActions(true); msg('Your turn');
+  setActions(true); msg('YOUR TURN');
 }
 
 function getLevMult(){
@@ -4028,8 +4028,8 @@ function onBonusCard(bc, cardIndex, handIdx){
   // Note: stamped only works on hand 1 (can't boost hand 2 mid-deal)
   switch(bc.id){
     case 'stamped':
-      if(!isHand2){ G.stampedOn=true; G.stampedInitialBet=G.mainBet; G.stampedCardsViewed=0; bonusToast(bc,'View up to 3 cards — then boost bet!'); showStampedBoost(); }
-      else bonusToast(bc,'Stamped Card on Hand 2 — view cards (no boost)');
+      if(!isHand2){ G.stampedOn=true; G.stampedInitialBet=G.mainBet; G.stampedCardsViewed=0; bonusToast(bc,'View 3 cards, then boost your bet'); showStampedBoost(); }
+      else bonusToast(bc,'View cards (boost not available on Hand 2)');
       break;
     case 'gold':{
       G.goldOn=true;
@@ -4039,54 +4039,54 @@ function onBonusCard(bc, cardIndex, handIdx){
       G._goldCardBet=(G._goldCardBet||0)+goldAmt;
       updateSBCircles&&updateSBCircles();
       G._bonusPayouts.push({label:'Gold Card'+(isHand2?' (H2)':'')+' — free Dealer Bust bet',pl:0,type:'info'});
-      bonusToast(bc,'Free Dealer Bust bet: '+fmtKFC(goldAmt)+(isHand2?' (Hand 2)':''));
+      bonusToast(bc,'Free Dealer Bust — '+fmtKFC(goldAmt)+' added'+(isHand2?' · Hand 2':''));
       break;
     }
     case 'scarface':{
       const sp=Math.floor(G.s.min/2);
       G.balance+=sp; G.preDealBal+=sp; updateUI();
       G._bonusPayouts.push({label:'Scarface'+(isHand2?' (H2)':'')+' — instant payout',pl:sp,type:'gain'});
-      bonusToast(bc,'Instant +'+fmtKFC(sp)+' (Scarface'+(isHand2?' H2':'')+')');
+      bonusToast(bc,'Scarface pays out — +'+fmtKFC(sp)+(isHand2?' · Hand 2':''));
       break;
     }
     case 'arrow':
       G.arrowCount++;
       G._bonusPayouts.push({label:'Arrow Card'+(isHand2?' (H2)':'')+' — free double-down',pl:0,type:'info'});
-      bonusToast(bc,G.arrowCount>=2?'Two arrows — double-double-down!':'Free double-down!'+(isHand2?' (Hand 2)':''));
+      bonusToast(bc,G.arrowCount>=2?'Two arrows — double-double-down free!':'Arrow Card — free double-down'+(isHand2?' · Hand 2':''));
       const at=document.getElementById('arrow-toast');
       if(at) at.style.display='block';
       break;
     case 'krueger':
       G.kruegerOn=true;
       G._bonusPayouts.push({label:'Krueger'+(isHand2?' (H2)':'')+' — bust insurance active',pl:0,type:'info'});
-      bonusToast(bc,'Bust insurance: half wager'+(isHand2?' (Hand 2)':''));
+      bonusToast(bc,'Krueger active — bust insurance: half wager'+(isHand2?' · Hand 2':''));
       break;
     case 'ice':{
       const ip=G.s.min*2;
       G.balance+=ip; G.preDealBal+=ip; updateUI();
       G._bonusPayouts.push({label:'Ice Card'+(isHand2?' (H2)':'')+' — instant payout',pl:ip,type:'gain'});
-      bonusToast(bc,'Instant +'+fmtKFC(ip)+' (Ice Card'+(isHand2?' H2':'')+')');
+      bonusToast(bc,'Ice Card pays out — +'+fmtKFC(ip)+(isHand2?' · Hand 2':''));
       break;
     }
     case 'desert':
       G.desertOn=true;
       G._bonusPayouts.push({label:'Desert Card'+(isHand2?' (H2)':'')+' — bust/loss protection',pl:0,type:'info'});
-      bonusToast(bc,'Full bust/loss protection'+(isHand2?' (Hand 2)':''));
+      bonusToast(bc,'Desert Card active — full bust/loss protection'+(isHand2?' · Hand 2':''));
       break;
     case 'steel':
       G.steelOn=true;
       G._bonusPayouts.push({label:'Steel Card'+(isHand2?' (H2)':'')+' — BJ pays 2:1',pl:0,type:'info'});
-      bonusToast(bc,'Blackjack pays 2:1 this hand'+(isHand2?' (Hand 2)':''));
+      bonusToast(bc,'Steel Card — Blackjack pays 2:1 this hand'+(isHand2?' · Hand 2':''));
       break;
     case 'blood':
       G._levCardsPending.push('blood');
       G._bonusPayouts.push({label:'Blood Jester'+(isHand2?' (H2)':'')+' — 2× leverage card earned (next round)',pl:0,type:'info'});
-      bonusToast(bc,'2× leverage card earned — usable next round!');
+      bonusToast(bc,'Blood Jester — 2× leverage card earned, usable next round');
       break;
     case 'plague':{
       G.plagueOn=true;
       G._bonusPayouts.push({label:'Plague Jester'+(isHand2?' (H2)':'')+' — half winnings taken',pl:0,type:'warn'});
-      bonusToast(bc,'Plague Jester — half your winnings go to the Plague Pot!');
+      bonusToast(bc,'Plague Jester — half your winnings taken if you win');
       break;
     }
   }
@@ -4128,8 +4128,8 @@ function hit(){
         if(r.bonus)onBonusCard(r.bonus, hitIdx); // same positional index
         renderAll();
         const v2=hv(h);
-        if(v2===22&&G.puOwned.has('net')){G.safetyTrigger=true;notif('Safety Net!');advOrEnd('safety');return;}
-        if(isBust(h)){sfx('bust');if(G.kruegerOn){const ins=Math.floor(G.mainBet/2);G.preDealBal+=ins;G.balance+=ins;updateUI();G._bonusPayouts.push({label:'Krueger — bust insurance',pl:ins,type:'gain'});notif('Krueger recovered '+fmtKFC(ins));G.kruegerOn=false;}if(G.desertOn){G.desertOn=false;advOrEnd('desert_push');return;}advOrEnd('bust');}
+        if(v2===22&&G.puOwned.has('net')){G.safetyTrigger=true;notif('SAFETY NET — PUSH');advOrEnd('safety');return;}
+        if(isBust(h)){sfx('bust');if(G.kruegerOn){const ins=Math.floor(G.mainBet/2);G.preDealBal+=ins;G.balance+=ins;updateUI();G._bonusPayouts.push({label:'Krueger — bust insurance',pl:ins,type:'gain'});notif('Krueger — recovered '+fmtKFC(ins));G.kruegerOn=false;}if(G.desertOn){G.desertOn=false;advOrEnd('desert_push');return;}advOrEnd('bust');}
         else if(v2===21){advOrEnd();}
         else renderScores();
       },300);
@@ -4138,16 +4138,16 @@ function hit(){
   }
   renderAll();
   const v=hv(h);
-  if(v===22&&G.puOwned.has('net')){ G.safetyTrigger=true; notif('Safety Net — push!'); advOrEnd('safety');return; }
+  if(v===22&&G.puOwned.has('net')){ G.safetyTrigger=true; notif('SAFETY NET — PUSH'); advOrEnd('safety');return; }
   if(isBust(h)){
     sfx('bust');
-    if(G.kruegerOn){const ins=Math.floor(G.mainBet/2);G.preDealBal+=ins;G.balance+=ins;updateUI();G._bonusPayouts.push({label:'Krueger — bust insurance',pl:ins,type:'gain'});notif('Krueger — recovered '+fmtKFC(ins)+' (half wager)');G.kruegerOn=false;}
+    if(G.kruegerOn){const ins=Math.floor(G.mainBet/2);G.preDealBal+=ins;G.balance+=ins;updateUI();G._bonusPayouts.push({label:'Krueger — bust insurance',pl:ins,type:'gain'});notif('Krueger — bust insurance paid '+fmtKFC(ins));G.kruegerOn=false;}
     if(G.desertOn){G.desertOn=false;advOrEnd('desert_push');return;}
     advOrEnd('bust');
   } else if(v===21){
     // If stamped card is active, let player boost their bet before the hand ends
     if(G.stampedOn&&G.stampedCardsViewed>=1){
-      msg('21! Boost your bet before standing?','bj');
+      msg('21 — BOOST BET BEFORE STANDING?','bj');
       showStampedBoost();
       // Don't auto-advance — player must use or skip the boost
       G._pendingStand=true;
@@ -4166,7 +4166,7 @@ function dbl(){
   sfx('chip');
   const h=G.hands[G.cur];
   // Double-down only allowed on the first two cards
-  if(h.length!==2){notif('Double down only allowed on initial 2 cards');return;}
+  if(h.length!==2){notif('Double down is only allowed on your first 2 cards');return;}
   if(G.arrowCount>0){
     // Free double: house covers the extra stake. Player wins at 2× but only risks original bet on loss.
     G.arrowCount--;
@@ -4180,9 +4180,9 @@ function dbl(){
     //   win: balance = preDealBal + mainBet*lm = preDealBal + 2×original → profit = original ✓
     //   loss: balance = preDealBal - original (capped via _freeDoubleBet) ✓
     updateBetPanel();
-    notif('🏹 Free double — bet: '+fmtKFC(G.mainBet)+' (no extra cost)');
+    notif('Arrow Card — free double-down');
   } else {
-    if(G.balance<G.mainBet){notif('Insufficient balance');return;}
+    if(G.balance<G.mainBet){notif('Not enough balance');return;}
     G.balance-=G.mainBet; G.mainBet*=2; updateUI(); updateBetPanel();
   }
   const c=draw(); h.push(c);
@@ -4203,21 +4203,21 @@ function dbl(){
 
 function surrender(){
   if(G.phase!=='play'){notif('Not in play phase');return;}
-  if(!G.puOwned.has('sally')){notif('Surrender Sally power-up needed');return;}
+  if(!G.puOwned.has('sally')){notif('Surrender Sally power-up required');return;}
   const dealerUp=G.dealer[0];
-  if(!dealerUp||cv(dealerUp)!==10){notif('Sally only works vs dealer 10');return;}
-  sfx('button'); notif('Surrender — recovering half bet...');
+  if(!dealerUp||cv(dealerUp)!==10){notif('Surrender only available against a dealer 10');return;}
+  sfx('button'); notif('Surrender — half bet returned');
   setTimeout(()=>settle('surrender'),300);
 }
 function split(){
   if(G.phase!=='play')return;
   const hand=G.hands[G.cur];
   // Block split only if a jester (no value) is in the hand
-  if(hand.some(c=>c.bonus&&c.bonus.jester)){notif('Cannot split — jester in hand');return;}
+  if(hand.some(c=>c.bonus&&c.bonus.jester)){notif('Cannot split — jester card in hand');return;}
   // Must have exactly 2 cards of equal value (bonus cards use their rep value)
-  if(hand.length!==2||cv(hand[0])!==cv(hand[1])){notif('Cannot split');return;}
-  if(G.splits>=2){notif('Max 2 splits');return;}
-  if(G.balance<G.mainBet){notif('Insufficient balance');return;}
+  if(hand.length!==2||cv(hand[0])!==cv(hand[1])){notif('Cards must match to split');return;}
+  if(G.splits>=2){notif('Maximum 2 splits per hand');return;}
+  if(G.balance<G.mainBet){notif('Not enough balance');return;}
   G.balance-=G.mainBet; G.splits++; updateUI();
   const c2=hand.splice(1,1)[0];
   hand.push(draw());
@@ -4229,15 +4229,15 @@ function split(){
   const cr1=document.getElementById('cards-'+(G.hands.length-1));
   if(cr0) cr0.innerHTML='';
   if(cr1) cr1.innerHTML='';
-  renderAll(); notif('Split!');
+  renderAll(); notif('SPLIT');
   renderScores();
   // Auto-stand current hand if it's BJ (ace+10), then check new hand
   setTimeout(()=>{
     if(isBJ(G.hands[G.cur])){
-      notif('Blackjack on split hand!'); sfx('bj'); showBJ();
+      notif('BLACKJACK on split hand!'); sfx('bj'); showBJ();
       advOrEnd();
     } else {
-      setActions(true); msg('Hand '+(G.cur+1));
+      setActions(true); msg('HAND '+(G.cur+1));
     }
   },400);
 }
@@ -4247,23 +4247,23 @@ function advOrEnd(reason){
   if(reason==='safety'){
     // Safety net: immediate push, skip dealer
     renderScores();
-    if(G.cur<G.hands.length-1){G.cur++;renderAll();setActions(true);msg('Hand '+(G.cur+1));}
+    if(G.cur<G.hands.length-1){G.cur++;renderAll();setActions(true);msg('HAND '+(G.cur+1));}
     else { G.phase='dealer'; setTimeout(()=>settle('safety'),400); }
     return;
   }
   if(reason==='desert_push'||reason==='bust'){
     renderScores();
-    if(G.cur<G.hands.length-1){G.cur++;renderAll();setActions(true);msg('Hand '+(G.cur+1));}
+    if(G.cur<G.hands.length-1){G.cur++;renderAll();setActions(true);msg('HAND '+(G.cur+1));}
     else dealerPlay();
     return;
   }
   if(G.cur<G.hands.length-1){
     G.cur++; renderAll();
     if(G.splits>0&&isBJ(G.hands[G.cur])){
-      notif('Blackjack on split hand!'); sfx('bj'); showBJ();
+      notif('BLACKJACK on split hand!'); sfx('bj'); showBJ();
       setTimeout(()=>advOrEnd(),300);
     } else {
-      setActions(true); msg('Hand '+(G.cur+1));
+      setActions(true); msg('HAND '+(G.cur+1));
     }
   }
   else dealerPlay();
@@ -4273,7 +4273,7 @@ function advOrEnd(reason){
 function dealerPlay(){
   G.phase='dealer';
   setActions(false);
-  msg('Dealer drawing…','dealer-drawing');
+  msg('DEALER DRAWING…','dealer-drawing');
   // Fully re-render dealer cards (all face-up) before the phase lock skips renderAll
   const _dc=document.getElementById('dealer-cards');
   if(_dc){
@@ -4295,7 +4295,7 @@ function dealerPlay(){
   }
   renderAll();
   if(isBJ(G.dealer)){
-    msg('Dealer Blackjack','lose');
+    msg('DEALER BLACKJACK','lose');
     setTimeout(()=>settle('dealer_bj'), 900);
     return;
   }
@@ -4377,7 +4377,7 @@ function settle(reason){
       const insPay=G.insuranceBet*2;
       G.preDealBal+=insPay+G.insuranceBet;
       G._bonusPayouts.push({label:'Insurance — paid 2:1',pl:insPay,type:'gain'});
-      setTimeout(()=>notif('Insurance pays 2:1! +'+fmtKFC(insPay)),200);
+      setTimeout(()=>notif('INSURANCE PAYS 2:1 — +'+fmtKFC(insPay)),200);
     } else {
       G._bonusPayouts.push({label:'Insurance — lost',pl:-G.insuranceBet,type:'warn'});
     }
@@ -4463,7 +4463,7 @@ function settle(reason){
     mainPL-=plague;
     G._plagueDeducted=plague;
     updateBonusEntry('Plague',{label:'Plague Jester — took '+fmtKFC(plague),pl:-plague,type:'warn'});
-    setTimeout(()=>notif('Plague Jester took '+fmtKFC(plague)+'!'),500);
+    setTimeout(()=>notif('Plague Jester — '+fmtKFC(plague)+' taken'),500);
   } else {
     G._plagueDeducted=0;
     // Plague was drawn but player lost — no deduction, update label
@@ -5034,7 +5034,7 @@ function closeResult(){
   if(G._levCardsPending&&G._levCardsPending.length>0){
     G._levCardsPending.forEach(lc=>G.levCards.push(lc));
     G._levCardsPending=[];
-    notif('🃏 Jester card(s) now available — use before next deal!');
+    notif('Jester card ready — evoke it before the next deal');
   }
   resetCards();
   updateBetPanel();
@@ -5047,7 +5047,7 @@ function closeResult(){
   // Explicitly reset msg-strip to neutral state
   const ms=document.getElementById('msg-strip');
   if(ms){ms.className='';ms.textContent='Place your bet';}
-  msg('Place your bet');
+  msg('PLACE YOUR BET');
   if(G.cutCardTriggered){
     G.cutCardTriggered=false;
     G.deck=buildShoe();
@@ -5055,31 +5055,31 @@ function closeResult(){
     G.puPending.clear();
     G.levCards=[]; G._levCardsPending=[];
     buildPuPanel(); buildLevPanel();
-    notif('🔀 End of shoe — reshuffling. Power-ups & jester cards reset.');
+    notif('New shoe — power-ups and jester cards reset');
   } else if(G.deck.length<40){
     G.puOwned.clear();
     G.puPending.clear();
     G.levCards=[]; G._levCardsPending=[]; // Jester cards expire at end of shoe
     buildPuPanel();
-    notif('New shoe — power-ups & jester cards reset');
+    notif('New shoe — power-ups and jester cards reset');
   }
   // Balance checks after hand
   if(G.balance>=BALANCE_CAP){
     setTimeout(()=>{
-      notif('⚠ 50B cap reached — cash out required');
+      notif('50B balance cap reached — cash out required');
       G.cashedOut=false;
       showCashout();
     },600);
   } else if(G.balance<=0){
     G.balance=0; updateUI();
     setTimeout(()=>{
-      notif('Balance liquidated — session over');
+      notif('Balance at zero — session over');
       G.cashedOut=false;
       showCashout();
     },600);
   } else if(G.balance<G.s.min){
     setTimeout(()=>{
-      notif('Balance too low for this stake');
+      notif('Balance too low for this stake — cash out or switch');
       G.cashedOut=false;
       showCashout();
     },600);
@@ -5161,7 +5161,7 @@ function buildStakeList(){
 }
 
 function selectStake(key){
-  if(G.phase!=='bet'){notif('Finish hand first');return;}
+  if(G.phase!=='bet'){notif('Finish the current hand first');return;}
   const s=STAKES[key];
   if(!confirm('Switch to '+s.label+' Stakes?\nMin bet: '+fmt(s.min)+' KFC\nAll power-ups will reset.')) return;
   G.stake=key; G.s=STAKES[key];
@@ -5174,7 +5174,7 @@ function selectStake(key){
 // ── CASHOUT ──────────────────────────────────────────────
 function showCashout(){
   const rm=document.getElementById('result-modal');
-  if(G.phase!=='bet'&&!(rm&&rm.classList.contains('open'))){notif('Finish hand first');return;}
+  if(G.phase!=='bet'&&!(rm&&rm.classList.contains('open'))){notif('Finish the current hand first');return;}
   if(rm&&rm.classList.contains('open')) closeResult();
   G._atCashout=true;  // block beforeunload from re-saving
   clearSession();     // wipe any saved session immediately
@@ -5230,7 +5230,7 @@ async function confirmCashout(){
       const r=await fetch(G.url+'?'+params.toString());
       const d=await r.json();
       if(d.ok||d.balance!==undefined){
-        setSyncBadge('live','SYNCED'); notif('Session Saved');
+        setSyncBadge('live','SYNCED'); notif('Session saved');
         badge.textContent='✓ Synced — ready to leave';
         badge.style.color='var(--green)';
       } else {
@@ -5239,7 +5239,7 @@ async function confirmCashout(){
     }catch(e){
       setSyncBadge('error','FAILED');
       localStorage.setItem('kfc_bal_'+(G.username||G.player),G.balance);
-      notif('Sync failed — saved locally');
+      notif('Sync failed — progress saved locally');
       badge.textContent='⚠ Sync failed — saved locally';
       badge.style.color='var(--red)';
     }
@@ -5273,7 +5273,7 @@ document.addEventListener&&document.addEventListener('DOMContentLoaded',()=>{
     o.addEventListener('click',e=>{
       if(e.target!==o) return;
       if(o.id==='cashout-modal'&&typeof G!=='undefined'&&G.balance>=BALANCE_CAP){
-        notif('Must cash out — 50B cap reached'); return;
+        notif('Balance cap reached — cash out first'); return;
       }
       o.classList.remove('open');
     });
@@ -5288,15 +5288,15 @@ function formatBetInput(el){
   el._raw=num;
 }
 function applyBetInput(){
-  if(G.phase!=='bet'){notif('Place bets before dealing');return;}
+  if(G.phase!=='bet'){notif('Place your bet before dealing');return;}
   const el=document.getElementById('bet-input');
   if(!el) return;
   const raw=(el.value||'').replace(/[^0-9]/g,'');
   const amount=parseInt(raw||'0',10);
   if(!amount||amount<=0){notif('Enter an amount');return;}
   if(amount<G.s.sMin){notif('Min chip: '+fmtKFC(G.s.sMin));return;}
-  if(G.mainBet+amount>G.s.max){notif('Max bet: '+fmtKFC(G.s.max));return;}
-  if(amount>G.balance){notif('Insufficient balance');return;}
+  if(G.mainBet+amount>G.s.max){notif('Max bet is '+fmtKFC(G.s.max));return;}
+  if(amount>G.balance){notif('Not enough balance');return;}
   // Round to nearest sMin
   const rounded=Math.round(amount/G.s.sMin)*G.s.sMin||G.s.sMin;
   G.mainBet+=rounded;
@@ -5497,13 +5497,13 @@ function cancelHit(){
 
 // ── QUICK BET BUTTONS ──────────────────────────────────────────────
 function quickBet(type){
-  if(G.phase!=='bet'){notif('Place bets before dealing');return;}
+  if(G.phase!=='bet'){notif('Place your bet before dealing');return;}
   let amount=0;
   if(type==='min') amount=G.s.min;
   else if(type==='half') amount=Math.floor(G.s.max/2);
   else if(type==='max') amount=G.s.max;
   if(amount>G.balance){ amount=G.balance; }
-  if(amount<=0){notif('Insufficient balance');return;}
+  if(amount<=0){notif('Not enough balance');return;}
   G.mainBet=amount;
   updateBetPanel(); updateBetCircle(); sfx('chip');
 }
@@ -5721,13 +5721,13 @@ function updateHand2Panel(){
 
 function copyH1toH2(){
   if(!G._hand2Active||G.phase!=='bet') return;
-  if(G.mainBet<=0){notif('Place Hand 1 bet first');return;}
+  if(G.mainBet<=0){notif('Place your Hand 1 bet first');return;}
   G.mainBet2=G.mainBet;
   if(!G.sideBets2) G.sideBets2={};
   SB_NAMES.forEach(n=>G.sideBets2[n]=G.sideBets[n]||0);
   if(typeof updateHand2Panel==='function') updateHand2Panel();
   sfx('chip');
-  notif('Hand 1 bet copied to Hand 2');
+  notif('Hand 2 bet matched to Hand 1');
 }
 function cycleH2SB(name){
   if(!G._hand2Active||G.phase!=='bet') return;
