@@ -1653,12 +1653,20 @@ body.hand2-active #chip-strip .chip { position: relative; }
         <!-- Play action buttons -->
         <div id="play-actions">
           <button class="act stand"   id="btn-stand"  onclick="stand()"  disabled>Stand</button>
-          <button class="act hit"     id="btn-hit"    onclick="hit()"    disabled>Hit</button>
+          <button class="act hit"     id="btn-hit"    onclick="hitGuard()"    disabled>Hit</button>
           <button class="act double"  id="btn-double" onclick="dbl()"    disabled>Double<span id="arrow-toast">🏹 FREE</span></button>
           <button class="act split"   id="btn-split"  onclick="split()"  disabled style="display:none">Split</button>
           <button class="act" id="btn-insurance-yes" onclick="takeInsurance()"    style="display:none;background:rgba(63,185,80,.12);border-color:var(--green);color:var(--green);font-size:10px">Insurance ✓</button>
           <button class="act" id="btn-insurance-no"  onclick="declineInsurance()" style="display:none;font-size:10px">No Ins.</button>
           <button class="shortcut-btn" id="btn-surrender" onclick="surrender()" style="display:none">Surrender</button>
+        </div>
+        <!-- Hit confirm strip — shown instead of actions when hand is 18+ -->
+        <div id="hit-confirm" style="display:none;flex-direction:column;align-items:center;gap:6px;width:100%;margin-top:10px">
+          <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--red);text-transform:uppercase">Hit on <span id="hit-confirm-val"></span>?</div>
+          <div style="display:flex;gap:8px;width:100%">
+            <button class="act stand" style="flex:1" onclick="cancelHit()">Cancel</button>
+            <button class="act hit"   style="flex:1;border-color:var(--red);color:var(--red)" onclick="confirmHit()">Yes, Hit</button>
+          </div>
         </div>
         <div id="strategy-hint"></div>
       </div><!-- end #playing-zone -->
@@ -4815,6 +4823,10 @@ function renderScores(){
 }
 
 function setActions(playing){
+  // Always dismiss the hit-confirm strip when actions change
+  const _hc=document.getElementById('hit-confirm');
+  const _pa=document.getElementById('play-actions');
+  if(_hc&&_hc.style.display!=='none'){ _hc.style.display='none'; if(_pa) _pa.style.display='flex'; }
   // Legacy hidden buttons
   const legacyIds=['btn-deal','btn-hit','btn-stand','btn-double','btn-split'];
   const legacyStates=[playing,!playing,!playing,!playing,!playing];
@@ -5215,10 +5227,19 @@ document.addEventListener('keydown', function(e){
       if(G.phase==='bet'&&G.mainBet>=G.s.min) deal();
       break;
     case 'h': case 'H':
-      if(G.phase==='play'){ const b=document.getElementById('btn-hit'); if(b&&!b.disabled) hit(); }
+      if(G.phase==='play'){
+        const hconf=document.getElementById('hit-confirm');
+        if(hconf&&hconf.style.display!=='none'){ confirmHit(); }
+        else{ const b=document.getElementById('btn-hit'); if(b&&!b.disabled) hitGuard(); }
+      }
       break;
     case 's': case 'S':
-      if(G.phase==='play'){ const b=document.getElementById('btn-stand'); if(b&&!b.disabled) stand(); }
+      if(G.phase==='play'){
+        // If hit-confirm is showing, S cancels it
+        const hconf=document.getElementById('hit-confirm');
+        if(hconf&&hconf.style.display!=='none'){ cancelHit(); }
+        else{ const b=document.getElementById('btn-stand'); if(b&&!b.disabled) stand(); }
+      }
       break;
     case 'd': case 'D':
       if(G.phase==='play'){ const b=document.getElementById('btn-double'); if(b&&!b.disabled) dbl(); }
@@ -5228,6 +5249,10 @@ document.addEventListener('keydown', function(e){
       break;
     case 'Escape':
       if(G.phase==='bet') clearBets();
+      else if(G.phase==='play'){
+        const hconf=document.getElementById('hit-confirm');
+        if(hconf&&hconf.style.display!=='none') cancelHit();
+      }
       break;
   }
 });
@@ -5327,6 +5352,33 @@ function renderSessionStats(){
     stat('Worst Loss',fmt(s.bigLoss),'var(--red)')+
     stat('Win Streak',s.maxStreak+'⬆')+
     stat('Lose Streak',s.maxLoseStreak+'⬇');
+}
+
+// ── HIT GUARD (18+) ──────────────────────────────────────────────
+function hitGuard(){
+  if(G.phase!=='play') return;
+  const h=G.hands[G.cur];
+  if(!h) return;
+  const v=hv(h);
+  if(v>=18){
+    // Show confirm strip, hide action buttons
+    document.getElementById('play-actions').style.display='none';
+    const confirmEl=document.getElementById('hit-confirm');
+    const valEl=document.getElementById('hit-confirm-val');
+    if(confirmEl){ confirmEl.style.display='flex'; }
+    if(valEl){ valEl.textContent=v; }
+  } else {
+    hit();
+  }
+}
+function confirmHit(){
+  document.getElementById('hit-confirm').style.display='none';
+  document.getElementById('play-actions').style.display='flex';
+  hit();
+}
+function cancelHit(){
+  document.getElementById('hit-confirm').style.display='none';
+  document.getElementById('play-actions').style.display='flex';
 }
 
 // ── QUICK BET BUTTONS ──────────────────────────────────────────────
