@@ -5363,10 +5363,20 @@ async function confirmCashout(){
   const retryBtn=document.getElementById('co-retry-btn');
   const stayBtn=document.getElementById('co-stay-btn');
 
+  // The Apps Script calculates the new wallet balance itself:
+  //   endBal = begBal(sheet) - buyIn + cashIn
+  // So we send:
+  //   balance  = G.balance  (chips returned = ending session balance = cashIn)
+  //   buyIn    = G.sessionStart  (chips taken out of wallet to play)
+  //   sessionPL = net P/L this session
+  const sessionPL = G.balance - G.sessionStart;
+
   const payload={
     username: G.username||G.player, player: G.player,
-    balance: G.balance, sessionPL: G.balance-G.sessionStart,
-    buyIn: G.sessionStart, date: new Date().toISOString(),
+    balance:   G.balance,           // cashIn: chips returned to wallet
+    sessionPL: sessionPL,
+    buyIn:     G.sessionStart,      // chips taken to table
+    date: new Date().toISOString(),
     stake: G.s.label, pin: G._cachedPin||''
   };
 
@@ -5421,7 +5431,7 @@ async function confirmCashout(){
   }
 
   G.sessionStart=G.balance;
-  G._totalBalance=G.balance;
+  G._totalBalance=newTotalBalance; // keep total in sync for any subsequent session
   G.log=[]; renderLog();
   resetSessionChart();
 }
