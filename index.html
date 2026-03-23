@@ -1660,14 +1660,6 @@ body.hand2-active #chip-strip .chip { position: relative; }
           <button class="act" id="btn-insurance-no"  onclick="declineInsurance()" style="display:none;font-size:10px">No Ins.</button>
           <button class="shortcut-btn" id="btn-surrender" onclick="surrender()" style="display:none">Surrender</button>
         </div>
-        <!-- Hit confirm strip — shown instead of actions when hand is 18+ -->
-        <div id="hit-confirm" style="display:none;flex-direction:column;align-items:center;gap:6px;width:100%;margin-top:10px">
-          <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--red);text-transform:uppercase">Hit on <span id="hit-confirm-val"></span>?</div>
-          <div style="display:flex;gap:8px;width:100%">
-            <button class="act stand" style="flex:1" onclick="cancelHit()">Cancel</button>
-            <button class="act hit"   style="flex:1;border-color:var(--red);color:var(--red)" onclick="confirmHit()">Yes, Hit</button>
-          </div>
-        </div>
         <div id="strategy-hint"></div>
       </div><!-- end #playing-zone -->
 
@@ -1997,6 +1989,19 @@ body.hand2-active #chip-strip .chip { position: relative; }
 
 <!-- ══════════════ MODALS ══════════════ -->
 
+
+<!-- HIT CONFIRM -->
+<div class="overlay" id="hit-confirm-modal">
+  <div class="modal" style="min-width:300px;max-width:320px;text-align:center">
+    <div style="font-size:11px;letter-spacing:4px;color:var(--red);text-transform:uppercase;margin-bottom:16px">Are you sure?</div>
+    <div style="font-family:var(--mono);font-size:13px;color:var(--white);margin-bottom:4px">Hit on <span id="hit-confirm-val" style="color:var(--red);font-weight:700"></span>?</div>
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:24px">This is a high-risk move</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-ghost" style="flex:1" onclick="cancelHit()">Cancel</button>
+      <button class="btn-primary" style="flex:1;background:var(--red);border-color:var(--red)" onclick="confirmHit()">Yes, Hit</button>
+    </div>
+  </div>
+</div>
 
 <!-- STAMPED BOOST MODAL -->
 <div class="overlay" id="stamped-modal">
@@ -4823,10 +4828,8 @@ function renderScores(){
 }
 
 function setActions(playing){
-  // Always dismiss the hit-confirm strip when actions change
-  const _hc=document.getElementById('hit-confirm');
-  const _pa=document.getElementById('play-actions');
-  if(_hc&&_hc.style.display!=='none'){ _hc.style.display='none'; if(_pa) _pa.style.display='flex'; }
+  // Dismiss hit-confirm modal if open when actions change
+  closeModal('hit-confirm-modal');
   // Legacy hidden buttons
   const legacyIds=['btn-deal','btn-hit','btn-stand','btn-double','btn-split'];
   const legacyStates=[playing,!playing,!playing,!playing,!playing];
@@ -5228,16 +5231,15 @@ document.addEventListener('keydown', function(e){
       break;
     case 'h': case 'H':
       if(G.phase==='play'){
-        const hconf=document.getElementById('hit-confirm');
-        if(hconf&&hconf.style.display!=='none'){ confirmHit(); }
+        const hconf=document.getElementById('hit-confirm-modal');
+        if(hconf&&hconf.classList.contains('open')){ confirmHit(); }
         else{ const b=document.getElementById('btn-hit'); if(b&&!b.disabled) hitGuard(); }
       }
       break;
     case 's': case 'S':
       if(G.phase==='play'){
-        // If hit-confirm is showing, S cancels it
-        const hconf=document.getElementById('hit-confirm');
-        if(hconf&&hconf.style.display!=='none'){ cancelHit(); }
+        const hconf=document.getElementById('hit-confirm-modal');
+        if(hconf&&hconf.classList.contains('open')){ cancelHit(); }
         else{ const b=document.getElementById('btn-stand'); if(b&&!b.disabled) stand(); }
       }
       break;
@@ -5250,8 +5252,8 @@ document.addEventListener('keydown', function(e){
     case 'Escape':
       if(G.phase==='bet') clearBets();
       else if(G.phase==='play'){
-        const hconf=document.getElementById('hit-confirm');
-        if(hconf&&hconf.style.display!=='none') cancelHit();
+        const hconf=document.getElementById('hit-confirm-modal');
+        if(hconf&&hconf.classList.contains('open')) cancelHit();
       }
       break;
   }
@@ -5361,24 +5363,18 @@ function hitGuard(){
   if(!h) return;
   const v=hv(h);
   if(v>=18){
-    // Show confirm strip, hide action buttons
-    document.getElementById('play-actions').style.display='none';
-    const confirmEl=document.getElementById('hit-confirm');
-    const valEl=document.getElementById('hit-confirm-val');
-    if(confirmEl){ confirmEl.style.display='flex'; }
-    if(valEl){ valEl.textContent=v; }
+    document.getElementById('hit-confirm-val').textContent=v;
+    openModal('hit-confirm-modal');
   } else {
     hit();
   }
 }
 function confirmHit(){
-  document.getElementById('hit-confirm').style.display='none';
-  document.getElementById('play-actions').style.display='flex';
+  closeModal('hit-confirm-modal');
   hit();
 }
 function cancelHit(){
-  document.getElementById('hit-confirm').style.display='none';
-  document.getElementById('play-actions').style.display='flex';
+  closeModal('hit-confirm-modal');
 }
 
 // ── QUICK BET BUTTONS ──────────────────────────────────────────────
