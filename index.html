@@ -4290,7 +4290,7 @@ function settle(reason){
   // Update session P&L chart — running total of all hands this session
   const _sessionRunningPL = G.log.reduce((a,e)=>a+e.pl, 0);
   updateSessionChart(_sessionRunningPL);
-  if(totalPLForDisplay>0){if(totalPLForDisplay>G.s.min*5)sfx('cash');else sfx('win');} else if(totalPLForDisplay<0){} else sfx('push');
+  if(totalPLForDisplay>0){if(totalPLForDisplay>G.s.min*10)sfx('cash');else sfx('win');} else if(totalPLForDisplay<0){} else sfx('push');
   // Show missed side bet payouts (including Dealer Bust if it busted)
   if(db){
     const dbCards=G.dealer.length;
