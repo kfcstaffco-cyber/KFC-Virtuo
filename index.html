@@ -1058,7 +1058,64 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
 .info-val { font-family: var(--mono); color: var(--gold-hi); font-size: 11px; }
 .info-desc { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
 
-/* ── STAMPED CARD BOOST ── */
+/* ── DOUBLE BUTTON SMOOTH DISABLE ── */
+#btn-double { transition: opacity .2s ease, border-color .2s ease, color .2s ease, background .2s ease; }
+#btn-double:disabled { opacity: 0.2 !important; }
+
+/* ── DEALER DRAWING PULSE ── */
+@keyframes dealerPulse {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.45; }
+}
+#msg-strip.dealer-drawing { animation: dealerPulse 1.1s ease-in-out infinite; border-color: var(--muted); color: var(--muted2); }
+
+/* ── BASIC STRATEGY HINT ── */
+#strategy-hint {
+  display: none; text-align: center; margin-top: 4px;
+  font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
+  text-transform: uppercase; padding: 4px 8px;
+  border-radius: var(--radius);
+}
+#strategy-hint.show { display: block; }
+#strategy-hint.hint-hit    { color: var(--green); border: 1px solid rgba(63,185,80,0.3); background: rgba(63,185,80,0.06); }
+#strategy-hint.hint-stand  { color: var(--red);   border: 1px solid rgba(248,81,73,0.3); background: rgba(248,81,73,0.06); }
+#strategy-hint.hint-double { color: var(--blue);  border: 1px solid rgba(88,166,255,0.3); background: rgba(88,166,255,0.06); }
+#strategy-hint.hint-split  { color: var(--purple);border: 1px solid rgba(188,140,255,0.3); background: rgba(188,140,255,0.06); }
+
+/* ── BET INPUT ── */
+#bet-input-row {
+  display: flex; gap: 6px; margin-top: 8px; align-items: center;
+}
+#bet-input {
+  flex: 1; background: var(--bg2); border: 1px solid var(--line2);
+  color: var(--white); font-family: var(--mono); font-size: 13px;
+  padding: 7px 10px; border-radius: var(--radius); outline: none;
+  transition: border-color .15s; min-width: 0;
+  margin-bottom: 0 !important;
+}
+#bet-input:focus { border-color: var(--gold-lo); }
+#bet-input-btn {
+  padding: 7px 12px; background: var(--bg3); border: 1px solid var(--line2);
+  color: var(--muted2); font-family: var(--sans); font-size: 10px; font-weight: 700;
+  letter-spacing: 2px; text-transform: uppercase; cursor: pointer;
+  border-radius: var(--radius); transition: all .15s; white-space: nowrap; flex-shrink: 0;
+}
+#bet-input-btn:hover { border-color: var(--gold-lo); color: var(--gold-hi); }
+
+/* ── KEYBOARD SHORTCUTS PANEL ── */
+.kbd-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; border-bottom: 1px solid var(--line);
+  font-size: 11px;
+}
+.kbd-row:last-child { border-bottom: none; }
+.kbd-key {
+  font-family: var(--mono); font-size: 10px; background: var(--bg3);
+  border: 1px solid var(--line2); padding: 2px 7px; border-radius: 3px;
+  color: var(--gold-hi); letter-spacing: 1px;
+}
+.kbd-desc { color: var(--muted2); }
+
 #stamped-boost {
   position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
   background:rgba(201,168,76,0.95); color:#111; border:none;
@@ -1545,6 +1602,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
           <button class="act" id="btn-insurance-no"  onclick="declineInsurance()" style="display:none;font-size:10px">No Ins.</button>
           <button class="shortcut-btn" id="btn-surrender" onclick="surrender()" style="display:none">Surrender</button>
         </div>
+        <div id="strategy-hint"></div>
       </div><!-- end #playing-zone -->
 
       <!-- PLAY-BOTTOM: bet circle + SB circles — always in flow, never hidden -->
@@ -1693,6 +1751,10 @@ body.hand2-active #chip-strip .chip { position: relative; }
       <div class="panel">
         <div class="panel-title">Bet <span id="bet-total-tag" style="color:var(--gold-hi);font-family:var(--mono)"></span></div>
         <div class="chip-row" id="chip-row"></div>
+        <div id="bet-input-row">
+          <input type="text" id="bet-input" placeholder="Custom amount…" inputmode="numeric" autocomplete="off" oninput="formatBetInput(this)" onkeydown="if(event.key==='Enter')applyBetInput()">
+          <button id="bet-input-btn" onclick="applyBetInput()">Bet</button>
+        </div>
         <div id="bet-lines"></div>
       </div>
 
@@ -1718,6 +1780,23 @@ body.hand2-active #chip-strip .chip { position: relative; }
       <div class="panel">
         <div class="panel-title">Session Log</div>
         <div id="log"></div>
+      </div>
+
+      <!-- KEYBOARD SHORTCUTS -->
+      <div class="panel">
+        <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between">
+          Controls
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;font-weight:400;text-transform:none">
+            <input type="checkbox" id="strategy-toggle" onchange="toggleStrategy(this.checked)" style="accent-color:var(--gold);width:12px;height:12px">
+            Strategy hints
+          </label>
+        </div>
+        <div class="kbd-row"><span class="kbd-desc">Deal / New hand</span><span class="kbd-key">Space</span></div>
+        <div class="kbd-row"><span class="kbd-desc">Hit</span><span class="kbd-key">H</span></div>
+        <div class="kbd-row"><span class="kbd-desc">Stand</span><span class="kbd-key">S</span></div>
+        <div class="kbd-row"><span class="kbd-desc">Double</span><span class="kbd-key">D</span></div>
+        <div class="kbd-row"><span class="kbd-desc">Split</span><span class="kbd-key">P</span></div>
+        <div class="kbd-row"><span class="kbd-desc">Clear bet</span><span class="kbd-key">Esc</span></div>
       </div>
     </div>
   </div>
@@ -1904,6 +1983,8 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <div id="co-pl" style="font-family:var(--mono);font-size:36px;font-weight:500;margin-bottom:4px"></div>
     <div id="co-bal" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px"></div>
     <div id="co-sync" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px"></div>
+    <!-- Session Stats -->
+    <div id="co-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px"></div>
       <!-- Session P&L Chart -->
       <div style="margin:16px 0 4px">
         <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Session P&L</div>
@@ -2995,6 +3076,9 @@ window.onload=()=>{
   Object.keys(localStorage).filter(k=>k.startsWith('kfc_bal_')).forEach(k=>localStorage.removeItem(k));
   G.url=localStorage.getItem('kfc_url')||'https://script.google.com/macros/s/AKfycbyWiTYHSuQXYxf8Ja3N_7IceeIJ6A83-35lNKtEYv4C9a4dxCILpNRhSLvdPHp2QEPd/exec';
   if(localStorage.getItem('kfc_sb_col')==='1'){const _sb=document.getElementById('sidebar');const _mn=document.getElementById('main');const _bt=document.getElementById('sidebar-toggle');if(_sb)_sb.classList.add('collapsed');if(_mn)_mn.style.gridTemplateColumns='1fr 0';if(_bt)_bt.textContent='⊟';}
+  // Load strategy hint preference
+  _strategyOn=localStorage.getItem('kfc_strategy')==='1';
+  const stEl=document.getElementById('strategy-toggle'); if(stEl) stEl.checked=_strategyOn;
   try{G.pins=JSON.parse(localStorage.getItem('kfc_pins')||'{}');}catch(e){G.pins={};}
   const cfgEl=document.getElementById('cfg-url');
   if(cfgEl) cfgEl.value=G.url;
@@ -3681,10 +3765,10 @@ function deal(){
   G._dealStagger=false;
   // Staggered card sounds
   [0,300,600,900].forEach(t=>setTimeout(()=>sfx('card'),t));
-  // Process bonuses
-  [p1,p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i);});
-  // Bonus processing for second hand
-  if(_deal2&&h2p1&&h2p2){ [h2p1,h2p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i);}); }
+  // Process bonuses for hand 1
+  [p1,p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i,0);});
+  // Bonus processing for second hand — pass handIdx=1 so effects scope correctly
+  if(_deal2&&h2p1&&h2p2){ [h2p1,h2p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i,1);}); }
   // Jester replacement
   [p1,p2].forEach((c,i)=>{
     if(c.bonus&&c.bonus.jester){
@@ -3716,6 +3800,24 @@ function deal(){
       revealHole();
       if(G.puOwned.has('guard')){notif('BJ Guard — Push!');renderAll();setTimeout(()=>settle('push_guard'),500);return;}
       msg('Push — both BJ','push');renderAll();setTimeout(()=>settle('push_player_bj'),500);return;
+    }
+    // Player has BJ — no point offering insurance (outcome is win or push regardless)
+    if(isBJ(G.hands[0])){
+      // Don't reveal hole yet — settle handles it; skip insurance entirely
+      setActions(false);
+      // Resolve immediately: if dealer has BJ it's a push, otherwise player BJ wins
+      revealHole(); renderAll();
+      if(isBJ(G.dealer)){
+        msg('Push — both BJ','push'); setTimeout(()=>settle('push_player_bj'),500);
+      } else {
+        if(G.stampedOn){
+          msg('Blackjack! Boost your bet first!','bj'); sfx('bj');
+          evaluateEarlySideBets(); showStampedBoost(); G._pendingBJ=true;
+        } else {
+          msg('Blackjack!','bj'); sfx('bj'); showBJ(); setTimeout(()=>settle('player_bj'),500);
+        }
+      }
+      return;
     }
     // Offer insurance — dealer BJ check happens after player decides
     setActions(false);
@@ -3759,71 +3861,76 @@ function getLevMult(){
 }
 
 // ── BONUS CARDS ──────────────────────────────────────────────
-function onBonusCard(bc, cardIndex){
+function onBonusCard(bc, cardIndex, handIdx){
+  // handIdx: 0 = hand 1 (default), 1 = hand 2
+  const isHand2 = handIdx===1;
   // Bonus card effects only valid on first two player cards (index 0 or 1)
   // Jesters are always valid (they replace themselves)
   const effectValid = (cardIndex===undefined || cardIndex<=1 || bc.jester);
   if(!effectValid){ return; } // silently ignore — no toast for cards drawn after 2nd
+  // For hand 2: instant payouts (scarface, ice) credit normally; 
+  // hand-state flags (stampedOn, arrowCount etc.) also apply (both hands share the same round)
+  // Note: stamped only works on hand 1 (can't boost hand 2 mid-deal)
   switch(bc.id){
-    // ── Season 3 ──
-    case 'stamped': G.stampedOn=true; G.stampedInitialBet=G.mainBet; G.stampedCardsViewed=0; bonusToast(bc,'View up to 3 cards — then boost bet!'); showStampedBoost(); break;
+    case 'stamped':
+      if(!isHand2){ G.stampedOn=true; G.stampedInitialBet=G.mainBet; G.stampedCardsViewed=0; bonusToast(bc,'View up to 3 cards — then boost bet!'); showStampedBoost(); }
+      else bonusToast(bc,'Stamped Card on Hand 2 — view cards (no boost)');
+      break;
     case 'gold':{
       G.goldOn=true;
       const goldAmt=G.s.min*2;
-      G.sideBets['Dealer Bust']=(G.sideBets['Dealer Bust']||0)+goldAmt;
-      // Do NOT add goldAmt to preDealBal — the free bet stake comes from the house.
-      // If it wins, calcSide() returns the profit and we credit that via totalPL.
-      // If it loses, nothing is deducted (the stake was never the player's money).
-      G._goldCardBet=(G._goldCardBet||0)+goldAmt; // track for display in breakdown
+      const targetSideBets=isHand2?G.sideBets2:G.sideBets;
+      targetSideBets['Dealer Bust']=(targetSideBets['Dealer Bust']||0)+goldAmt;
+      G._goldCardBet=(G._goldCardBet||0)+goldAmt;
       updateSBCircles&&updateSBCircles();
-      G._bonusPayouts.push({label:'Gold Card — free Dealer Bust bet',pl:0,type:'info'});
-      bonusToast(bc,'Free Dealer Bust bet: '+fmtKFC(goldAmt));
+      G._bonusPayouts.push({label:'Gold Card'+(isHand2?' (H2)':'')+' — free Dealer Bust bet',pl:0,type:'info'});
+      bonusToast(bc,'Free Dealer Bust bet: '+fmtKFC(goldAmt)+(isHand2?' (Hand 2)':''));
       break;
     }
     case 'scarface':{
       const sp=Math.floor(G.s.min/2);
       G.balance+=sp; G.preDealBal+=sp; updateUI();
-      G._bonusPayouts.push({label:'Scarface — instant payout',pl:sp,type:'gain'});
-      bonusToast(bc,'Instant +'+fmtKFC(sp)+' (Scarface)');
+      G._bonusPayouts.push({label:'Scarface'+(isHand2?' (H2)':'')+' — instant payout',pl:sp,type:'gain'});
+      bonusToast(bc,'Instant +'+fmtKFC(sp)+' (Scarface'+(isHand2?' H2':'')+')');
       break;
     }
     case 'arrow':
       G.arrowCount++;
-      G._bonusPayouts.push({label:'Arrow Card — free double-down',pl:0,type:'info'});
-      bonusToast(bc,G.arrowCount>=2?'Two arrows — double-double-down!':'Free double-down!');
+      G._bonusPayouts.push({label:'Arrow Card'+(isHand2?' (H2)':'')+' — free double-down',pl:0,type:'info'});
+      bonusToast(bc,G.arrowCount>=2?'Two arrows — double-double-down!':'Free double-down!'+(isHand2?' (Hand 2)':''));
       const at=document.getElementById('arrow-toast');
       if(at) at.style.display='block';
       break;
     case 'krueger':
       G.kruegerOn=true;
-      G._bonusPayouts.push({label:'Krueger — bust insurance active',pl:0,type:'info'});
-      bonusToast(bc,'Bust insurance: half wager');
+      G._bonusPayouts.push({label:'Krueger'+(isHand2?' (H2)':'')+' — bust insurance active',pl:0,type:'info'});
+      bonusToast(bc,'Bust insurance: half wager'+(isHand2?' (Hand 2)':''));
       break;
     case 'ice':{
       const ip=G.s.min*2;
       G.balance+=ip; G.preDealBal+=ip; updateUI();
-      G._bonusPayouts.push({label:'Ice Card — instant payout',pl:ip,type:'gain'});
-      bonusToast(bc,'Instant +'+fmtKFC(ip)+' (Ice Card 2:1)');
+      G._bonusPayouts.push({label:'Ice Card'+(isHand2?' (H2)':'')+' — instant payout',pl:ip,type:'gain'});
+      bonusToast(bc,'Instant +'+fmtKFC(ip)+' (Ice Card'+(isHand2?' H2':'')+')');
       break;
     }
     case 'desert':
       G.desertOn=true;
-      G._bonusPayouts.push({label:'Desert Card — bust/loss protection',pl:0,type:'info'});
-      bonusToast(bc,'Full bust/loss protection');
+      G._bonusPayouts.push({label:'Desert Card'+(isHand2?' (H2)':'')+' — bust/loss protection',pl:0,type:'info'});
+      bonusToast(bc,'Full bust/loss protection'+(isHand2?' (Hand 2)':''));
       break;
     case 'steel':
       G.steelOn=true;
-      G._bonusPayouts.push({label:'Steel Card — BJ pays 2:1',pl:0,type:'info'});
-      bonusToast(bc,'Blackjack pays 2:1 this hand');
+      G._bonusPayouts.push({label:'Steel Card'+(isHand2?' (H2)':'')+' — BJ pays 2:1',pl:0,type:'info'});
+      bonusToast(bc,'Blackjack pays 2:1 this hand'+(isHand2?' (Hand 2)':''));
       break;
     case 'blood':
       G._levCardsPending.push('blood');
-      G._bonusPayouts.push({label:'Blood Jester — 2× leverage card earned (next round)',pl:0,type:'info'});
+      G._bonusPayouts.push({label:'Blood Jester'+(isHand2?' (H2)':'')+' — 2× leverage card earned (next round)',pl:0,type:'info'});
       bonusToast(bc,'2× leverage card earned — usable next round!');
       break;
     case 'plague':{
       G.plagueOn=true;
-      G._bonusPayouts.push({label:'Plague Jester — half winnings taken',pl:0,type:'warn'});
+      G._bonusPayouts.push({label:'Plague Jester'+(isHand2?' (H2)':'')+' — half winnings taken',pl:0,type:'warn'});
       bonusToast(bc,'Plague Jester — half your winnings go to the Plague Pot!');
       break;
     }
@@ -3894,7 +4001,7 @@ function hit(){
     }
     advOrEnd();
   }
-  else { renderScores(); setActions(true); }
+  else { renderScores(); setActions(true); updateStrategyHint(); }
 }
 
 function stand(){ if(G.phase!=='play')return; sfx('button'); hideStampedBoost(); G.stampedOn=false; advOrEnd(); }
@@ -4006,6 +4113,7 @@ function advOrEnd(reason){
 function dealerPlay(){
   G.phase='dealer';
   setActions(false);
+  msg('Dealer drawing…','dealer-drawing');
   // Fully re-render dealer cards (all face-up) before the phase lock skips renderAll
   const _dc=document.getElementById('dealer-cards');
   if(_dc){
@@ -4643,6 +4751,9 @@ function setActions(playing){
   const insY=document.getElementById('btn-insurance-yes');
   const insN=document.getElementById('btn-insurance-no');
   // (insurance handled separately via showInsurance)
+  // Strategy hint
+  if(playing) updateStrategyHint();
+  else { const sh=document.getElementById('strategy-hint'); if(sh){sh.className='';sh.style.display='none';} }
 }
 
 // ── RESULT ──────────────────────────────────────────────
@@ -4852,8 +4963,8 @@ function showCashout(){
   document.getElementById('co-actions-pre').style.display='flex';
   document.getElementById('co-actions-post').style.display='none';
   openModal('cashout-modal');
-  // Draw P&L chart
-  setTimeout(()=>drawSessionChart(),100);
+  // Draw P&L chart and stats
+  setTimeout(()=>{ drawSessionChart(); renderSessionStats(); },100);
 }
 
 async function confirmCashout(){
@@ -4935,6 +5046,160 @@ document.addEventListener&&document.addEventListener('DOMContentLoaded',()=>{
     });
   });
 });
+
+// ── BET INPUT ──────────────────────────────────────────────
+function formatBetInput(el){
+  const raw=el.value.replace(/[^0-9]/g,'');
+  const num=parseInt(raw||'0',10);
+  el.value=num===0?'':num.toLocaleString('de-CH');
+  el._raw=num;
+}
+function applyBetInput(){
+  if(G.phase!=='bet'){notif('Place bets before dealing');return;}
+  const el=document.getElementById('bet-input');
+  if(!el) return;
+  const raw=(el.value||'').replace(/[^0-9]/g,'');
+  const amount=parseInt(raw||'0',10);
+  if(!amount||amount<=0){notif('Enter an amount');return;}
+  if(amount<G.s.sMin){notif('Min chip: '+fmtKFC(G.s.sMin));return;}
+  if(G.mainBet+amount>G.s.max){notif('Max bet: '+fmtKFC(G.s.max));return;}
+  if(amount>G.balance){notif('Insufficient balance');return;}
+  // Round to nearest sMin
+  const rounded=Math.round(amount/G.s.sMin)*G.s.sMin||G.s.sMin;
+  G.mainBet+=rounded;
+  el.value=''; el._raw=0;
+  updateBetPanel(); updateBetCircle(); sfx('chip');
+}
+
+// ── KEYBOARD SHORTCUTS ──────────────────────────────────────────────
+document.addEventListener('keydown', function(e){
+  // Don't fire when typing in an input
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  // Don't fire when a modal is open (except result modal handled separately)
+  const openModals=document.querySelectorAll('.overlay.open');
+  const onlyResult=openModals.length===1&&openModals[0].id==='result-modal';
+  if(openModals.length>0&&!onlyResult) return;
+  switch(e.key){
+    case ' ':
+    case 'Enter':
+      e.preventDefault();
+      if(openModals.length>0&&onlyResult){ closeResult(); return; }
+      if(G.phase==='bet'&&G.mainBet>=G.s.min) deal();
+      break;
+    case 'h': case 'H':
+      if(G.phase==='play'){ const b=document.getElementById('btn-hit'); if(b&&!b.disabled) hit(); }
+      break;
+    case 's': case 'S':
+      if(G.phase==='play'){ const b=document.getElementById('btn-stand'); if(b&&!b.disabled) stand(); }
+      break;
+    case 'd': case 'D':
+      if(G.phase==='play'){ const b=document.getElementById('btn-double'); if(b&&!b.disabled) dbl(); }
+      break;
+    case 'p': case 'P':
+      if(G.phase==='play'){ const b=document.getElementById('btn-split'); if(b&&!b.disabled&&b.style.display!=='none') split(); }
+      break;
+    case 'Escape':
+      if(G.phase==='bet') clearBets();
+      break;
+  }
+});
+
+// ── BASIC STRATEGY HINT ──────────────────────────────────────────────
+let _strategyOn = false;
+function toggleStrategy(on){
+  _strategyOn=on;
+  localStorage.setItem('kfc_strategy',on?'1':'0');
+  const el=document.getElementById('strategy-hint');
+  if(el&&!on){ el.className=''; el.style.display='none'; }
+  if(on) updateStrategyHint();
+}
+function basicStrategyAction(pv, dealerUp, canDouble, canSplit, hand){
+  // Simplified basic strategy (no soft totals for now)
+  const d=dealerUp;
+  // Check for pair
+  if(canSplit&&hand&&hand.length===2){
+    const r=cv(hand[0]);
+    if(r===11) return 'split'; // Aces always split
+    if(r===8)  return 'split'; // 8s always split
+    if(r===10||r===5) {} // never split 10s or 5s — fall through
+    else if(r===9){ if(d!==7&&d!==10&&d!==11) return 'split'; }
+    else if(r===7){ if(d<=7) return 'split'; }
+    else if(r===6){ if(d<=6) return 'split'; }
+    else if(r===4){ if(d===5||d===6) return 'split'; }
+    else if(r===3||r===2){ if(d<=7) return 'split'; }
+  }
+  // Soft totals (hand contains an ace counted as 11)
+  const hasAce=hand&&hand.some(c=>c.r==='A'||(!c.bonus&&c.r==='A'));
+  const nonAceSum=hand?hand.reduce((s,c)=>s+(cv(c)===11?1:cv(c)),0):pv;
+  const isSoft=hasAce&&pv<=21&&(pv-nonAceSum)===10;
+  if(isSoft){
+    const soft=pv; // e.g. soft 18 = A+7
+    if(soft>=19) return 'stand';
+    if(soft===18){ if(d>=3&&d<=6) return canDouble?'double':'stand'; if(d>=9||d===10||d===11) return 'hit'; return 'stand'; }
+    if(soft===17){ if(d>=3&&d<=6) return canDouble?'double':'hit'; return 'hit'; }
+    if(soft===16||soft===15){ if(d>=4&&d<=6) return canDouble?'double':'hit'; return 'hit'; }
+    if(soft<=14){ if(d===5||d===6) return canDouble?'double':'hit'; return 'hit'; }
+  }
+  // Hard totals
+  if(pv>=17) return 'stand';
+  if(pv>=13&&pv<=16){ return d<=6?'stand':'hit'; }
+  if(pv===12){ return (d>=4&&d<=6)?'stand':'hit'; }
+  if(pv===11){ return canDouble?'double':'hit'; }
+  if(pv===10){ return (d<=9&&canDouble)?'double':'hit'; }
+  if(pv===9){ return (d>=3&&d<=6&&canDouble)?'double':'hit'; }
+  return 'hit';
+}
+function updateStrategyHint(){
+  const el=document.getElementById('strategy-hint');
+  if(!el) return;
+  if(!_strategyOn||G.phase!=='play'){ el.className=''; el.style.display='none'; return; }
+  const hand=G.hands[G.cur];
+  if(!hand||hand.length<2){ el.className=''; el.style.display='none'; return; }
+  const pv=hv(hand);
+  const dealerUpCard=G.dealer[0];
+  const d=dealerUpCard?cv(dealerUpCard):0;
+  const canDouble=hand.length===2&&!document.getElementById('btn-double')?.disabled;
+  const canSplit=hand.length===2&&cv(hand[0])===cv(hand[1])&&G.splits<2;
+  const action=basicStrategyAction(pv,d,canDouble,canSplit,hand);
+  const labels={hit:'Hit',stand:'Stand',double:'Double',split:'Split'};
+  el.textContent='Strategy: '+labels[action];
+  el.className='show hint-'+action;
+  el.style.display='block';
+}
+
+// ── SESSION STATS ──────────────────────────────────────────────
+function calcSessionStats(){
+  const log=G.log;
+  if(!log.length) return null;
+  const hands=log.length;
+  const wins=log.filter(e=>e.pl>0).length;
+  const losses=log.filter(e=>e.pl<0).length;
+  const pushes=log.filter(e=>e.pl===0).length;
+  const winRate=Math.round((wins/hands)*100);
+  const bigWin=Math.max(...log.map(e=>e.pl));
+  const bigLoss=Math.min(...log.map(e=>e.pl));
+  // Longest win streak
+  let streak=0, maxStreak=0, loseStreak=0, maxLoseStreak=0;
+  log.forEach(e=>{
+    if(e.pl>0){ streak++; maxStreak=Math.max(maxStreak,streak); loseStreak=0; }
+    else{ loseStreak++; maxLoseStreak=Math.max(maxLoseStreak,loseStreak); streak=0; }
+  });
+  return {hands,wins,losses,pushes,winRate,bigWin,bigLoss,maxStreak,maxLoseStreak};
+}
+function renderSessionStats(){
+  const el=document.getElementById('co-stats');
+  if(!el) return;
+  const s=calcSessionStats();
+  if(!s){el.innerHTML='';return;}
+  const stat=(label,val,color='')=>`<div style="background:var(--bg2);border:1px solid var(--line);padding:8px 10px;border-radius:var(--radius)"><div style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase;margin-bottom:3px">${label}</div><div style="font-family:var(--mono);font-size:13px;font-weight:600;color:${color||'var(--white)'}">${val}</div></div>`;
+  el.innerHTML=
+    stat('Hands',s.hands)+
+    stat('Win Rate',s.winRate+'%', s.winRate>=50?'var(--green)':'var(--muted2)')+
+    stat('Best Win','+'+fmt(s.bigWin),'var(--green)')+
+    stat('Worst Loss',fmt(s.bigLoss),'var(--red)')+
+    stat('Win Streak',s.maxStreak+'⬆')+
+    stat('Lose Streak',s.maxLoseStreak+'⬇');
+}
 
 // ── NOTIF ──────────────────────────────────────────────
 let nTimer;
