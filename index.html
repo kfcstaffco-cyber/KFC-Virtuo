@@ -942,7 +942,6 @@ body:not(.betting) #playing-zone { opacity: 1; pointer-events: auto; transform: 
 #play-actions #btn-insurance-yes,
 #play-actions #btn-insurance-no { flex: 1; min-width: calc(50% - 6px); }
 #play-actions #btn-surrender { flex: 0 0 100%; width: 100%; }
-#play-actions #btn-clear { display: none; }
 
 /* ── PLAY-BOTTOM: same layout as betting bottom — PP · 21+3 · [BIG CIRCLE] · C7s · DB ── */
 #play-bottom {
@@ -1542,7 +1541,6 @@ body.hand2-active #chip-strip .chip { position: relative; }
           <button class="act hit"     id="btn-hit"    onclick="hit()"    disabled>Hit</button>
           <button class="act double"  id="btn-double" onclick="dbl()"    disabled>Double<span id="arrow-toast">🏹 FREE</span></button>
           <button class="act split"   id="btn-split"  onclick="split()"  disabled style="display:none">Split</button>
-          <button class="act"         id="btn-clear"  onclick="clearBets()" style="display:none">Clear</button>
           <button class="act" id="btn-insurance-yes" onclick="takeInsurance()"    style="display:none;background:rgba(63,185,80,.12);border-color:var(--green);color:var(--green);font-size:10px">Insurance ✓</button>
           <button class="act" id="btn-insurance-no"  onclick="declineInsurance()" style="display:none;font-size:10px">No Ins.</button>
           <button class="shortcut-btn" id="btn-surrender" onclick="surrender()" style="display:none">Surrender</button>
@@ -4610,8 +4608,8 @@ function renderScores(){
 
 function setActions(playing){
   // Legacy hidden buttons
-  const legacyIds=['btn-deal','btn-hit','btn-stand','btn-double','btn-split','btn-clear'];
-  const legacyStates=[playing,!playing,!playing,!playing,!playing,playing];
+  const legacyIds=['btn-deal','btn-hit','btn-stand','btn-double','btn-split'];
+  const legacyStates=[playing,!playing,!playing,!playing,!playing];
   legacyIds.forEach((id,i)=>{
     const el=document.getElementById(id);
     if(el) el.disabled=legacyStates[i];
@@ -4638,8 +4636,6 @@ function setActions(playing){
     splitEl.style.display=canSplit?'':'none';
     splitEl.disabled=!canSplit;
   }
-  const clrBtn=document.getElementById('btn-clear');
-  if(clrBtn) clrBtn.style.display=playing?'none':'block';
   // Surrender (in play-actions)
   const srv=document.getElementById('btn-surrender');
   if(srv) srv.style.display=(playing&&G.puOwned.has('sally'))?'flex':'none';
