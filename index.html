@@ -1058,7 +1058,65 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
 .info-val { font-family: var(--mono); color: var(--gold-hi); font-size: 11px; }
 .info-desc { font-size: 11px; color: var(--muted); line-height: 1.5; margin-top: 4px; }
 
-/* ── DOUBLE BUTTON SMOOTH DISABLE ── */
+/* ── CARD FLIP ANIMATION ── */
+@keyframes cardFlip {
+  0%   { transform: rotateY(0deg); }
+  50%  { transform: rotateY(90deg); }
+  100% { transform: rotateY(0deg); }
+}
+.card.flipping { animation: cardFlip .35s ease both; }
+
+/* ── BALANCE FLASH ── */
+@keyframes balFlashWin  { 0%,100%{text-shadow:none} 40%{text-shadow:0 0 18px rgba(63,185,80,0.9),0 0 32px rgba(63,185,80,0.5)} }
+@keyframes balFlashLose { 0%,100%{text-shadow:none} 40%{text-shadow:0 0 18px rgba(248,81,73,0.9),0 0 32px rgba(248,81,73,0.5)} }
+.tb-balance.flash-win  { animation: balFlashWin  .7s ease; }
+.tb-balance.flash-lose { animation: balFlashLose .7s ease; }
+
+/* ── QUICK BET BUTTONS ── */
+#quick-bet-row {
+  display: flex; gap: 4px; margin-top: 6px;
+}
+.quick-bet-btn {
+  flex: 1; padding: 5px 4px; font-family: var(--mono); font-size: 9px;
+  letter-spacing: 1px; text-transform: uppercase; cursor: pointer;
+  border: 1px solid var(--line2); color: var(--muted); background: transparent;
+  border-radius: var(--radius); transition: all .15s;
+}
+.quick-bet-btn:hover { border-color: var(--gold-lo); color: var(--gold-hi); background: rgba(201,168,76,.05); }
+
+/* ── AUTO SAME-BET TOGGLE ── */
+#auto-same-bet-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 6px 0 2px; font-family: var(--mono); font-size: 9px;
+  color: var(--muted); letter-spacing: 1px; text-transform: uppercase;
+}
+#auto-same-bet-toggle {
+  position: relative; width: 30px; height: 16px; cursor: pointer;
+  -webkit-appearance: none; appearance: none;
+  background: var(--bg3); border: 1px solid var(--line2); border-radius: 8px;
+  transition: background .2s, border-color .2s; flex-shrink: 0;
+}
+#auto-same-bet-toggle:checked { background: var(--gold-lo); border-color: var(--gold); }
+#auto-same-bet-toggle::after {
+  content: ''; position: absolute; top: 2px; left: 2px;
+  width: 10px; height: 10px; border-radius: 50%; background: var(--muted2);
+  transition: transform .2s, background .2s;
+}
+#auto-same-bet-toggle:checked::after { transform: translateX(14px); background: var(--gold-hi); }
+
+/* ── SOFT TOTAL LABEL ── */
+.score-soft { font-size: 8px; color: var(--blue); letter-spacing: 1px; margin-left: 3px; opacity: 0.8; }
+
+/* ── SPLIT LOG ROW ── */
+.log-split-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 3px; padding: 2px 0;
+}
+.log-split-cell {
+  font-family: var(--mono); font-size: 9px; padding: 3px 5px;
+  border-radius: 2px; background: rgba(255,255,255,0.03);
+}
+
 #btn-double { transition: opacity .2s ease, border-color .2s ease, color .2s ease, background .2s ease; }
 #btn-double:disabled { opacity: 0.2 !important; }
 
@@ -1751,9 +1809,18 @@ body.hand2-active #chip-strip .chip { position: relative; }
       <div class="panel">
         <div class="panel-title">Bet <span id="bet-total-tag" style="color:var(--gold-hi);font-family:var(--mono)"></span></div>
         <div class="chip-row" id="chip-row"></div>
+        <div id="quick-bet-row">
+          <button class="quick-bet-btn" onclick="quickBet('min')">Min</button>
+          <button class="quick-bet-btn" onclick="quickBet('half')">½ Max</button>
+          <button class="quick-bet-btn" onclick="quickBet('max')">Max</button>
+        </div>
         <div id="bet-input-row">
           <input type="text" id="bet-input" placeholder="Custom amount…" inputmode="numeric" autocomplete="off" oninput="formatBetInput(this)" onkeydown="if(event.key==='Enter')applyBetInput()">
           <button id="bet-input-btn" onclick="applyBetInput()">Bet</button>
+        </div>
+        <div id="auto-same-bet-row">
+          <span>Auto same bet</span>
+          <input type="checkbox" id="auto-same-bet-toggle" onchange="toggleAutoSameBet(this.checked)">
         </div>
         <div id="bet-lines"></div>
       </div>
@@ -3079,6 +3146,9 @@ window.onload=()=>{
   // Load strategy hint preference
   _strategyOn=localStorage.getItem('kfc_strategy')==='1';
   const stEl=document.getElementById('strategy-toggle'); if(stEl) stEl.checked=_strategyOn;
+  // Load auto same-bet preference
+  _autoSameBet=localStorage.getItem('kfc_autobet')==='1';
+  const abEl=document.getElementById('auto-same-bet-toggle'); if(abEl) abEl.checked=_autoSameBet;
   try{G.pins=JSON.parse(localStorage.getItem('kfc_pins')||'{}');}catch(e){G.pins={};}
   const cfgEl=document.getElementById('cfg-url');
   if(cfgEl) cfgEl.value=G.url;
@@ -3347,7 +3417,19 @@ function updateInventoryBar(){
 }
 
 function updateUI(){
-  document.getElementById('tb-bal').textContent=fmtKFC(G.balance);
+  const balEl=document.getElementById('tb-bal');
+  const prev=G._prevBalance;
+  const cur=G.balance;
+  balEl.textContent=fmtKFC(cur);
+  // Flash balance on change
+  if(prev!==undefined && cur!==prev){
+    const cls=cur>prev?'flash-win':'flash-lose';
+    balEl.classList.remove('flash-win','flash-lose');
+    void balEl.offsetWidth; // force reflow to restart animation
+    balEl.classList.add(cls);
+    setTimeout(()=>balEl.classList.remove(cls),700);
+  }
+  G._prevBalance=cur;
   // Subtract 1 for the cut card which is still in the deck
   const rawLen=G.deck?G.deck.length:0;
   const hasCut=G.deck&&G.deck.some(c=>c.cutCard);
@@ -3626,7 +3708,9 @@ function buildLevPanel(){
   }
   G.levCards.forEach((lc,i)=>{
     const label=lc==='blood'?'Blood Jester (2×)':'Bone Jester (3×)';
-    addItemBtn(c,label,'Card — evoke before deal','lev-card-'+i,G.leverage===`c${i}`,'',()=>toggleLev(`c${i}`));
+    const inBet=G.phase==='bet';
+    const sub=inBet?'Evoke before deal — betting phase only':'Betting phase only — deal not yet started';
+    addItemBtn(c,label,sub,'lev-card-'+i,G.leverage===`c${i}`,inBet?'':'locked',inBet?()=>toggleLev(`c${i}`):null);
   });
   if(G.levCards.length===0&&['highroller','champion'].includes(G.stake)){
     c.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--muted)">Not available at this tier</div>';
@@ -3635,6 +3719,11 @@ function buildLevPanel(){
 }
 
 function toggleLev(key){
+  // Jester cards (c0, c1…) may only be evoked during the betting phase
+  if(key.startsWith('c') && G.phase!=='bet'){
+    notif('Jester cards must be evoked before dealing');
+    return;
+  }
   G.leverage=G.leverage===key?null:key;
   buildLevPanel(); updateBetPanel(); updateInventoryBar();
 }
@@ -4177,16 +4266,21 @@ function revealHole(){
   if(cards.length>holeIdx){
     const holeEl=cards[holeIdx];
     const c=G.dealer[holeIdx];
-    holeEl.classList.remove('down');
-    if(c && !c.bonus){
-      holeEl.className='card '+(RED.includes(c.s)?'red':'black')+' up';
-      holeEl.innerHTML=cardInner(c);
-    } else if(c && c.bonus){
-      holeEl.className='card bonus';
-      holeEl.dataset.bonusId=c.bonus.id;
-      holeEl.innerHTML=bonusCardInner(c.bonus,c.repIdx);
-      applyBonusStyle(holeEl,c.bonus);
-    }
+    // Add flip class — swap content at midpoint (180ms in)
+    holeEl.classList.add('flipping');
+    setTimeout(()=>{
+      holeEl.classList.remove('down');
+      if(c && !c.bonus){
+        holeEl.className='card '+(RED.includes(c.s)?'red':'black')+' up flipping';
+        holeEl.innerHTML=cardInner(c);
+      } else if(c && c.bonus){
+        holeEl.className='card bonus flipping';
+        holeEl.dataset.bonusId=c.bonus.id;
+        holeEl.innerHTML=bonusCardInner(c.bonus,c.repIdx);
+        applyBonusStyle(holeEl,c.bonus);
+      }
+      setTimeout(()=>holeEl.classList.remove('flipping'),175);
+    },175);
   }
   renderScores();
 }
@@ -4710,8 +4804,13 @@ function renderScores(){
     if(!el)return;
     const v=hv(h);
     const bust=isBust(h); const bj=isBJ(h);
+    // Detect soft hand: contains an ace counted as 11
+    const hasAce=h.some(c=>!c.bonus&&c.r==='A');
+    const hardSum=h.reduce((s,c)=>s+cv(c),0);
+    const isSoft=!bust&&!bj&&hasAce&&hardSum!==v&&v<=21;
     el.className='score'+(bust?' bust':bj?' bj':'');
-    el.innerHTML=`total <span>${bust?'BUST':bj?'BJ':v}</span>`;
+    const softLabel=isSoft?`<span class="score-soft">soft</span>`:'';
+    el.innerHTML=`total ${softLabel}<span>${bust?'BUST':bj?'BJ':v}</span>`;
   });
 }
 
@@ -4830,6 +4929,15 @@ function closeResult(){
   if(G.sideBets2) SB_NAMES.forEach(n=>G.sideBets2[n]=0);
   G.leverage=null;
   updateSBCircles(); // reset all SB circles to inactive after round
+  // Auto same-bet: restore last bets automatically
+  if(_autoSameBet&&G.lastMainBet>0){
+    G.mainBet=G.lastMainBet;
+    SB_NAMES.forEach(n=>G.sideBets[n]=(G.lastSideBets&&G.lastSideBets[n])||0);
+    if(G._hand2Active&&G.lastMainBet2>0){
+      G.mainBet2=G.lastMainBet2;
+      SB_NAMES.forEach(n=>G.sideBets2[n]=(G.lastSideBets2&&G.lastSideBets2[n])||0);
+    }
+  }
   // Blood Jester: if a leverage card (not 2x token) was used this hand, consume it
   if(G._usedLevCardIdx!==undefined){
     G.levCards.splice(G._usedLevCardIdx,1);
@@ -4895,13 +5003,32 @@ function closeResult(){
 // ── LOG ──────────────────────────────────────────────
 function renderLog(){
   const c=document.getElementById('log');
-  const rows=[...G.log].reverse(); // show ALL hands, newest first
+  const rows=[...G.log].reverse();
   if(!rows.length){c.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--muted);padding:8px 0">No hands yet</div>';return;}
   c.innerHTML=rows.map(e=>{
-    // For 2-hand entries, wrap long detail
-    const isMulti = e.detail && e.detail.startsWith('H1:');
-    return `<div class="log-row${isMulti?' log-row-multi':''}">
-      <div class="log-detail" style="${isMulti?'white-space:normal;font-size:9px':''}">${e.detail}</div>
+    const bd=e.breakdown;
+    // Split hand: show H1 and H2 as separate sub-rows
+    if(bd&&bd.hand2){
+      const h1pl=bd.main.pl; const h2pl=bd.hand2.pl;
+      const h1cls=h1pl>0?'w':h1pl<0?'l':'p';
+      const h2cls=h2pl>0?'w':h2pl<0?'l':'p';
+      return `<div class="log-row" style="flex-direction:column;gap:3px;align-items:stretch">
+        <div class="log-split-row">
+          <div class="log-split-cell"><span style="color:var(--muted);font-size:8px">H1 </span><span style="color:var(--muted2)">${bd.main.detail}</span></div>
+          <div class="log-split-cell"><span style="color:var(--muted);font-size:8px">H2 </span><span style="color:var(--muted2)">${bd.hand2.detail}</span></div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div style="display:flex;gap:8px">
+            <span class="log-pl ${h1cls}" style="font-size:9px">H1 ${h1pl>=0?'+':''}${fmt(h1pl)}</span>
+            <span class="log-pl ${h2cls}" style="font-size:9px">H2 ${h2pl>=0?'+':''}${fmt(h2pl)}</span>
+          </div>
+          <div class="log-pl ${e.pl>0?'w':e.pl<0?'l':'p'}">${e.pl>=0?'+':''}${fmt(e.pl)}</div>
+          <div class="log-bal">${fmt(e.bal)}</div>
+        </div>
+      </div>`;
+    }
+    return `<div class="log-row">
+      <div class="log-detail">${e.detail}</div>
       <div class="log-pl ${e.pl>0?'w':e.pl<0?'l':'p'}">${e.pl>=0?'+':''}${fmt(e.pl)}</div>
       <div class="log-bal">${fmt(e.bal)}</div>
     </div>`;
@@ -5200,6 +5327,26 @@ function renderSessionStats(){
     stat('Worst Loss',fmt(s.bigLoss),'var(--red)')+
     stat('Win Streak',s.maxStreak+'⬆')+
     stat('Lose Streak',s.maxLoseStreak+'⬇');
+}
+
+// ── QUICK BET BUTTONS ──────────────────────────────────────────────
+function quickBet(type){
+  if(G.phase!=='bet'){notif('Place bets before dealing');return;}
+  let amount=0;
+  if(type==='min') amount=G.s.min;
+  else if(type==='half') amount=Math.floor(G.s.max/2);
+  else if(type==='max') amount=G.s.max;
+  if(amount>G.balance){ amount=G.balance; }
+  if(amount<=0){notif('Insufficient balance');return;}
+  G.mainBet=amount;
+  updateBetPanel(); updateBetCircle(); sfx('chip');
+}
+
+// ── AUTO SAME-BET ──────────────────────────────────────────────
+let _autoSameBet=false;
+function toggleAutoSameBet(on){
+  _autoSameBet=on;
+  localStorage.setItem('kfc_autobet',on?'1':'0');
 }
 
 // ── NOTIF ──────────────────────────────────────────────
