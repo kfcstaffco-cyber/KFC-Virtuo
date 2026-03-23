@@ -4394,7 +4394,6 @@ function settle(reason){
   if(G.plagueOn&&mainPL>0){
     const plague=Math.floor(mainPL/2);
     mainPL-=plague;
-    detail+=' [Plague: -'+fmtKFC(plague)+']';
     G._plagueDeducted=plague;
     updateBonusEntry('Plague',{label:'Plague Jester — took '+fmtKFC(plague),pl:-plague,type:'warn'});
     setTimeout(()=>notif('Plague Jester took '+fmtKFC(plague)+'!'),500);
@@ -4902,16 +4901,13 @@ function showResult(pl,detail,bal){
       } else {
         bkHtml+=`<div class="r-row ${bd.main.pl>0?'w':bd.main.pl<0?'l':'p'}"><span>Main result</span><span>${bd.main.pl>=0?'+':''}${fmtKFC(bd.main.pl)}</span></div>`;
       }
-      // Bonus card entries
+      // Bonus card entries (includes plague if triggered)
       if(bd.bonus&&bd.bonus.length>0){
         bd.bonus.forEach(b=>{
           const cls=b.type==='gain'?'w':b.type==='warn'?'l':'';
           const valStr=b.pl>0?`+${fmtKFC(b.pl)}`:b.pl<0?fmtKFC(b.pl):'';
           bkHtml+=`<div class="r-row ${cls}"><span>🃏 ${b.label}</span>${valStr?`<span>${valStr}</span>`:''}</div>`;
         });
-      }
-      if(bd.plague>0){
-        bkHtml+=`<div class="r-row l"><span>↳ Plague Jester took</span><span>-${fmtKFC(bd.plague)}</span></div>`;
       }
       // Side bets — show both wins and losses
       bd.sbs.forEach(sb=>{
