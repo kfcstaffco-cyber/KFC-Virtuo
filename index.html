@@ -4050,22 +4050,23 @@ function deal(){
   [p1,p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i,0);});
   // Bonus processing for second hand — pass handIdx=1 so effects scope correctly
   if(_deal2&&h2p1&&h2p2){ [h2p1,h2p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i,1);}); }
-  // Jester replacement
+  // Jester replacement — jester triggers its effect then is REPLACED by a real card
+  // The jester never persists in the hand; hand stays at 2 value cards
   [p1,p2].forEach((c,i)=>{
     if(c.bonus&&c.bonus.jester){
       const rep=draw();
-      G.hands[0].splice(G.hands[0].indexOf(c)+1,0,rep);
-      if(rep.bonus)onBonusCard(rep.bonus,i,0); // handIdx=0, same position as replaced jester
+      const jesterIdx=G.hands[0].indexOf(c);
+      G.hands[0].splice(jesterIdx,1,rep); // REPLACE jester with replacement card
+      if(rep.bonus)onBonusCard(rep.bonus,i,0);
       renderAll();
     }
   });
-  // If dealer's face-up card (d1) is a jester, draw an extra face-up card
-  // (jester has no value; dealer needs an additional real card showing)
-  // Structure: [d1_jester(visible), replacement(visible), d2_hole(hidden)]
+  // If dealer's face-up card (d1) is a jester, REPLACE it with a real card
+  // Dealer hand stays at 2 cards; jester effect triggers then card is swapped
   if(d1.bonus&&d1.bonus.jester){
     onDealerJester(false);
     const rep=draw();
-    G.dealer.splice(1,0,rep); // insert before hole card (index 1), so hole stays last
+    G.dealer.splice(0,1,rep); // replace d1 jester with replacement at index 0
     renderAll();
   }
   if(d2.bonus&&d2.bonus.jester)onDealerJester(true);
@@ -4247,19 +4248,20 @@ function hit(){
   if(c.bonus){
     const hitIdx=h.length-1; // index of this card in hand
     onBonusCard(c.bonus, hitIdx);
-    // Jester is not a value card — auto-draw replacement
+    // Jester is not a value card — REPLACE it with a real card
     if(c.bonus.jester){
       setTimeout(()=>{
-        const r=draw(); h.push(r);
-        if(r.bonus)onBonusCard(r.bonus, hitIdx); // same positional index
+        const r=draw();
+        h.splice(h.length-1,1,r); // replace the jester with the new card
+        if(r.bonus)onBonusCard(r.bonus, hitIdx);
         renderAll();
         const v2=hv(h);
         if(v2===22&&G.puOwned.has('net')){G.safetyTrigger=true;notif('SAFETY NET — PUSH');advOrEnd('safety');return;}
         if(isBust(h)){sfx('bust');if(G.kruegerOn){const ins=Math.floor(G.mainBet/2);G.preDealBal+=ins;G.balance+=ins;updateUI();G._bonusPayouts.push({label:'Krueger — bust insurance',pl:ins,type:'gain'});notif('Krueger — recovered '+fmtKFC(ins));G.kruegerOn=false;}if(G.desertOn){G.desertOn=false;advOrEnd('desert_push');return;}advOrEnd('bust');}
         else if(v2===21){advOrEnd();}
-        else renderScores();
+        else{ renderScores(); setActions(true); updateStrategyHint(); }
       },300);
-      return; // early return — hit() continuation handled in setTimeout above
+      return;
     }
   }
   renderAll();
@@ -4313,11 +4315,12 @@ function dbl(){
   }
   const c=draw(); h.push(c);
   if(c.bonus&&c.bonus.jester){
-    // Jester on double-down: trigger effect then draw a real card
+    // Jester on double-down: trigger effect then REPLACE with a real card
     onBonusCard(c.bonus, h.length-1);
     renderAll();
     setTimeout(()=>{
-      const c2=draw(); h.push(c2);
+      const c2=draw();
+      h.splice(h.length-1,1,c2); // replace the jester
       if(c2.bonus) onBonusCard(c2.bonus, h.length-1);
       renderAll(); advOrEnd();
     },400);
@@ -4429,8 +4432,27 @@ function dealerPlay(){
     if(hv(G.dealer)<17){
       const c=draw();
       G.dealer.push(c);
-      if(c.bonus&&c.bonus.jester) onDealerJester();
-      appendDealerCard(c); // only append new card, no full re-render
+      if(c.bonus&&c.bonus.jester){
+        // Jester: trigger effect, then REPLACE with real card before continuing
+        onDealerJester();
+        appendDealerCard(c);
+        renderScores();
+        setTimeout(()=>{
+          const rep=draw();
+          G.dealer.splice(G.dealer.length-1,1,rep); // replace the jester
+          // Update the last DOM card to show the replacement
+          const dc=document.getElementById('dealer-cards');
+          if(dc&&dc.lastChild){
+            const el=dc.lastChild;
+            if(rep.bonus){el.className='card bonus';el.dataset.bonusId=rep.bonus.id;el.innerHTML=bonusCardInner(rep.bonus,rep.repIdx);applyBonusStyle(el,rep.bonus);}
+            else{el.className='card '+(RED.includes(rep.s)?'red':'black')+' up';el.innerHTML=cardInner(rep);}
+          }
+          renderScores();
+          setTimeout(drawDealer, 900);
+        }, 600);
+        return;
+      }
+      appendDealerCard(c);
       renderScores();
       setTimeout(drawDealer, 900);
     } else {
