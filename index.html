@@ -584,10 +584,18 @@ body:not(.betting) #betting-spacer { flex: 0; }
   #sync-badge { display: none; }
 
   /* ── HAND 2 SECTION ── */
-  #hand2-bet-section { padding: 4px 0 0; }
-  #hand2-sb-circles { gap: 4px; }
-  #hand2-bet-circle { width: 64px !important; height: 64px !important; }
-  .h2-sb-circle { width: 38px !important; height: 38px !important; max-width: 38px !important; }
+  #hand2-bet-section { padding: 4px 0 0; width: 100%; box-sizing: border-box; }
+  #hand2-sb-circles {
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    justify-content: center;
+  }
+  #hand2-sb-circles::-webkit-scrollbar { display: none; }
+  #hand2-bet-circle { width: 60px !important; height: 60px !important; }
+  .h2-sb-circle { width: 36px !important; height: 36px !important; max-width: 36px !important; }
   .h2-sb-circle .sb-circle-label { font-size: 6px !important; }
   .h2-sb-circle .sb-circle-amt { font-size: 8px !important; }
   #hand2-toggle-wrap { margin: 4px 0 0; }
@@ -605,16 +613,20 @@ body:not(.betting) #betting-spacer { flex: 0; }
   #table-area {
     position: static;
     height: auto;
+    max-height: calc(100vh - 90px); /* cap at viewport, scroll internally */
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
     min-height: 0;
-    padding: 10px 12px 6px;
+    padding: 8px 12px 6px;
     border-right: none;
     border-bottom: 1px solid var(--line);
     border-radius: 0;
-    overflow: visible;
-    /* Prevent any child from leaking horizontally */
     width: 100%;
     box-sizing: border-box;
   }
+  /* Kill spacer on mobile — we don't need vertical centering */
+  #betting-spacer { display: none !important; }
 
   /* ── SHOE ── */
   #shoe-area {
@@ -655,12 +667,14 @@ body:not(.betting) #betting-spacer { flex: 0; }
     gap: 4px;
     width: 100%;
     box-sizing: border-box;
+    margin-top: 6px;
   }
+  /* Stand + Hit always row 1 (50% each), Double + Split row 2 (50% each) */
   #play-actions .act {
-    flex: 1 1 calc(25% - 4px);
+    flex: 1 1 calc(50% - 4px);
     min-width: 0;
     padding: 9px 2px;
-    font-size: 9px;
+    font-size: 10px;
     letter-spacing: .5px;
     box-sizing: border-box;
   }
@@ -669,9 +683,10 @@ body:not(.betting) #betting-spacer { flex: 0; }
     flex: 1 1 calc(50% - 4px);
     min-width: 0;
   }
+  /* Surrender: inline with other buttons, not full width */
   #play-actions #btn-surrender {
-    flex: 0 0 100%;
-    width: 100%;
+    flex: 1 1 calc(50% - 4px);
+    width: auto;
   }
 
   /* ── SIDE BET CIRCLES ── */
@@ -681,19 +696,6 @@ body:not(.betting) #betting-spacer { flex: 0; }
     justify-content: center;
     gap: 6px;
     max-width: 100%;
-  }
-  /* On narrow screens: PP + 21+3 on top row, bet circle centred, C7s + DB bottom row */
-  @media (max-width: 400px) {
-    #sb-circles {
-      display: grid;
-      grid-template-columns: 42px 42px 56px 42px 42px;
-      grid-template-rows: auto;
-      align-items: center;
-      gap: 4px;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-    }
-    #bet-circle { width: 56px !important; height: 56px !important; }
   }
   #play-bottom-inner {
     display: flex;
@@ -716,8 +718,16 @@ body:not(.betting) #betting-spacer { flex: 0; }
 
   /* ── BETTING ZONE ── */
   #betting-zone { padding: 0; width: 100%; box-sizing: border-box; }
-  #bet-shortcuts { gap: 5px; }
-  .shortcut-btn { padding: 5px 4px; font-size: 8px; letter-spacing: 1px; }
+  #bet-shortcuts {
+    gap: 4px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 2px;
+  }
+  #bet-shortcuts::-webkit-scrollbar { display: none; }
+  .shortcut-btn { padding: 5px 6px; font-size: 8px; letter-spacing: 0.8px; flex-shrink: 0; }
   #btn-deal-top { padding: 10px 20px !important; min-width: 0 !important; }
 
   /* ── CHIP STRIP ── */
@@ -763,7 +773,21 @@ body:not(.betting) #betting-spacer { flex: 0; }
     max-height: 88vh !important;
     padding: 18px 14px !important;
     box-sizing: border-box !important;
+    overflow-y: auto !important;
   }
+  /* Result modal number fits any screen */
+  .result-num { font-size: clamp(28px, 10vw, 44px); }
+
+  /* ── DEAL BUTTON ── override inline min-width */
+  #btn-deal-top {
+    min-width: 0 !important;
+    padding: 11px 24px !important;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  /* ── HAND SLOTS ── no fixed min-width on mobile */
+  .hand-slot { min-width: 0 !important; }
 
   /* ── STAKE LIST ── */
   .stake-btn { padding: 9px 12px; }
@@ -774,14 +798,29 @@ body:not(.betting) #betting-spacer { flex: 0; }
   .log-detail { max-width: calc(100vw - 60px); }
 
   /* ── NOTIF ── */
-  #notif { max-width: calc(100vw - 24px); font-size: 11px; left: 12px !important; right: 12px !important; transform: none !important; }
+  #notif {
+    max-width: calc(100vw - 24px);
+    font-size: 11px;
+    left: 12px !important;
+    right: 12px !important;
+    transform: none !important;
+    white-space: normal;
+    text-align: center;
+    padding: 10px 14px;
+  }
 
   /* ── SPLASH ANIMATIONS ── */
   #allin-splash { font-size: clamp(40px, 10vw, 80px); }
   #bj-splash { font-size: clamp(38px, 9vw, 72px); }
 
-  /* ── NOTIF TOAST ── */
-  #bonus-toast { max-width: calc(100vw - 24px); font-size: 11px; }
+  /* ── BONUS TOAST ── */
+  #bonus-toast {
+    max-width: calc(100vw - 24px);
+    font-size: 11px;
+    top: auto;
+    bottom: 12px;
+    right: 12px;
+  }
 }
 
 /* Extra small screens (iPhone SE, older androids) */
@@ -794,8 +833,19 @@ body:not(.betting) #betting-spacer { flex: 0; }
     width: 40px !important; height: 40px !important;
     max-width: 40px !important;
   }
+  /* Fix circles row on tiny phones — single scrollable row */
+  #sb-circles {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    justify-content: flex-start;
+    padding-bottom: 4px;
+    scrollbar-width: none;
+  }
+  #sb-circles::-webkit-scrollbar { display: none; }
   #play-actions .act { font-size: 8px; padding: 8px 1px; letter-spacing: 0; }
   #play-bet-circle { width: 60px !important; height: 60px !important; }
+  #bet-circle { width: 56px !important; height: 56px !important; }
   .shortcut-btn { font-size: 7px; padding: 4px 3px; }
 }
 
@@ -968,7 +1018,7 @@ body:not(.betting) #playing-zone { opacity: 1; pointer-events: auto; transform: 
   overflow: visible;
 }
 body.betting  #play-bottom { opacity: 0; pointer-events: none; max-height: 0; padding: 0; border-color: transparent; overflow: hidden; }
-body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 200px; transition: opacity .3s cubic-bezier(.4,0,.2,1) .12s, max-height .38s cubic-bezier(.4,0,.2,1); }
+body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 400px; transition: opacity .3s cubic-bezier(.4,0,.2,1) .12s, max-height .38s cubic-bezier(.4,0,.2,1); }
 #play-bottom-inner {
   display: flex; align-items: center; gap: 8px; justify-content: center;
 }
@@ -1721,7 +1771,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
       <div id="betting-zone">
         <!-- 1. Deal button (centered, full-width feel) -->
         <div style="display:flex;justify-content:center;width:100%;margin-bottom:6px">
-          <button class="act primary" id="btn-deal-top" onclick="deal()" style="min-width:160px;padding:11px 48px">Deal</button>
+          <button class="act primary" id="btn-deal-top" onclick="deal()" style="padding:11px 48px">Deal</button>
         </div>
         <!-- 1b. Shortcuts row -->
         <div id="betting-deal-row" style="justify-content:center">
