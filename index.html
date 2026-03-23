@@ -3234,19 +3234,22 @@ document.addEventListener('keydown',function(e){
 const SESSION_KEY='kfc_session_v1';
 
 function saveSession(){
-  // Only save when logged in and in bet phase (mid-hand state is too complex to restore)
+  // Saves current state. Always restores to bet phase.
+  // If navigated away mid-hand, balance is restored to pre-deal amount (bet refunded).
   if(!G.player) return;
+  // Use preDealBal if mid-hand (refunds the in-flight bet on restore)
+  const safeBalance = (G.phase !== 'bet' && G.preDealBal > 0) ? G.preDealBal : G.balance;
   try{
     const snap={
       player:G.player, username:G.username,
-      balance:G.balance, sessionStart:G.sessionStart, totalBalance:G._totalBalance||G.balance, cashedOut:G.cashedOut, sessionActive:G._sessionActive,
+      balance:safeBalance, sessionStart:G.sessionStart, totalBalance:G._totalBalance||G.balance, cashedOut:G.cashedOut, sessionActive:G._sessionActive,
       stake:G.stake,
       cachedPin:G._cachedPin||'',
       lastMainBet:G.lastMainBet, lastSideBets:G.lastSideBets,
       mainBet:G.mainBet, sideBets:{...G.sideBets},
       leverage:G.leverage,
       log:G.log.slice(-50), // keep last 50 log entries
-      phase:G.phase==='bet'?'bet':'bet', // always restore to bet phase
+      phase:'bet', // always restore to bet phase
       levCards:G.levCards,
       levCardsPending:G._levCardsPending||[],
       puOwned:[...G.puOwned],
@@ -3323,6 +3326,29 @@ window.addEventListener('beforeunload', (e)=>{
   }
 });
 
+// pagehide fires on mobile when page is hidden/navigated away (more reliable than beforeunload)
+window.addEventListener('pagehide', ()=>{
+  if(G.player && !G.cashedOut && !G._atCashout && G._sessionActive){
+    saveSession();
+  }
+});
+
+// Back-button trap: push a dummy history entry so back button triggers popstate
+// instead of leaving the page
+function _installBackTrap(){
+  history.pushState({kfc:1}, '');
+  window.addEventListener('popstate', function _popHandler(evt){
+    // Re-push so the next back press also fires popstate
+    history.pushState({kfc:1}, '');
+    if(G.player && !G.cashedOut && G._sessionActive){
+      // Show cashout modal instead of letting them leave
+      notif('Cash out before leaving the table!');
+      saveSession();
+      if(G.phase==='bet') showCashout();
+    }
+  });
+}
+
 window.onload=()=>{
   // Clear old test data from localStorage
   Object.keys(localStorage).filter(k=>k.startsWith('kfc_bal_')).forEach(k=>localStorage.removeItem(k));
@@ -3347,6 +3373,28 @@ window.onload=()=>{
   G._shoeTotal=G.deck.length-1;
   SB_NAMES.forEach(n=>G.sideBets[n]=0); updateSBCircles&&updateSBCircles();
   buildStakeList();
+  // Check for cashout-in-progress snap (reload during cashout screen)
+  try{
+    const coSnap=localStorage.getItem('kfc_cashout_snap');
+    if(coSnap){
+      const cs=JSON.parse(coSnap);
+      if(cs&&cs.player&&(Date.now()-cs.ts)<30*60*1000){ // within 30 min
+        G.player=cs.player; G.username=cs.username||cs.player;
+        G.balance=cs.balance; G.sessionStart=cs.sessionStart;
+        G._totalBalance=cs.totalBalance||cs.balance;
+        G.stake=cs.stake||'low'; G.s=STAKES[G.stake]||STAKES.low;
+        G.log=cs.log||[];
+        G._sessionActive=true; G.cashedOut=false; G._atCashout=false;
+        if(cs.chartPts){ _chartPts.length=0; cs.chartPts.forEach(p=>_chartPts.push(p)); }
+        openApp(G.player, G.balance);
+        notif('Cashout restored — please confirm below');
+        setTimeout(()=>showCashout(), 600);
+        return;
+      } else {
+        localStorage.removeItem('kfc_cashout_snap');
+      }
+    }
+  }catch(e){}
   // Try to restore a previous session
   if(restoreSession()){
     // Session found — skip login, go straight to table
@@ -3502,6 +3550,8 @@ function openApp(displayName, balance){
       showCashout();
     },2300);
   }
+  // Install back-button trap to prevent losing session via browser back
+  _installBackTrap();
 }
 
 // loadBalance merged into doLogin/openApp
@@ -5333,8 +5383,17 @@ function showCashout(){
   const rm=document.getElementById('result-modal');
   if(G.phase!=='bet'&&!(rm&&rm.classList.contains('open'))){notif('Finish the current hand first');return;}
   if(rm&&rm.classList.contains('open')) closeResult();
-  G._atCashout=true;  // block beforeunload from re-saving
-  clearSession();     // wipe any saved session immediately
+  G._atCashout=true;  // block beforeunload from re-saving mid-cashout
+  // DON'T clearSession() here — keep it alive so reload can restore stats
+  // Save a cashout snapshot so reload during cashout restores the modal correctly
+  try{
+    localStorage.setItem('kfc_cashout_snap', JSON.stringify({
+      player:G.player, username:G.username, balance:G.balance,
+      sessionStart:G.sessionStart, totalBalance:G._totalBalance||G.balance,
+      stake:G.stake, log:G.log.slice(-50), chartPts:[..._chartPts],
+      ts:Date.now()
+    }));
+  }catch(e){}
   const pl=G.balance-G.sessionStart;
   const el=document.getElementById('co-pl');
   el.textContent=(pl>=0?'+':'')+fmtKFC(pl);
@@ -5386,7 +5445,7 @@ async function attemptSync(payload){
 
 async function confirmCashout(){
   G.cashedOut=true;
-  clearSession();
+  // Session is cleared only after sync/save succeeds — not here
   document.getElementById('co-actions-pre').style.display='none';
   const post=document.getElementById('co-actions-post');
   post.style.display='flex';
@@ -5425,6 +5484,7 @@ async function confirmCashout(){
       // No sheet — save locally, allow leave
       localStorage.setItem('kfc_bal_'+(G.username||G.player), G.balance);
       clearSyncQueue();
+      clearSession(); localStorage.removeItem('kfc_cashout_snap'); // safe to wipe now
       setSyncBadge('','LOCAL');
       badge.textContent='✓ Saved locally — ready to leave';
       badge.style.color='var(--green)';
@@ -5437,6 +5497,7 @@ async function confirmCashout(){
     try{
       await attemptSync(payload);
       clearSyncQueue();
+      clearSession(); localStorage.removeItem('kfc_cashout_snap'); // safe to wipe now
       setSyncBadge('live','SYNCED');
       badge.textContent='✓ Synced — ready to leave';
       badge.style.color='var(--green)';
