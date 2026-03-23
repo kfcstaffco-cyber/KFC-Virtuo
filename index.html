@@ -3442,8 +3442,7 @@ window.onload=()=>{
 
     // Silently re-fetch balance from sheet to catch any changes since last close
     if(G.url && G.username && G._cachedPin){
-      fetch(G.url+'?action=getBalance&username='+encodeURIComponent(G.username)+'&pin='+encodeURIComponent(G._cachedPin))
-        .then(r=>r.json())
+      sheetGet(G.url+'?action=getBalance&username='+encodeURIComponent(G.username)+'&pin='+encodeURIComponent(G._cachedPin))
         .then(d=>{
           if(d.auth && typeof d.balance==='number'){
             const prevTotal=G._totalBalance;
@@ -3477,9 +3476,7 @@ async function doLogin(){
   if(G.url){
     err.textContent='Connecting...';
     try{
-      const r=await fetch(G.url+'?action=getBalance&username='+encodeURIComponent(username)+'&pin='+encodeURIComponent(pin));
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      const d=await r.json();
+      const d=await sheetGet(G.url+'?action=getBalance&username='+encodeURIComponent(username)+'&pin='+encodeURIComponent(pin));
       if(d.error&&d.auth===false){err.textContent=d.error||'Authentication failed';return;}
       if(d.auth){
         err.textContent='';
@@ -3632,8 +3629,7 @@ function doLogout(skipToStake){
       if(G.url){
         try{
           const pin=G._cachedPin||'';
-          const r=await fetch(G.url+'?action=getBalance&username='+encodeURIComponent(wasUsername)+'&pin='+encodeURIComponent(pin));
-          const d=await r.json();
+          const d=await sheetGet(G.url+'?action=getBalance&username='+encodeURIComponent(wasUsername)+'&pin='+encodeURIComponent(pin));
           if(d.auth&&typeof d.balance==='number'){
             _pendingLogin.balance=d.balance;
           }
@@ -4143,10 +4139,34 @@ function deal(){
   [p1,p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i,0);});
   // Bonus processing for second hand — pass handIdx=1 so effects scope correctly
   if(_deal2&&h2p1&&h2p2){ [h2p1,h2p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i,1);}); }
-  // Jesters stay in the hand as 0-value cards — no replacement drawn, no swap.
-  // Their effect triggers via onBonusCard above. hv()/cv() already return 0 for jesters.
-  // Check for dealer jester effects (hole card jester)
+  // Jesters stay in the hand as 0-value cards with their effect triggered above.
+  // But since a jester fills a card slot without contributing value, draw one extra
+  // card per jester in the initial deal so the player always has 2 value cards.
+  [p1,p2].forEach((c)=>{
+    if(c.bonus&&c.bonus.jester){
+      const extra=draw();
+      G.hands[0].push(extra);
+      if(extra.bonus) onBonusCard(extra.bonus, G.hands[0].length-1, 0);
+    }
+  });
+  if(_deal2&&h2p1&&h2p2){
+    [h2p1,h2p2].forEach((c)=>{
+      if(c.bonus&&c.bonus.jester){
+        const extra=draw();
+        G.hands[1].push(extra);
+        if(extra.bonus) onBonusCard(extra.bonus, G.hands[1].length-1, 1);
+      }
+    });
+  }
+  // Dealer face-up jester: dealer also needs an extra card to have a real value showing
+  if(d1.bonus&&d1.bonus.jester){
+    onDealerJester(false);
+    const extra=draw();
+    G.dealer.splice(1,0,extra); // insert before hole card so hole stays last
+  }
+  // Check for dealer hole card jester effect
   if(d2.bonus&&d2.bonus.jester) onDealerJester(true);
+  renderAll();
 
   // If dealer shows an Ace, offer insurance BEFORE peeking for BJ.
   // Dealer BJ is resolved inside declineInsurance / takeInsurance flow.
@@ -4358,7 +4378,9 @@ function dbl(){
   sfx('chip');
   const h=G.hands[G.cur];
   // Double-down only allowed on the first two cards
-  if(h.length!==2){notif('Double down is only allowed on your first 2 cards');return;}
+  // Double-down allowed on initial deal only — check value card count (jesters don't count)
+  const valueCards=h.filter(c=>!(c.bonus&&c.bonus.jester));
+  if(valueCards.length!==2){notif('Double down is only allowed on your first 2 cards');return;}
   if(G.arrowCount>0){
     // Free double: house covers the extra stake. Player wins at 2× but only risks original bet on loss.
     G.arrowCount--;
@@ -4397,7 +4419,8 @@ function split(){
   // Block split only if a jester (no value) is in the hand
   if(hand.some(c=>c.bonus&&c.bonus.jester)){notif('Cannot split — jester card in hand');return;}
   // Must have exactly 2 cards of equal value (bonus cards use their rep value)
-  if(hand.length!==2||cv(hand[0])!==cv(hand[1])){notif('Cards must match to split');return;}
+  const splitValueCards=hand.filter(c=>!(c.bonus&&c.bonus.jester));
+  if(splitValueCards.length!==2||cv(splitValueCards[0])!==cv(splitValueCards[1])){notif('Cards must match to split');return;}
   if(G.splits>=2){notif('Maximum 2 splits per hand');return;}
   if(G.balance<G.mainBet){notif('Not enough balance');return;}
   G.balance-=G.mainBet; G.splits++; updateUI();
@@ -5411,15 +5434,51 @@ function getSyncQueue(){
 async function attemptSync(payload){
   if(!G.url) return {ok:false, local:true};
   const params=new URLSearchParams({
-    action:'updatebalance', username:payload.username, player:payload.player,
-    balance:String(payload.balance), sessionPL:String(payload.sessionPL),
-    buyIn:String(payload.buyIn), date:payload.date, stake:payload.stake,
-    pin:payload.pin||''
+    action:'updatebalance',
+    username: String(payload.username||payload.player||''),
+    player:   String(payload.player||payload.username||''),
+    balance:  String(payload.balance),
+    sessionPL:String(payload.sessionPL),
+    buyIn:    String(payload.buyIn),
+    date:     payload.date,
+    stake:    payload.stake,
+    pin:      payload.pin||''
   });
-  const r=await fetch(G.url+'?'+params.toString());
-  const d=await r.json();
+  let r;
+  try{
+    r = await fetch(G.url+'?'+params.toString(), {
+      method: 'GET',
+      redirect: 'follow',   // follow Google's redirect chain
+      cache: 'no-store'
+    });
+  }catch(netErr){
+    console.error('Sync network error:', netErr);
+    throw new Error('Network error: '+netErr.message);
+  }
+  if(!r.ok){
+    console.error('Sync HTTP error:', r.status, r.statusText);
+    throw new Error('HTTP '+r.status);
+  }
+  let d;
+  try{
+    const text = await r.text();
+    d = JSON.parse(text);
+  }catch(parseErr){
+    console.error('Sync parse error — response was not JSON');
+    throw new Error('Invalid response from server');
+  }
+  console.log('Sync response:', d);
+  if(d.error && !d.ok) throw new Error(d.error);
   if(d.ok||d.balance!==undefined) return {ok:true};
   throw new Error(d.error||'Server error');
+}
+
+// Shared fetch helper for all sheet GET requests — handles redirect and JSON parse
+async function sheetGet(url){
+  const r = await fetch(url, {method:'GET', redirect:'follow', cache:'no-store'});
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const text = await r.text();
+  return JSON.parse(text);
 }
 
 async function confirmCashout(){
