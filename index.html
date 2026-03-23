@@ -3248,7 +3248,7 @@ function saveSession(){
       lastMainBet:G.lastMainBet, lastSideBets:G.lastSideBets,
       mainBet:G.mainBet, sideBets:{...G.sideBets},
       leverage:G.leverage,
-      log:G.log.slice(-50), // keep last 50 log entries
+      log:G.log.slice(-50),
       phase:'bet', // always restore to bet phase
       levCards:G.levCards,
       levCardsPending:G._levCardsPending||[],
@@ -3259,6 +3259,7 @@ function saveSession(){
       mainBet2:G.mainBet2||0,
       sideBets2:{...G.sideBets2||{}},
       chartPts:[..._chartPts],
+      needsSync: !G.cashedOut && !G._atCashout, // flag: closed without cashing out
       ts:Date.now()
     };
     localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
@@ -3401,23 +3402,58 @@ window.onload=()=>{
     openApp(G.player, G.balance);
     notif('Session restored — welcome back, '+G.player);
     _afterRestoreChart();
+
+    // If session was closed without cashing out, auto-sync current balance to sheet
+    const _snap = JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+    if(_snap.needsSync && G.url && G.username && G._cachedPin){
+      setTimeout(async()=>{
+        try{
+          const autoPayload={
+            username:G.username, player:G.player,
+            balance:G.balance,
+            sessionPL:G.balance - G.sessionStart,
+            buyIn:G.sessionStart,
+            date:new Date().toISOString(),
+            stake:G.s.label, pin:G._cachedPin||''
+          };
+          await attemptSync(autoPayload);
+          clearSyncQueue();
+          // Clear the needsSync flag now that it's saved
+          try{
+            const s=JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+            s.needsSync=false;
+            localStorage.setItem(SESSION_KEY,JSON.stringify(s));
+          }catch(e){}
+          setSyncBadge('live','LIVE');
+          notif('✓ Auto-saved to sheet');
+        }catch(e){
+          // Sync failed — store in queue so next cashout retries
+          storeSyncQueue({
+            username:G.username, player:G.player,
+            balance:G.balance, sessionPL:G.balance-G.sessionStart,
+            buyIn:G.sessionStart, date:new Date().toISOString(),
+            stake:G.s.label, pin:G._cachedPin||''
+          });
+          setSyncBadge('error','UNSAVED');
+          notif('Auto-save failed — will retry on cashout');
+        }
+      }, 2500); // short delay so page finishes loading first
+    }
+
     // Silently re-fetch balance from sheet to catch any changes since last close
     if(G.url && G.username && G._cachedPin){
       fetch(G.url+'?action=getBalance&username='+encodeURIComponent(G.username)+'&pin='+encodeURIComponent(G._cachedPin))
         .then(r=>r.json())
         .then(d=>{
           if(d.auth && typeof d.balance==='number'){
-            // Sheet returns full wallet balance — only update _totalBalance
-            // Do NOT overwrite session balance (G.balance = chips at table, not wallet)
             const prevTotal=G._totalBalance;
             G._totalBalance=d.balance;
             if(G.phase==='bet' && d.balance!==prevTotal){
-              // Wallet changed while away (e.g. admin top-up) — notify but keep session balance
-              notif('Balance synced — '+fmtKFC(d.balance));
+              notif('Wallet synced — '+fmtKFC(d.balance));
             }
           }
         })
-        .catch(()=>{}); // sheet unreachable — keep cached balance
+        .catch(()=>{});
     }
   } else {
     setTimeout(()=>{ const u=document.getElementById('lusername'); if(u) u.focus(); },120);
@@ -3493,8 +3529,10 @@ function checkBalanceCap(){
 
 function openApp(displayName, balance){
   G.player=displayName;
-  G.balance=G.sessionStart=balance;
-  // _sessionActive intentionally NOT reset here — preserved from restoreSession if restoring
+  G.balance=balance;
+  // Only reset sessionStart on a fresh login — on session restore it's already set correctly
+  // by restoreSession() and must NOT be overwritten (it represents the original buy-in)
+  if(!G._sessionActive) G.sessionStart=balance;
   document.getElementById('login').style.display='none';
   document.getElementById('app').style.display='flex';
   document.getElementById('app').style.flexDirection='column';
