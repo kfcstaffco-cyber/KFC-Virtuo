@@ -1603,7 +1603,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
   <div id="main">
     <!-- TABLE AREA -->
     <div id="table-area">
-      <canvas id="suit-bg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:1"></canvas>
+      <canvas id="grid-bg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></canvas>
       <div class="felt-logo"></div>
       <!-- SHOE VISUAL -->
       <div id="shoe-area">
@@ -5700,64 +5700,55 @@ function resetHand2State(){
   document.body.classList.remove('hand2-active');
 }
 
-// ── SUIT WATERMARK BACKGROUND ──────────────────────────────────────────────
-(function initSuitBg(){
-  const canvas=document.getElementById('suit-bg');
-  if(!canvas)return;
+// ── BREATHING GRID BACKGROUND ──────────────────────────────────────────────
+(function initGridBg(){
+  const canvas=document.getElementById('grid-bg');
+  if(!canvas) return;
   const ctx=canvas.getContext('2d');
-  const SUITS=['♠','♥','♦','♣'];
-  let symbols=[], W=0, H=0, animId=null;
+  let W=0, H=0, animId=null, t=0;
 
   function resize(){
     W=canvas.offsetWidth; H=canvas.offsetHeight;
     canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
     ctx.scale(devicePixelRatio,devicePixelRatio);
-    buildSymbols();
   }
 
-  function buildSymbols(){
-    symbols=[];
-    const cols=5, rows=7;
-    for(let c=0;c<cols;c++){
-      for(let r=0;r<rows;r++){
-        const idx=(c*rows+r)%4;
-        symbols.push({
-          suit: SUITS[idx],
-          x: (c+0.5)*(W/cols) + (Math.random()-0.5)*30,
-          baseY: (r+0.5)*(H/rows) + (Math.random()-0.5)*20,
-          size: 28+Math.random()*22,
-          opacity: 0.025+Math.random()*0.03,
-          rotSpeed: (Math.random()-0.5)*0.0003,  // very slow rotation
-          rot: Math.random()*Math.PI*2,
-          floatAmp: 6+Math.random()*10,
-          floatSpeed: 0.0003+Math.random()*0.0003, // very slow float
-          phase: Math.random()*Math.PI*2,
-        });
-      }
-    }
-  }
+  const gapX=48, gapY=44;
 
-  let t=0;
   function frame(){
     ctx.clearRect(0,0,W,H);
-    t+=0.5; // increment in ms-equivalent — kept low for slow movement
-    symbols.forEach(s=>{
-      s.rot+=s.rotSpeed;
-      const py=s.baseY+Math.sin(t*s.floatSpeed+s.phase)*s.floatAmp;
-      ctx.save();
-      ctx.translate(s.x,py);
-      ctx.rotate(s.rot);
-      ctx.font=`${s.size}px serif`;
-      ctx.fillStyle=`rgba(201,168,76,${s.opacity})`;
-      ctx.textAlign='center';
-      ctx.textBaseline='middle';
-      ctx.fillText(s.suit,0,0);
-      ctx.restore();
-    });
+    t+=0.008;
+    const cols=Math.ceil(W/gapX)+1;
+    const rows=Math.ceil(H/gapY)+1;
+    for(let c=0;c<cols;c++){
+      for(let r=0;r<rows;r++){
+        const x=c*gapX, y=r*gapY;
+        const wave=Math.sin(t+c*0.5+r*0.4);
+        const op=0.04+wave*0.03;
+        // dot
+        ctx.beginPath();
+        ctx.arc(x,y,1.2,0,Math.PI*2);
+        ctx.fillStyle=`rgba(201,168,76,${Math.max(0,op)})`;
+        ctx.fill();
+        // horizontal line
+        if(c<cols-1){
+          ctx.beginPath();
+          ctx.moveTo(x,y); ctx.lineTo(x+gapX,y);
+          ctx.strokeStyle=`rgba(201,168,76,${Math.max(0,(op*0.55))})`;
+          ctx.lineWidth=0.5; ctx.stroke();
+        }
+        // vertical line
+        if(r<rows-1){
+          ctx.beginPath();
+          ctx.moveTo(x,y); ctx.lineTo(x,y+gapY);
+          ctx.strokeStyle=`rgba(201,168,76,${Math.max(0,(op*0.55))})`;
+          ctx.lineWidth=0.5; ctx.stroke();
+        }
+      }
+    }
     animId=requestAnimationFrame(frame);
   }
 
-  // Wait for DOM to be ready and table-area to have dimensions
   function start(){
     if(canvas.offsetWidth===0){setTimeout(start,200);return;}
     resize();
@@ -5765,9 +5756,8 @@ function resetHand2State(){
     frame();
   }
   window.addEventListener('resize',()=>{if(animId)cancelAnimationFrame(animId);resize();frame();});
-  // Start after login flow completes (table-area is hidden initially)
   document.addEventListener('DOMContentLoaded',()=>setTimeout(start,300));
-  setTimeout(start,500); // fallback
+  setTimeout(start,500);
 })();
 
 </script>
