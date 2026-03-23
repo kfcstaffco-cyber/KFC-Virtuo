@@ -4828,10 +4828,14 @@ function renderScores(){
     if(!el)return;
     const v=hv(h);
     const bust=isBust(h); const bj=isBJ(h);
-    // Detect soft hand: contains an ace counted as 11
+    // Detect soft hand: hand contains an ace AND hv() is counting it as 11
+    // hardSum = value if all aces counted as 1
     const hasAce=h.some(c=>!c.bonus&&c.r==='A');
-    const hardSum=h.reduce((s,c)=>s+cv(c),0);
-    const isSoft=!bust&&!bj&&hasAce&&hardSum!==v&&v<=21;
+    const hardSum=h.reduce((s,c)=>{
+      if(!c.bonus&&c.r==='A') return s+1;
+      return s+cv(c);
+    },0);
+    const isSoft=!bust&&!bj&&hasAce&&v===hardSum+10&&v<=21;
     el.className='score'+(bust?' bust':bj?' bj':'');
     const softLabel=isSoft?`<span class="score-soft">soft</span>`:'';
     el.innerHTML=`total ${softLabel}<span>${bust?'BUST':bj?'BJ':v}</span>`;
