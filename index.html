@@ -2278,6 +2278,8 @@ function draw(){
   return c;
 }
 function cv(c){
+  // Jesters have no card value
+  if(c.bonus&&c.bonus.jester) return 0;
   if(c.bonus){
     const reps=BONUS_CARD_REPS[c.bonus.id];
     if(!reps||reps.length===0) return 0;
@@ -2292,6 +2294,8 @@ function cv(c){
 function hv(hand){
   let v=0,a=0;
   for(const c of hand){
+    // Jesters contribute zero value — skip entirely
+    if(c.bonus&&c.bonus.jester) continue;
     const val=cv(c);
     if(c.bonus){
       // Bonus card with ace rep
@@ -2307,17 +2311,25 @@ function hv(hand){
   return v;
 }
 function isBJ(h){
-  // Jesters have zero value and are invisible to BJ logic.
-  // BJ = exactly 2 non-jester cards: one Ace + one 10-value card.
+  // BJ = exactly 2 non-jester cards: one Ace-value + one 10-value (10, J, Q, K)
   const valueCards=h.filter(c=>!(c.bonus&&c.bonus.jester));
   if(valueCards.length!==2) return false;
   const hasAce=valueCards.some(c=>{
     if(!c.bonus) return c.r==='A';
     const reps=BONUS_CARD_REPS[c.bonus.id];
+    if(!reps||!reps.length) return false;
     const idx=(c.repIdx!==undefined)?c.repIdx:0;
-    return reps&&reps[idx]&&reps[idx].r==='A';
+    return reps[idx]&&reps[idx].r==='A';
   });
-  const has10=valueCards.some(c=>cv(c)===10);
+  const has10=valueCards.some(c=>{
+    // 10-value: any non-bonus 10/J/Q/K, or bonus card whose rep rank is 10/J/Q/K
+    if(!c.bonus) return 'JQK'.includes(c.r) || c.r==='10';
+    const reps=BONUS_CARD_REPS[c.bonus.id];
+    if(!reps||!reps.length) return false;
+    const idx=(c.repIdx!==undefined)?c.repIdx:0;
+    const r=reps[idx]?reps[idx].r:null;
+    return r&&('JQK'.includes(r)||r==='10');
+  });
   return hasAce&&has10;
 }
 function dealerShowsAce(){
@@ -3692,8 +3704,11 @@ function buildSideBets(){
     if(G.sideBets[n]===undefined) G.sideBets[n]=0; // only init if not set
     const row=document.createElement('div');
     row.className='sb-row';
+    const val=G.sideBets[n]||0;
     const amt=document.createElement('div');
-    amt.className='sb-amt'; amt.id='sb-'+n.replace(/\s/g,'_').replace(/\+/g,'p'); amt.textContent='—';
+    amt.className='sb-amt'+(val>0?' active':'');
+    amt.id='sb-'+n.replace(/\s/g,'_').replace(/\+/g,'p');
+    amt.textContent=val>0?fmtKFC(val):'—';
     row.innerHTML=`<div class="sb-name">${n}</div>`;
     row.appendChild(amt);
     row.onclick=()=>cycleSB(n);
@@ -4853,7 +4868,7 @@ function renderScores(){
     if(G.phase==='play' && !G.holeRevealed){
       // Hole still hidden — only sum face-up cards (all except the last/hole card)
       const visibleCards=G.dealer.slice(0,G.dealer.length-1);
-      const v=visibleCards.reduce((sum,c)=>sum+cv(c),0);
+      const v=visibleCards.reduce((sum,c)=>c.bonus&&c.bonus.jester?sum:sum+cv(c),0);
       ds.innerHTML=`showing <span>${v||'?'}</span>`;
     } else {
       // Hole revealed or dealer/done phase — show full hand value
@@ -4873,6 +4888,7 @@ function renderScores(){
     let hardSum=0;
     let aceCount=0;
     for(const c of h){
+      if(c.bonus&&c.bonus.jester) continue; // jesters have no value
       const rank=cardRank(c);
       if(rank==='A'){ aceCount++; hardSum+=1; }
       else { hardSum+=cv(c); }
@@ -4999,8 +5015,7 @@ function closeResult(){
   G.mainBet2=0;
   if(G.sideBets2) SB_NAMES.forEach(n=>G.sideBets2[n]=0);
   G.leverage=null;
-  updateSBCircles(); // reset all SB circles to inactive after round
-  // Auto same-bet: restore last bets automatically
+  // Auto same-bet: restore last bets automatically BEFORE updating circles
   if(_autoSameBet&&G.lastMainBet>0){
     G.mainBet=G.lastMainBet;
     SB_NAMES.forEach(n=>G.sideBets[n]=(G.lastSideBets&&G.lastSideBets[n])||0);
@@ -5009,6 +5024,7 @@ function closeResult(){
       SB_NAMES.forEach(n=>G.sideBets2[n]=(G.lastSideBets2&&G.lastSideBets2[n])||0);
     }
   }
+  updateSBCircles(); // update circles AFTER bets are restored so active state is correct
   // Blood Jester: if a leverage card (not 2x token) was used this hand, consume it
   if(G._usedLevCardIdx!==undefined){
     G.levCards.splice(G._usedLevCardIdx,1);
@@ -5024,6 +5040,7 @@ function closeResult(){
   updateBetPanel();
   if(typeof updateHand2Panel==='function') updateHand2Panel();
   buildSideBets();
+  updateSBCircles(); // re-sync circles after buildSideBets rebuilds the sidebar rows
   buildLevPanel();
   buildPuPanel();
   setActions(false);
@@ -5342,11 +5359,12 @@ function toggleStrategy(on){
   if(on) updateStrategyHint();
 }
 function basicStrategyAction(pv, dealerUp, canDouble, canSplit, hand){
-  // Simplified basic strategy (no soft totals for now)
+  // Filter out jesters — they have no value and shouldn't affect strategy
+  const valueCards = hand ? hand.filter(c=>!(c.bonus&&c.bonus.jester)) : [];
   const d=dealerUp;
-  // Check for pair
-  if(canSplit&&hand&&hand.length===2){
-    const r=cv(hand[0]);
+  // Check for pair (only if exactly 2 value cards of equal cv)
+  if(canSplit && valueCards.length===2){
+    const r=cv(valueCards[0]);
     if(r===11) return 'split'; // Aces always split
     if(r===8)  return 'split'; // 8s always split
     if(r===10||r===5) {} // never split 10s or 5s — fall through
@@ -5357,11 +5375,17 @@ function basicStrategyAction(pv, dealerUp, canDouble, canSplit, hand){
     else if(r===3||r===2){ if(d<=7) return 'split'; }
   }
   // Soft totals (hand contains an ace counted as 11)
-  const hasAce=hand&&hand.some(c=>c.r==='A'||(!c.bonus&&c.r==='A'));
-  const nonAceSum=hand?hand.reduce((s,c)=>s+(cv(c)===11?1:cv(c)),0):pv;
+  const hasAce=valueCards.some(c=>{
+    if(!c.bonus) return c.r==='A';
+    const reps=BONUS_CARD_REPS[c.bonus.id];
+    if(!reps||!reps.length) return false;
+    const idx=(c.repIdx!==undefined)?c.repIdx:0;
+    return reps[idx]&&reps[idx].r==='A';
+  });
+  const nonAceSum=valueCards.reduce((s,c)=>s+(cv(c)===11?1:cv(c)),0);
   const isSoft=hasAce&&pv<=21&&(pv-nonAceSum)===10;
   if(isSoft){
-    const soft=pv; // e.g. soft 18 = A+7
+    const soft=pv;
     if(soft>=19) return 'stand';
     if(soft===18){ if(d>=3&&d<=6) return canDouble?'double':'stand'; if(d>=9||d===10||d===11) return 'hit'; return 'stand'; }
     if(soft===17){ if(d>=3&&d<=6) return canDouble?'double':'hit'; return 'hit'; }
@@ -5386,8 +5410,9 @@ function updateStrategyHint(){
   const pv=hv(hand);
   const dealerUpCard=G.dealer[0];
   const d=dealerUpCard?cv(dealerUpCard):0;
+  const valueCards=hand.filter(c=>!(c.bonus&&c.bonus.jester));
   const canDouble=hand.length===2&&!document.getElementById('btn-double')?.disabled;
-  const canSplit=hand.length===2&&cv(hand[0])===cv(hand[1])&&G.splits<2;
+  const canSplit=valueCards.length===2&&cv(valueCards[0])===cv(valueCards[1])&&G.splits<2;
   const action=basicStrategyAction(pv,d,canDouble,canSplit,hand);
   const labels={hit:'Hit',stand:'Stand',double:'Double',split:'Split'};
   el.textContent='Strategy: '+labels[action];
