@@ -2350,7 +2350,8 @@ function cv(c){
   if(c.bonus){
     const reps=BONUS_CARD_REPS[c.bonus.id];
     if(!reps||reps.length===0) return 0;
-    const idx=(c.repIdx!==undefined)?c.repIdx:0;
+    // Normalise repIdx: null/undefined both → 0
+    const idx=(c.repIdx!=null)?c.repIdx:0;
     const r=(reps[idx]||reps[0]).r;
     if('JQK'.includes(r)) return 10;
     if(r==='A') return 11;
@@ -2365,9 +2366,9 @@ function hv(hand){
     if(c.bonus&&c.bonus.jester) continue;
     const val=cv(c);
     if(c.bonus){
-      // Bonus card with ace rep
+      // Bonus card with ace rep — normalise repIdx: null/undefined → 0
       const reps=BONUS_CARD_REPS[c.bonus.id];
-      const idx=(c.repIdx!==undefined)?c.repIdx:0;
+      const idx=(c.repIdx!=null)?c.repIdx:0;
       if(reps&&reps[idx]&&reps[idx].r==='A') a++;
       else v+=val;
     } else {
@@ -2385,7 +2386,7 @@ function isBJ(h){
     if(!c.bonus) return c.r==='A';
     const reps=BONUS_CARD_REPS[c.bonus.id];
     if(!reps||!reps.length) return false;
-    const idx=(c.repIdx!==undefined)?c.repIdx:0;
+    const idx=(c.repIdx!=null)?c.repIdx:0;
     return reps[idx]&&reps[idx].r==='A';
   });
   const has10=valueCards.some(c=>{
@@ -2393,7 +2394,7 @@ function isBJ(h){
     if(!c.bonus) return 'JQK'.includes(c.r) || c.r==='10';
     const reps=BONUS_CARD_REPS[c.bonus.id];
     if(!reps||!reps.length) return false;
-    const idx=(c.repIdx!==undefined)?c.repIdx:0;
+    const idx=(c.repIdx!=null)?c.repIdx:0;
     const r=reps[idx]?reps[idx].r:null;
     return r&&('JQK'.includes(r)||r==='10');
   });
@@ -2404,7 +2405,7 @@ function dealerShowsAce(){
   if(!d0) return false;
   if(!d0.bonus) return d0.r==='A';
   const reps=BONUS_CARD_REPS[d0.bonus.id];
-  const idx=(d0.repIdx!==undefined)?d0.repIdx:0;
+  const idx=(d0.repIdx!=null)?d0.repIdx:0;
   return reps&&reps[idx]&&reps[idx].r==='A';
 }
 function isBust(h){ return hv(h)>21; }
@@ -4054,7 +4055,7 @@ function deal(){
     if(c.bonus&&c.bonus.jester){
       const rep=draw();
       G.hands[0].splice(G.hands[0].indexOf(c)+1,0,rep);
-      if(rep.bonus)onBonusCard(rep.bonus,i); // same index as replaced jester
+      if(rep.bonus)onBonusCard(rep.bonus,i,0); // handIdx=0, same position as replaced jester
       renderAll();
     }
   });
@@ -4713,14 +4714,14 @@ function cardRank(c){
   if(!c||!c.bonus) return c?c.r:null;
   const reps=BONUS_CARD_REPS[c.bonus.id];
   if(!reps||!reps.length) return null;
-  const idx=(c.repIdx!==undefined)?c.repIdx:0;
+  const idx=(c.repIdx!=null)?c.repIdx:0;
   return reps[idx]?reps[idx].r:null;
 }
 function cardSuit(c){
   if(!c||!c.bonus) return c?c.s:null;
   const reps=BONUS_CARD_REPS[c.bonus.id];
   if(!reps||!reps.length) return null;
-  const idx=(c.repIdx!==undefined)?c.repIdx:0;
+  const idx=(c.repIdx!=null)?c.repIdx:0;
   return reps[idx]?reps[idx].s:null;
 }
 
@@ -4957,7 +4958,7 @@ function bonusCardInner(bc, repIdx){
       +'<div style="position:absolute;bottom:0;left:0;right:0;background:'+accent+';padding:2px 3px;text-align:center;font-family:var(--mono);font-size:6px;font-weight:700;color:#fff;letter-spacing:1px">'+label+'</div>'
       +'</div>';
   }
-  const idx=(repIdx!==undefined)?repIdx:0;
+  const idx=(repIdx!=null)?repIdx:0;
   const rep=(reps&&reps[idx])?reps[idx]:(reps?reps[0]:{r:'?',s:String.fromCharCode(9733)});
   const rank=rep.r;
   const suit=rep.s;
@@ -5007,6 +5008,10 @@ function renderScores(){
     const el=document.getElementById('score-'+hi);
     if(!el)return;
     const v=hv(h);
+    // Debug: log hand composition when score seems off
+    if(h.some(c=>c.bonus)){
+      console.log(`Hand ${hi} score=${v}:`, h.map(c=>c.bonus?`${c.bonus.id}[${c.repIdx}]cv=${cv(c)}`:`${c.r}${c.s}`));
+    }
     const bust=isBust(h); const bj=isBJ(h);
     // Detect soft hand: hand contains an ace being counted as 11
     // Compute hardSum by counting ALL aces (regular and bonus) as 1
@@ -5370,6 +5375,8 @@ async function confirmCashout(){
   //   buyIn    = G.sessionStart  (chips taken out of wallet to play)
   //   sessionPL = net P/L this session
   const sessionPL = G.balance - G.sessionStart;
+  // Calculate what the new wallet total will be (for local _totalBalance tracking)
+  const newTotalBalance = (G._totalBalance||G.sessionStart) - G.sessionStart + G.balance;
 
   const payload={
     username: G.username||G.player, player: G.player,
@@ -5515,7 +5522,7 @@ function basicStrategyAction(pv, dealerUp, canDouble, canSplit, hand){
     if(!c.bonus) return c.r==='A';
     const reps=BONUS_CARD_REPS[c.bonus.id];
     if(!reps||!reps.length) return false;
-    const idx=(c.repIdx!==undefined)?c.repIdx:0;
+    const idx=(c.repIdx!=null)?c.repIdx:0;
     return reps[idx]&&reps[idx].r==='A';
   });
   const nonAceSum=valueCards.reduce((s,c)=>s+(cv(c)===11?1:cv(c)),0);
