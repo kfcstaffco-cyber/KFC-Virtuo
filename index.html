@@ -4692,12 +4692,13 @@ function renderScores(){
   // Dealer
   const ds=document.getElementById('dealer-score');
   if(ds){
-    if(G.phase==='play'){
-      // Sum all face-up dealer cards (all except the last/hole card)
+    if(G.phase==='play' && !G.holeRevealed){
+      // Hole still hidden — only sum face-up cards (all except the last/hole card)
       const visibleCards=G.dealer.slice(0,G.dealer.length-1);
       const v=visibleCards.reduce((sum,c)=>sum+cv(c),0);
       ds.innerHTML=`showing <span>${v||'?'}</span>`;
     } else {
+      // Hole revealed or dealer/done phase — show full hand value
       const v=hv(G.dealer);
       const cls=isBust(G.dealer)?'bust':isBJ(G.dealer)?'bj':'';
       ds.className='score '+cls;
