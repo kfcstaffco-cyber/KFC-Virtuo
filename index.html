@@ -1538,10 +1538,10 @@ body.hand2-active #chip-strip .chip { position: relative; }
 
         <!-- Play action buttons -->
         <div id="play-actions">
-          <button class="act hit"     id="btn-hit"    onclick="hit()"    disabled>Hit</button>
           <button class="act stand"   id="btn-stand"  onclick="stand()"  disabled>Stand</button>
+          <button class="act hit"     id="btn-hit"    onclick="hit()"    disabled>Hit</button>
           <button class="act double"  id="btn-double" onclick="dbl()"    disabled>Double<span id="arrow-toast">🏹 FREE</span></button>
-          <button class="act split"   id="btn-split"  onclick="split()"  disabled>Split</button>
+          <button class="act split"   id="btn-split"  onclick="split()"  disabled style="display:none">Split</button>
           <button class="act"         id="btn-clear"  onclick="clearBets()" style="display:none">Clear</button>
           <button class="act" id="btn-insurance-yes" onclick="takeInsurance()"    style="display:none;background:rgba(63,185,80,.12);border-color:var(--green);color:var(--green);font-size:10px">Insurance ✓</button>
           <button class="act" id="btn-insurance-no"  onclick="declineInsurance()" style="display:none;font-size:10px">No Ins.</button>
@@ -1589,8 +1589,8 @@ body.hand2-active #chip-strip .chip { position: relative; }
         </div>
         <!-- 1b. Shortcuts row -->
         <div id="betting-deal-row" style="justify-content:center">
-          <button class="shortcut-btn" id="btn-same-bet" onclick="sameBet()">↺ Same Bet</button>
           <button class="shortcut-btn" id="btn-all-sides" onclick="allSideBets()">⊕ All Side Bets</button>
+          <button class="shortcut-btn" id="btn-same-bet" onclick="sameBet()">↺ Same Bet</button>
           <button class="shortcut-btn" id="btn-copy-h1h2" onclick="copyH1toH2()" style="display:none">⇉ Copy H1</button>
           <button class="shortcut-btn" id="btn-clear-top" onclick="clearBets()">✕ Clear</button>
         </div>
@@ -3896,7 +3896,7 @@ function hit(){
     }
     advOrEnd();
   }
-  else renderScores();
+  else { renderScores(); setActions(true); }
 }
 
 function stand(){ if(G.phase!=='play')return; sfx('button'); hideStampedBoost(); G.stampedOn=false; advOrEnd(); }
@@ -4617,7 +4617,7 @@ function setActions(playing){
     if(el) el.disabled=legacyStates[i];
   });
   // New play-phase buttons
-  const playIds=['btn-hit','btn-stand','btn-double','btn-split'];
+  const playIds=['btn-hit','btn-stand','btn-double'];
   playIds.forEach(id=>{
     const el=document.getElementById(id);
     if(el) el.disabled=!playing;
@@ -4627,6 +4627,16 @@ function setActions(playing){
   if(dblEl&&playing){
     const curHand=G.hands&&G.hands[G.cur];
     dblEl.disabled=(curHand&&curHand.length!==2);
+  }
+  // Split: only show when a valid split is available
+  const splitEl=document.getElementById('btn-split');
+  if(splitEl){
+    const curHand=G.hands&&G.hands[G.cur];
+    const canSplit=playing && curHand && curHand.length===2 &&
+      cv(curHand[0])===cv(curHand[1]) && G.splits<2 && G.balance>=G.mainBet &&
+      !curHand.some(c=>c.bonus&&c.bonus.jester);
+    splitEl.style.display=canSplit?'':'none';
+    splitEl.disabled=!canSplit;
   }
   const clrBtn=document.getElementById('btn-clear');
   if(clrBtn) clrBtn.style.display=playing?'none':'block';
