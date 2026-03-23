@@ -675,27 +675,43 @@ body:not(.betting) #betting-spacer { flex: 0; }
   }
 
   /* ── SIDE BET CIRCLES ── */
-  #sb-circles, #play-sb-circles {
-    gap: 5px;
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    /* Allow horizontal scroll if circles don't fit, but hide scrollbar */
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    padding-bottom: 2px;
+  #sb-circles {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
     max-width: 100%;
   }
-  #sb-circles::-webkit-scrollbar, #play-sb-circles::-webkit-scrollbar { display: none; }
+  /* On narrow screens: PP + 21+3 on top row, bet circle centred, C7s + DB bottom row */
+  @media (max-width: 400px) {
+    #sb-circles {
+      display: grid;
+      grid-template-columns: 42px 42px 56px 42px 42px;
+      grid-template-rows: auto;
+      align-items: center;
+      gap: 4px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #bet-circle { width: 56px !important; height: 56px !important; }
+  }
+  #play-bottom-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+  }
   .sb-circle, .sb-mini {
-    width: 46px !important; height: 46px !important;
-    max-width: 46px !important; flex-shrink: 0;
+    width: 42px !important; height: 42px !important;
+    max-width: 42px !important; flex-shrink: 0;
   }
   .sb-circle-label { font-size: 7px !important; }
-  .sb-circle-amt { font-size: 9px !important; }
+  .sb-circle-amt { font-size: 8px !important; }
 
   /* ── PLAY-BOTTOM / BET CIRCLE ── */
-  #play-bet-circle { width: 70px !important; height: 70px !important; }
-  #play-bottom-inner { gap: 5px; }
+  #play-bet-circle { width: 64px !important; height: 64px !important; }
+  #bet-circle      { width: 64px !important; height: 64px !important; }
+  #bet-circle-row  { flex-shrink: 0; }
   #betting-deal-row { gap: 6px; }
 
   /* ── BETTING ZONE ── */
@@ -2106,8 +2122,9 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <!-- Post-confirm buttons (shown after sync) -->
     <div id="co-actions-post" style="display:none;flex-direction:column;gap:8px">
       <div id="co-confirmed-badge" style="font-family:var(--mono);font-size:11px;color:var(--green);letter-spacing:1px;text-align:center;padding:8px 0">✓ Synced — ready to leave</div>
-      <button class="btn-primary" style="width:100%" onclick="doLogout(G.balance<=0);closeModal('cashout-modal')">Leave Table</button>
-      <button class="btn-ghost" style="width:100%" onclick="if(G.balance>=BALANCE_CAP){notif('Balance cap reached — cash out first');}else{G._atCashout=false;closeModal('cashout-modal');}">Stay &amp; Play More</button>
+      <button id="co-retry-btn" class="btn-primary" style="width:100%;display:none;background:var(--red);border-color:var(--red)">↺ Retry Sync</button>
+      <button id="co-leave-btn" class="btn-primary" style="width:100%" onclick="doLogout(G.balance<=0);closeModal('cashout-modal')">Leave Table</button>
+      <button id="co-stay-btn" class="btn-ghost" style="width:100%" onclick="if(G.balance>=BALANCE_CAP){notif('Balance cap reached — cash out first');}else{G._atCashout=false;closeModal('cashout-modal');}">Stay &amp; Play More</button>
     </div>
   </div>
 </div>
@@ -2388,7 +2405,25 @@ function initAudio(){
   }
   function multi(...fns){ return ()=>fns.forEach(f=>f()); }
   // Realistic card deal: short filtered noise burst (cloth) + brief high transient
-  SFX.card = ()=>{ctx.resume().then(()=>{try{const t=ctx.currentTime,sr=ctx.sampleRate;const buf=ctx.createBuffer(1,Math.floor(sr*0.1),sr);const d=buf.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=(Math.random()*2-1);const src=ctx.createBufferSource();src.buffer=buf;const f=ctx.createBiquadFilter();f.type='bandpass';f.frequency.value=1400;f.Q.value=0.6;const g=ctx.createGain();g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(0.09,t+0.006);g.gain.exponentialRampToValueAtTime(0.001,t+0.09);src.connect(f);f.connect(g);g.connect(ctx.destination);src.start(t);src.stop(t+0.1);}catch(e){}});};
+  // Card deal sounds — 3 slight pitch variations, cycles to avoid robotic repetition
+  const _cardFreqs=[1300,1450,1550];
+  let _cardSfxIdx=0;
+  SFX.card = ()=>{ctx.resume().then(()=>{try{
+    const freq=_cardFreqs[_cardSfxIdx%_cardFreqs.length]; _cardSfxIdx++;
+    const t=ctx.currentTime,sr=ctx.sampleRate;
+    const buf=ctx.createBuffer(1,Math.floor(sr*0.1),sr);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1);
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    const f=ctx.createBiquadFilter(); f.type='bandpass';
+    f.frequency.value=freq; f.Q.value=0.55+(Math.random()*0.15);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,t);
+    g.gain.linearRampToValueAtTime(0.08+(Math.random()*0.02),t+0.006);
+    g.gain.exponentialRampToValueAtTime(0.001,t+0.09);
+    src.connect(f); f.connect(g); g.connect(ctx.destination);
+    src.start(t); src.stop(t+0.1);
+  }catch(e){}});};
   // ── CHIP: ceramic poker chip click (double-hit, no body) ──
   SFX.chip = ()=>{ ctx.resume().then(()=>{ try{
     const t=ctx.currentTime, sr=ctx.sampleRate;
@@ -3091,19 +3126,57 @@ function handleResultOverlayClick(e){
 }
 // Keyboard: Enter or Escape closes result modal, Escape closes other modals
 document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'||e.key==='Enter'){
+  // Don't fire when typing in an input
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  const openModals=document.querySelectorAll('.overlay.open');
+  const onlyResult=openModals.length===1&&openModals[0].id==='result-modal';
+
+  // Enter/Space: universal advance key — close result → deal
+  if(e.key===' '||e.key==='Enter'){
+    e.preventDefault();
+    if(openModals.length>0&&onlyResult){ closeResult(); return; }
+    if(openModals.length>0&&!onlyResult) return; // other modal open, ignore
+    if(G.phase==='bet'&&G.mainBet>=G.s.min){ deal(); return; }
+    return;
+  }
+
+  // Escape: clear bets / cancel confirm / close modals
+  if(e.key==='Escape'){
     const rm=document.getElementById('result-modal');
-    if(rm&&rm.classList.contains('open')){
-      e.preventDefault();
-      closeResult();
-      return;
+    if(rm&&rm.classList.contains('open')){ closeResult(); return; }
+    if(openModals.length>0){ openModals.forEach(m=>closeModal(m.id)); return; }
+    if(G.phase==='bet') clearBets();
+    else if(G.phase==='play'){
+      const hconf=document.getElementById('hit-confirm-modal');
+      if(hconf&&hconf.classList.contains('open')) cancelHit();
     }
-    if(e.key==='Escape'){
-      // Close any open overlay/modal
-      document.querySelectorAll('.overlay.open').forEach(m=>{
-        if(m.id!=='result-modal') closeModal(m.id);
-      });
-    }
+    return;
+  }
+
+  // Play-phase shortcuts — ignore when any modal open
+  if(openModals.length>0) return;
+
+  switch(e.key){
+    case 'h': case 'H':
+      if(G.phase==='play'){
+        const hconf=document.getElementById('hit-confirm-modal');
+        if(hconf&&hconf.classList.contains('open')){ confirmHit(); }
+        else{ const b=document.getElementById('btn-hit'); if(b&&!b.disabled) hitGuard(); }
+      }
+      break;
+    case 's': case 'S':
+      if(G.phase==='play'){
+        const hconf=document.getElementById('hit-confirm-modal');
+        if(hconf&&hconf.classList.contains('open')){ cancelHit(); }
+        else{ const b=document.getElementById('btn-stand'); if(b&&!b.disabled) stand(); }
+      }
+      break;
+    case 'd': case 'D':
+      if(G.phase==='play'){ const b=document.getElementById('btn-double'); if(b&&!b.disabled) dblGuard(); }
+      break;
+    case 'p': case 'P':
+      if(G.phase==='play'){ const b=document.getElementById('btn-split'); if(b&&!b.disabled&&b.style.display!=='none') split(); }
+      break;
   }
 });
 // ── SESSION PERSISTENCE ──────────────────────────────────────────────
@@ -3332,6 +3405,8 @@ function openApp(displayName, balance){
   if(!G.deck||G.deck.length===0) G.deck=buildShoe();
   msg('PLACE YOUR BET');
   const db2=document.getElementById('btn-deal'); if(db2) db2.disabled=true;
+  // Retry any previously failed sync in background
+  if(G.url){ const q=getSyncQueue(); if(q){ setTimeout(async()=>{ try{ await attemptSync(q); clearSyncQueue(); setSyncBadge('live','LIVE'); notif('Pending sync completed'); }catch(e){} },2000); } }
   // Set initial betting phase
   G.phase='bet';
   document.body.classList.add('betting');
@@ -5200,58 +5275,103 @@ function showCashout(){
   setTimeout(()=>{ drawSessionChart(); renderSessionStats(); },100);
 }
 
+// ── SYNC QUEUE ──────────────────────────────────────────────
+// If sync fails, store payload for retry next open / on retry click
+const SYNC_QUEUE_KEY = 'kfc_sync_queue';
+function storeSyncQueue(payload){
+  try{ localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(payload)); }catch(e){}
+}
+function clearSyncQueue(){
+  try{ localStorage.removeItem(SYNC_QUEUE_KEY); }catch(e){}
+}
+function getSyncQueue(){
+  try{ const v=localStorage.getItem(SYNC_QUEUE_KEY); return v?JSON.parse(v):null; }catch(e){return null;}
+}
+
+async function attemptSync(payload){
+  if(!G.url) return {ok:false, local:true};
+  const params=new URLSearchParams({
+    action:'updatebalance', username:payload.username, player:payload.player,
+    balance:String(payload.balance), sessionPL:String(payload.sessionPL),
+    buyIn:String(payload.buyIn), date:payload.date, stake:payload.stake,
+    pin:payload.pin||''
+  });
+  const r=await fetch(G.url+'?'+params.toString());
+  const d=await r.json();
+  if(d.ok||d.balance!==undefined) return {ok:true};
+  throw new Error(d.error||'Server error');
+}
+
 async function confirmCashout(){
   G.cashedOut=true;
-  clearSession(); // prevent accidental restore after cashout
+  clearSession();
   document.getElementById('co-actions-pre').style.display='none';
   const post=document.getElementById('co-actions-post');
   post.style.display='flex';
   const badge=document.getElementById('co-confirmed-badge');
-  badge.textContent='Syncing...';
-  badge.style.color='var(--muted)';
-  setSyncBadge('','SYNCING');
-  if(G.url){
-    try{
-      // Send as GET request — Apps Script deployed as "Anyone" supports cross-origin GET
-      // natively with no CORS preflight, so this works from GitHub Pages without any
-      // special headers. All params go in the query string.
-      // buyIn = session starting balance (what the player brought to the table).
-      const params=new URLSearchParams({
-        action:    'updatebalance',
-        username:  G.username||G.player,
-        player:    G.player,
-        balance:   String(G.balance),
-        sessionPL: String(G.balance-G.sessionStart),
-        buyIn:     String(G.sessionStart),  // actual amount brought to table this session
-        date:      new Date().toISOString(),
-        stake:     G.s.label,
-        pin:       G._cachedPin||''
-      });
-      const r=await fetch(G.url+'?'+params.toString());
-      const d=await r.json();
-      if(d.ok||d.balance!==undefined){
-        setSyncBadge('live','SYNCED'); notif('Session saved');
-        badge.textContent='✓ Synced — ready to leave';
-        badge.style.color='var(--green)';
-      } else {
-        throw new Error(d.error||'Unknown error');
-      }
-    }catch(e){
-      setSyncBadge('error','FAILED');
-      localStorage.setItem('kfc_bal_'+(G.username||G.player),G.balance);
-      notif('Sync failed — progress saved locally');
-      badge.textContent='⚠ Sync failed — saved locally';
-      badge.style.color='var(--red)';
+  const leaveBtn=document.getElementById('co-leave-btn');
+  const retryBtn=document.getElementById('co-retry-btn');
+  const stayBtn=document.getElementById('co-stay-btn');
+
+  const payload={
+    username: G.username||G.player, player: G.player,
+    balance: G.balance, sessionPL: G.balance-G.sessionStart,
+    buyIn: G.sessionStart, date: new Date().toISOString(),
+    stake: G.s.label, pin: G._cachedPin||''
+  };
+
+  async function doSync(){
+    badge.textContent='Syncing…';
+    badge.style.color='var(--muted)';
+    setSyncBadge('','SYNCING');
+    if(leaveBtn) leaveBtn.disabled=true;
+    if(retryBtn) retryBtn.style.display='none';
+
+    if(!G.url){
+      // No sheet — save locally, allow leave
+      localStorage.setItem('kfc_bal_'+(G.username||G.player), G.balance);
+      clearSyncQueue();
+      setSyncBadge('','LOCAL');
+      badge.textContent='✓ Saved locally — ready to leave';
+      badge.style.color='var(--green)';
+      if(leaveBtn){ leaveBtn.disabled=false; leaveBtn.textContent='Leave Table'; }
+      if(stayBtn) stayBtn.style.display='block';
+      notif('Saved locally');
+      return;
     }
-  } else {
-    localStorage.setItem('kfc_bal_'+(G.username||G.player),G.balance);
-    setSyncBadge('','LOCAL');
-    notif('Saved locally');
-    badge.textContent='✓ Saved locally — ready to leave';
-    badge.style.color='var(--green)';
+
+    try{
+      await attemptSync(payload);
+      clearSyncQueue();
+      setSyncBadge('live','SYNCED');
+      badge.textContent='✓ Synced — ready to leave';
+      badge.style.color='var(--green)';
+      if(leaveBtn){ leaveBtn.disabled=false; leaveBtn.textContent='Leave Table'; }
+      if(stayBtn) stayBtn.style.display='block';
+      notif('Session saved');
+    }catch(e){
+      // Failed — store in queue, lock leave, show retry
+      storeSyncQueue(payload);
+      localStorage.setItem('kfc_bal_'+(G.username||G.player), G.balance);
+      setSyncBadge('error','FAILED');
+      badge.textContent='⚠ Sync failed — must retry before leaving';
+      badge.style.color='var(--red)';
+      if(leaveBtn){ leaveBtn.disabled=true; leaveBtn.textContent='Sync Required'; }
+      if(retryBtn) retryBtn.style.display='block';
+      if(stayBtn) stayBtn.style.display='none';
+      notif('Sync failed — retry required to leave');
+    }
   }
+
+  await doSync();
+
+  // Wire retry button
+  if(retryBtn){
+    retryBtn.onclick=async()=>{ await doSync(); };
+  }
+
   G.sessionStart=G.balance;
-  G._totalBalance=G.balance; // update total balance after cashout
+  G._totalBalance=G.balance;
   G.log=[]; renderLog();
   resetSessionChart();
 }
@@ -5305,50 +5425,6 @@ function applyBetInput(){
 }
 
 // ── KEYBOARD SHORTCUTS ──────────────────────────────────────────────
-document.addEventListener('keydown', function(e){
-  // Don't fire when typing in an input
-  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
-  // Don't fire when a modal is open (except result modal handled separately)
-  const openModals=document.querySelectorAll('.overlay.open');
-  const onlyResult=openModals.length===1&&openModals[0].id==='result-modal';
-  if(openModals.length>0&&!onlyResult) return;
-  switch(e.key){
-    case ' ':
-    case 'Enter':
-      e.preventDefault();
-      if(openModals.length>0&&onlyResult){ closeResult(); return; }
-      if(G.phase==='bet'&&G.mainBet>=G.s.min) deal();
-      break;
-    case 'h': case 'H':
-      if(G.phase==='play'){
-        const hconf=document.getElementById('hit-confirm-modal');
-        if(hconf&&hconf.classList.contains('open')){ confirmHit(); }
-        else{ const b=document.getElementById('btn-hit'); if(b&&!b.disabled) hitGuard(); }
-      }
-      break;
-    case 's': case 'S':
-      if(G.phase==='play'){
-        const hconf=document.getElementById('hit-confirm-modal');
-        if(hconf&&hconf.classList.contains('open')){ cancelHit(); }
-        else{ const b=document.getElementById('btn-stand'); if(b&&!b.disabled) stand(); }
-      }
-      break;
-    case 'd': case 'D':
-      if(G.phase==='play'){ const b=document.getElementById('btn-double'); if(b&&!b.disabled) dblGuard(); }
-      break;
-    case 'p': case 'P':
-      if(G.phase==='play'){ const b=document.getElementById('btn-split'); if(b&&!b.disabled&&b.style.display!=='none') split(); }
-      break;
-    case 'Escape':
-      if(G.phase==='bet') clearBets();
-      else if(G.phase==='play'){
-        const hconf=document.getElementById('hit-confirm-modal');
-        if(hconf&&hconf.classList.contains('open')) cancelHit();
-      }
-      break;
-  }
-});
-
 // ── BASIC STRATEGY HINT ──────────────────────────────────────────────
 let _strategyOn = false;
 function toggleStrategy(on){
