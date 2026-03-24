@@ -1661,6 +1661,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <div class="tb-right">
       <button class="btn-ghost" id="sidebar-toggle" onclick="toggleSidebar()" style="font-size:11px;padding:6px 10px;letter-spacing:1px" title="Toggle sidebar">⊞</button>
       <div class="badge" id="sync-badge">LOCAL</div>
+      <button class="btn-ghost" onclick="showTopUp()" style="border-color:rgba(63,185,80,0.4);color:var(--green)" id="btn-topup">Top Up</button>
       <button class="btn-ghost" onclick="showCashout()">Cash Out</button>
     </div>
   </div>
@@ -1778,6 +1779,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
           <button class="shortcut-btn" id="btn-all-sides" onclick="allSideBets()">⊕ All Side Bets</button>
           <button class="shortcut-btn" id="btn-same-bet" onclick="sameBet()">↺ Same Bet</button>
           <button class="shortcut-btn" id="btn-copy-h1h2" onclick="copyH1toH2()" style="display:none">⇉ Copy H1</button>
+          <button class="shortcut-btn" id="btn-undo-bet" onclick="undoBet()" title="Undo last chip">↩ Undo</button>
           <button class="shortcut-btn" id="btn-clear-top" onclick="clearBets()">✕ Clear</button>
         </div>
         <!-- 2. Chips -->
@@ -2167,6 +2169,8 @@ body.hand2-active #chip-strip .chip { position: relative; }
         <button class="btn-primary" style="flex:1" onclick="confirmCashout()">Confirm & Sync</button>
         <button class="btn-ghost" onclick="if(G.balance>=BALANCE_CAP){notif('Balance cap reached — cash out first');}else{G._atCashout=false;closeModal('cashout-modal');}">Stay</button>
       </div>
+      <!-- Top Up option: shown when balance is low/zero -->
+      <button id="co-topup-btn" class="btn-ghost" style="width:100%;border-color:rgba(63,185,80,0.5);color:var(--green);display:none" onclick="closeModal('cashout-modal');showTopUp()">⊕ Top Up & Continue</button>
       <button class="btn-ghost" style="width:100%;margin-top:4px;border-color:rgba(248,81,73,0.4);color:var(--red)" onclick="doLogout(G.balance<=0);closeModal('cashout-modal')">Leave Table</button>
     </div>
     <!-- Post-confirm buttons (shown after sync) -->
@@ -2176,6 +2180,27 @@ body.hand2-active #chip-strip .chip { position: relative; }
       <button id="co-leave-btn" class="btn-primary" style="width:100%" onclick="doLogout(G.balance<=0);closeModal('cashout-modal')">Leave Table</button>
       <button id="co-stay-btn" class="btn-ghost" style="width:100%" onclick="if(G.balance>=BALANCE_CAP){notif('Balance cap reached — cash out first');}else{G._atCashout=false;closeModal('cashout-modal');}">Stay &amp; Play More</button>
     </div>
+  </div>
+</div>
+
+<!-- TOP UP -->
+<div class="overlay" id="topup-modal">
+  <div class="modal" style="min-width:300px;max-width:340px">
+    <div style="font-size:11px;letter-spacing:4px;color:var(--green);text-transform:uppercase;margin-bottom:20px">Top Up</div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px;letter-spacing:1px">Current balance</div>
+    <div id="tu-current" style="font-family:var(--mono);font-size:22px;font-weight:500;color:var(--gold-hi);margin-bottom:20px"></div>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:6px;letter-spacing:1px">Add to session</div>
+    <input type="text" id="tu-amount" inputmode="numeric" autocomplete="off"
+      placeholder="0"
+      oninput="formatTopUpInput(this)"
+      style="width:100%;padding:10px 12px;background:var(--bg2);border:1px solid var(--line2);color:var(--white);font-family:var(--mono);font-size:14px;outline:none;border-radius:var(--radius);margin-bottom:4px;box-sizing:border-box">
+    <div id="tu-hint" style="font-family:var(--mono);font-size:9px;color:var(--muted);margin-bottom:20px;letter-spacing:1px"></div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px" id="tu-quick"></div>
+    <div style="display:flex;gap:8px">
+      <button class="btn-primary" style="flex:2;background:var(--green);border-color:var(--green)" onclick="confirmTopUp()">Add Funds →</button>
+      <button class="btn-ghost" style="flex:1" onclick="closeModal('topup-modal')">Cancel</button>
+    </div>
+    <div class="err" id="tu-err" style="margin-top:8px"></div>
   </div>
 </div>
 
@@ -3787,7 +3812,8 @@ function buildChips(){['chip-row','chip-strip'].forEach(rowId=>{const c=document
     if(typeof _h2ChipTarget!=='undefined'&&_h2ChipTarget&&G._hand2Active){
       // Route chip to hand 2
       const newBet2=(G.mainBet2||0)+v;
-      if(newBet2>G.s.max){if((G.mainBet2||0)<G.s.max){G.mainBet2=G.s.max;if(typeof updateHand2Panel==='function')updateHand2Panel();sfx('chip');}notif('Max bet is '+fmtKFC(G.s.max));return;}
+      if(newBet2>G.s.max){if((G.mainBet2||0)<G.s.max){_snapBet();G.mainBet2=G.s.max;if(typeof updateHand2Panel==='function')updateHand2Panel();sfx('chip');}notif('Max bet is '+fmtKFC(G.s.max));return;}
+      _snapBet();
       G.mainBet2=newBet2;
       if(typeof updateHand2Panel==='function')updateHand2Panel();
       sfx('chip');
@@ -3795,7 +3821,8 @@ function buildChips(){['chip-row','chip-strip'].forEach(rowId=>{const c=document
     } else {
       // Route chip to hand 1 (original behaviour)
       const newBet=G.mainBet+v;
-      if(newBet>G.s.max){if(G.mainBet<G.s.max){G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet is '+fmtKFC(G.s.max));return;}
+      if(newBet>G.s.max){if(G.mainBet<G.s.max){_snapBet();G.mainBet=G.s.max;updateBetPanel();sfx('chip');}notif('Max bet is '+fmtKFC(G.s.max));return;}
+      _snapBet();
       G.mainBet=newBet;updateBetPanel();sfx('chip');
       flyChipToCircle(btn,col,lbl);
       btn.style.transform='translateY(-5px) scale(1.15)';setTimeout(()=>{btn.style.transform='';},200);
@@ -3860,8 +3887,87 @@ function updateBetPanel(){
   if(typeof updateHand2Panel==='function') updateHand2Panel();
 }
 
+// ── BET HISTORY (for undo) ──────────────────────────────────────
+// Each entry is a snapshot: {mainBet, sideBets, mainBet2, sideBets2}
+const _betHistory = [];
+function _snapBet(){
+  _betHistory.push({
+    mainBet:G.mainBet, sideBets:{...G.sideBets},
+    mainBet2:G.mainBet2||0, sideBets2:{...G.sideBets2||{}}
+  });
+  if(_betHistory.length>20) _betHistory.shift(); // cap history
+}
+function undoBet(){
+  if(G.phase!=='bet') return;
+  if(_betHistory.length===0){ notif('Nothing to undo'); return; }
+  const prev=_betHistory.pop();
+  G.mainBet=prev.mainBet;
+  SB_NAMES.forEach(n=>G.sideBets[n]=prev.sideBets[n]||0);
+  if(G._hand2Active){ G.mainBet2=prev.mainBet2||0; SB_NAMES.forEach(n=>G.sideBets2[n]=prev.sideBets2[n]||0); if(typeof updateHand2Panel==='function') updateHand2Panel(); }
+  updateBetPanel(); buildSideBets(); updateSBCircles(); sfx('button');
+  notif('↩ Bet undone');
+}
+
+// ── TOP UP ──────────────────────────────────────────────────────
+function showTopUp(){
+  if(G.phase!=='bet'){ notif('Finish the current hand first'); return; }
+  // Populate modal
+  document.getElementById('tu-current').textContent = fmtKFC(G.balance);
+  document.getElementById('tu-err').textContent = '';
+  document.getElementById('tu-hint').textContent = 'Min: '+fmtKFC(G.s.min)+' · Max single top-up: '+fmtKFC(BALANCE_CAP-G.balance);
+  // Quick amount buttons
+  const qb = document.getElementById('tu-quick');
+  if(qb){
+    qb.innerHTML='';
+    [G.s.min, G.s.min*5, G.s.min*10, G.s.min*50].filter(v=>v<=(BALANCE_CAP-G.balance)).forEach(v=>{
+      const b=document.createElement('button');
+      b.className='shortcut-btn';
+      b.style.cssText='flex:1;min-width:0;font-size:10px';
+      b.textContent=fmt(v);
+      b.onclick=()=>{ const inp=document.getElementById('tu-amount'); if(inp){inp.value=v.toLocaleString('de-CH');inp._raw=v;} };
+      qb.appendChild(b);
+    });
+  }
+  const inp=document.getElementById('tu-amount');
+  if(inp){ inp.value=''; inp._raw=0; }
+  openModal('topup-modal');
+  setTimeout(()=>{ const i=document.getElementById('tu-amount'); if(i) i.focus(); },120);
+}
+function formatTopUpInput(el){
+  const raw=el.value.replace(/[^0-9]/g,'');
+  const num=parseInt(raw||'0',10);
+  el.value=num===0?'':num.toLocaleString('de-CH');
+  el._raw=num;
+}
+function confirmTopUp(){
+  const inp=document.getElementById('tu-amount');
+  const err=document.getElementById('tu-err');
+  const amount=inp?inp._raw||parseInt((inp.value||'').replace(/[^0-9]/g,''),10)||0:0;
+  if(!amount||amount<=0){ if(err) err.textContent='Enter an amount'; return; }
+  if(amount<G.s.min){ if(err) err.textContent='Minimum top-up: '+fmtKFC(G.s.min); return; }
+  if(G.balance+amount>BALANCE_CAP){ if(err) err.textContent='Would exceed 50B cap (have '+fmtKFC(G.balance)+')'; return; }
+  // Apply top-up: add to both balance and sessionStart so it's accounted for in buyIn
+  G.balance+=amount;
+  G.sessionStart+=amount;         // buyIn grows — sheet will deduct correctly
+  G._totalBalance=(G._totalBalance||0)+amount;
+  // Track top-ups for the log
+  G._topUpTotal=(G._topUpTotal||0)+amount;
+  G.log.push({detail:'Top Up +'+fmtKFC(amount),pl:0,bal:G.balance,topup:true});
+  updateUI(); renderLog();
+  closeModal('topup-modal');
+  // Reset _atCashout flag so the session continues normally
+  G._atCashout=false;
+  notif('✓ '+fmtKFC(amount)+' added to session');
+  sfx('cash');
+  saveSession();
+  // Hide Top Up button in cashout modal since we just topped up
+  const coBtn=document.getElementById('co-topup-btn');
+  if(coBtn) coBtn.style.display='none';
+}
+
 function clearBets(){
   if(G.phase!=='bet')return;
+  _betHistory.length=0; // clear undo stack on full clear
   G.mainBet=0;
   SB_NAMES.forEach(n=>G.sideBets[n]=0);
   G.leverage=null;
@@ -3879,6 +3985,7 @@ function clearBets(){
 function sameBet(){
   if(G.phase!=='bet'){notif('Finish the current hand first');return;}
   if(!G.lastMainBet&&Object.values(G.lastSideBets||{}).every(v=>!v)){notif('No previous bet to restore');return;}
+  _betHistory.length=0; // fresh start — can't undo into previous round
   G.mainBet=G.lastMainBet||0;
   SB_NAMES.forEach(n=>G.sideBets[n]=(G.lastSideBets&&G.lastSideBets[n])||0);
   // Restore hand 2 if it was active last round
@@ -3937,6 +4044,7 @@ function cycleSB(name){
   const steps=[0,G.s.sMin,G.s.sMin*2,G.s.sMin*5,G.s.min];
   const cur=G.sideBets[name]||0;
   const ni=steps.findIndex(v=>v>cur);
+  _snapBet();
   G.sideBets[name]=ni===-1?0:steps[ni];
   sfx('chip');
   updateBetPanel();
@@ -4087,6 +4195,10 @@ function deal(){
   if(G.balance>=BALANCE_CAP){notif('50B balance cap reached — cash out first');showCashout();return;}
   if(G.mainBet<=0){notif('Place a bet first');return;}
   if(G.mainBet<G.s.min){notif('Minimum bet is '+fmtKFC(G.s.min));return;}
+  // If hand 2 is active but hand 1 has no bet, prompt to fill hand 1 first
+  if(G._hand2Active&&(G.mainBet2||0)>0&&G.mainBet<=0){
+    notif('Fill Hand 1 before placing on Hand 2'); return;
+  }
   const totalDeducted=G.mainBet+Object.values(G.sideBets).reduce((a,b)=>a+b,0)+(G.leverage==='2x'?G.s.min*2:0)
     +((G._hand2Active&&(G.mainBet2||0)>=G.s.min)?(G.mainBet2+Object.values(G.sideBets2||{}).reduce((a,b)=>a+b,0)):0);
   if(G.balance<totalDeducted){notif('Not enough balance');return;}
@@ -5211,6 +5323,7 @@ function showResult(pl,detail,bal){
 
 function closeResult(){
   closeModal('result-modal');
+  _betHistory.length=0; // fresh undo stack for new round
   // Full reset for next hand
   G.phase='bet';
   G.hands=[[]]; G.cur=0; G.splits=0; G.dealer=[];
@@ -5413,6 +5526,13 @@ function showCashout(){
   // Reset to pre-confirm state
   document.getElementById('co-actions-pre').style.display='flex';
   document.getElementById('co-actions-post').style.display='none';
+  // Show Top Up option when balance is zero or too low to continue
+  const coTopUpBtn=document.getElementById('co-topup-btn');
+  if(coTopUpBtn){
+    const canTopUp = G.balance<BALANCE_CAP && (G.balance<=0 || G.balance<G.s.min);
+    coTopUpBtn.style.display = canTopUp ? 'block' : 'none';
+    coTopUpBtn.textContent = G.balance<=0 ? '⊕ Top Up & Continue (balance depleted)' : '⊕ Top Up & Continue';
+  }
   openModal('cashout-modal');
   // Draw P&L chart and stats
   setTimeout(()=>{ drawSessionChart(); renderSessionStats(); },100);
