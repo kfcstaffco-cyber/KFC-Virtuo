@@ -2311,7 +2311,7 @@ const G = {
   puOwned:new Set(), puPending:new Set(), puActive:null,
   phase:'bet', // bet | play | dealer | done
   // bonus card flags
-  arrowCount:0, kruegerOn:false, desertOn:false, goldOn:false, steelOn:false, stampedOn:false, stampedInitialBet:0, stampedCardsViewed:0,
+  arrowCounts:[0,0], kruegerOn:false, desertOn:false, goldOn:false, steelOn:false, stampedOn:false, stampedInitialBet:0, stampedCardsViewed:0,
   safetyTrigger:false, dealerJester:false,
   _hand2Active:false, mainBet2:0, sideBets2:{},
   log:[],
@@ -3867,9 +3867,10 @@ function updateBetPanel(){
   const dblBtn=document.getElementById('btn-double');
   const arrowToast=document.getElementById('arrow-toast');
   if(dblBtn&&arrowToast){
-    arrowToast.style.display=G.arrowCount>0?'block':'none';
-    dblBtn.style.borderColor=G.arrowCount>0?'var(--blue)':'';
-    dblBtn.style.color=G.arrowCount>0?'var(--blue)':'';
+    const _curArrow=(G.arrowCounts&&G.arrowCounts[G.cur||0])||0;
+    arrowToast.style.display=_curArrow>0?'block':'none';
+    dblBtn.style.borderColor=_curArrow>0?'var(--blue)':'';
+    dblBtn.style.color=_curArrow>0?'var(--blue)':'';
   }
   const c=document.getElementById('bet-lines');
   let html=`<div class="bet-line"><span class="bet-key">main</span><span class="bet-val">${fmtKFC(G.mainBet)}</span></div>`;
@@ -4261,9 +4262,9 @@ function deal(){
   if(G.leverage&&G.leverage.startsWith('c')){
     G._usedLevCardIdx=parseInt(G.leverage.slice(1));
   }
-  G.arrowCount=0; G.kruegerOn=false; G.desertOn=false; G.goldOn=false;
+  G.arrowCounts=[0,0]; G.kruegerOn=false; G.desertOn=false; G.goldOn=false;
   G.steelOn=false; G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.plagueOn=false;
-  G.safetyTrigger=false; G.dealerJester=false; G.insuranceBet=0; G.arrowCount=0; G._freeDoubleBet=0; G._freeLevBet=0;
+  G.safetyTrigger=false; G.dealerJester=false; G.insuranceBet=0; G._freeDoubleBet=0; G._freeLevBet=0;
   G._sessionActive=true; // mark session as active after first deal
   G.phase='play'; document.body.classList.remove('betting');
   _h2ChipTarget=false; setH2ChipTarget(false);
@@ -4421,7 +4422,7 @@ function onBonusCard(bc, cardIndex, handIdx){
   const effectValid = (cardIndex===undefined || cardIndex<=1 || bc.jester);
   if(!effectValid){ return; } // silently ignore — no toast for cards drawn after 2nd
   // For hand 2: instant payouts (scarface, ice) credit normally; 
-  // hand-state flags (stampedOn, arrowCount etc.) also apply (both hands share the same round)
+  // hand-state flags (stampedOn etc.) — arrowCounts is per-hand so effects stay scoped correctly
   // Note: stamped only works on hand 1 (can't boost hand 2 mid-deal)
   switch(bc.id){
     case 'stamped':
@@ -4446,13 +4447,15 @@ function onBonusCard(bc, cardIndex, handIdx){
       bonusToast(bc,'Scarface pays out — +'+fmtKFC(sp)+(isHand2?' · Hand 2':''));
       break;
     }
-    case 'arrow':
-      G.arrowCount++;
-      G._bonusPayouts.push({label:'Arrow Card'+(isHand2?' (H2)':'')+' — free double-down',pl:0,type:'info'});
-      bonusToast(bc,G.arrowCount>=2?'Two arrows — double-double-down free!':'Arrow Card — free double-down'+(isHand2?' · Hand 2':''));
+    case 'arrow':{
+      const _hi=handIdx||0;
+      if(!G.arrowCounts) G.arrowCounts=[0,0];
+      G.arrowCounts[_hi]++;
+      G._bonusPayouts.push({label:'Arrow Card'+(isHand2?' (H2)':'')+' — free double-down (Hand '+(_hi+1)+')',pl:0,type:'info'});
+      bonusToast(bc,G.arrowCounts[_hi]>=2?'Two arrows on Hand '+(_hi+1)+' — double-double-down free!':'Arrow Card — free double-down (Hand '+(_hi+1)+')');
       const at=document.getElementById('arrow-toast');
       if(at) at.style.display='block';
-      break;
+      break;}
     case 'krueger':
       G.kruegerOn=true;
       G._bonusPayouts.push({label:'Krueger'+(isHand2?' (H2)':'')+' — bust insurance active',pl:0,type:'info'});
@@ -4554,10 +4557,10 @@ function dbl(){
   // Double-down allowed on initial deal only — check value card count (jesters don't count)
   const valueCards=h.filter(c=>!(c.bonus&&c.bonus.jester));
   if(valueCards.length!==2){notif('Double down is only allowed on your first 2 cards');return;}
-  if(G.arrowCount>0){
+  if((G.arrowCounts&&G.arrowCounts[G.cur])||0){
     // Free double: house covers the extra stake. Player wins at 2× but only risks original bet on loss.
-    G.arrowCount--;
-    const at2=document.getElementById('arrow-toast');if(at2&&G.arrowCount===0)at2.style.display='none';
+    G.arrowCounts[G.cur]--;
+    const at2=document.getElementById('arrow-toast');if(at2&&G.arrowCounts[G.cur]===0)at2.style.display='none';
     const originalBet=G.mainBet;
     G._freeDoubleBet=originalBet; // the house-funded extra stake = original bet amount
     G.mainBet=originalBet*2;      // doubled for win calculation
@@ -5391,7 +5394,7 @@ function closeResult(){
   // Full reset for next hand
   G.phase='bet';
   G.hands=[[]]; G.cur=0; G.splits=0; G.dealer=[];
-  G.arrowCount=0; G.kruegerOn=false; G.desertOn=false; G.goldOn=false;
+  G.arrowCounts=[0,0]; G.kruegerOn=false; G.desertOn=false; G.goldOn=false;
   G.steelOn=false; G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.plagueOn=false;
   G.safetyTrigger=false; G.dealerJester=false; G._freeDoubleBet=0;
   G._handStartBal=0;
@@ -5910,7 +5913,7 @@ function renderSessionStats(){
 function dblGuard(){
   if(G.phase!=='play') return;
   // Free double (arrow card) — no confirm needed, no extra cost
-  if(G.arrowCount>0){ dbl(); return; }
+  if((G.arrowCounts&&G.arrowCounts[G.cur])||0){ dbl(); return; }
   const h=G.hands[G.cur];
   const v=h?hv(h):0;
   // Confirm when bet is large OR hand value is 17+
