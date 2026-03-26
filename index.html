@@ -2311,7 +2311,7 @@ const G = {
   puOwned:new Set(), puPending:new Set(), puActive:null,
   phase:'bet', // bet | play | dealer | done
   // bonus card flags
-  arrowCounts:[0,0], kruegerOn:false, desertOn:false, goldOn:false, steelOn:false, stampedOn:false, stampedInitialBet:0, stampedCardsViewed:0,
+  arrowCounts:[0,0], kruegerOn:[false,false], desertOn:[false,false], steelOn:[false,false], goldOn:false, stampedOn:false, stampedInitialBet:0, stampedCardsViewed:0,
   safetyTrigger:false, dealerJester:false,
   _hand2Active:false, mainBet2:0, sideBets2:{},
   log:[],
@@ -4262,8 +4262,8 @@ function deal(){
   if(G.leverage&&G.leverage.startsWith('c')){
     G._usedLevCardIdx=parseInt(G.leverage.slice(1));
   }
-  G.arrowCounts=[0,0]; G.kruegerOn=false; G.desertOn=false; G.goldOn=false;
-  G.steelOn=false; G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.plagueOn=false;
+  G.arrowCounts=[0,0]; G.kruegerOn=[false,false]; G.desertOn=[false,false]; G.steelOn=[false,false]; G.goldOn=false;
+  G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.plagueOn=false;
   G.safetyTrigger=false; G.dealerJester=false; G.insuranceBet=0; G._freeDoubleBet=0; G._freeLevBet=0;
   G._sessionActive=true; // mark session as active after first deal
   G.phase='play'; document.body.classList.remove('betting');
@@ -4457,7 +4457,7 @@ function onBonusCard(bc, cardIndex, handIdx){
       if(at) at.style.display='block';
       break;}
     case 'krueger':
-      G.kruegerOn=true;
+      G.kruegerOn[handIdx||0]=true;
       G._bonusPayouts.push({label:'Krueger'+(isHand2?' (H2)':'')+' — bust insurance active',pl:0,type:'info'});
       bonusToast(bc,'Krueger active — bust insurance: half wager'+(isHand2?' · Hand 2':''));
       break;
@@ -4469,12 +4469,12 @@ function onBonusCard(bc, cardIndex, handIdx){
       break;
     }
     case 'desert':
-      G.desertOn=true;
+      G.desertOn[handIdx||0]=true;
       G._bonusPayouts.push({label:'Desert Card'+(isHand2?' (H2)':'')+' — bust/loss protection',pl:0,type:'info'});
       bonusToast(bc,'Desert Card active — full bust/loss protection'+(isHand2?' · Hand 2':''));
       break;
     case 'steel':
-      G.steelOn=true;
+      G.steelOn[handIdx||0]=true;
       G._bonusPayouts.push({label:'Steel Card'+(isHand2?' (H2)':'')+' — BJ pays 2:1',pl:0,type:'info'});
       bonusToast(bc,'Steel Card — Blackjack pays 2:1 this hand'+(isHand2?' · Hand 2':''));
       break;
@@ -4529,8 +4529,8 @@ function hit(){
   if(v===22&&G.puOwned.has('net')){ G.safetyTrigger=true; notif('SAFETY NET — PUSH'); advOrEnd('safety');return; }
   if(isBust(h)){
     sfx('bust');
-    if(G.kruegerOn){const ins=Math.floor(G.mainBet/2);G.preDealBal+=ins;G.balance+=ins;updateUI();G._bonusPayouts.push({label:'Krueger — bust insurance',pl:ins,type:'gain'});notif('Krueger — bust insurance paid '+fmtKFC(ins));G.kruegerOn=false;}
-    if(G.desertOn){G.desertOn=false;advOrEnd('desert_push');return;}
+    if(G.kruegerOn[G.cur]){const _kBet=(G.cur===1&&G._hand2Active)?(G.mainBet2||0):G.mainBet;const ins=Math.floor(_kBet/2);G.preDealBal+=ins;G.balance+=ins;updateUI();G._bonusPayouts.push({label:'Krueger'+(G.cur===1?' (H2)':'')+' — bust insurance',pl:ins,type:'gain'});notif('Krueger — bust insurance paid '+fmtKFC(ins));G.kruegerOn[G.cur]=false;}
+    if(G.desertOn[G.cur]){G.desertOn[G.cur]=false;advOrEnd('desert_push');return;}
     advOrEnd('bust');
   } else if(v===21){
     // If stamped card is active, let player boost their bet before the hand ends
@@ -4798,7 +4798,7 @@ function settle(reason){
       w=-_betForHand; // leverage card: lose full stake on bust
       detail='Bust'+(freeLev?' [Lev card — lose stake only]':'');
     }
-    else if(reason==='player_bj')  {const r=G.puOwned.has('novak')||G.steelOn?2:1.5;w=Math.floor(_betForHand*r*lm);detail=`Blackjack ${r}:1${G.steelOn?' (Steel)':''}`;}
+    else if(reason==='player_bj')  {const _sOn=G.steelOn[hi]||false;const r=G.puOwned.has('novak')||_sOn?2:1.5;w=Math.floor(_betForHand*r*lm);detail=`Blackjack ${r}:1${_sOn?' (Steel)':''}`;}
     else if(reason==='dealer_bj'){
       const freeLev4=G.leverage&&G.leverage.startsWith('c');
       w=-_betForHand;detail='Dealer BJ'; // leverage card: lose full stake
@@ -4806,7 +4806,7 @@ function settle(reason){
     else if(pbj&&reason==='normal'){
       // BJ on a hand that went through normal dealer play (split hand, or hand 0 in 2-hand mode)
       if(isBJ(G.dealer)){w=0;detail='Push — both BJ';}
-      else{const r=G.puOwned.has('novak')||G.steelOn?2:1.5;w=Math.floor(_betForHand*r*lm);detail=`Blackjack ${r}:1${G.steelOn?' (Steel)':''}`;sfx('bj');}
+      else{const _sOn=G.steelOn[hi]||false;const r=G.puOwned.has('novak')||_sOn?2:1.5;w=Math.floor(_betForHand*r*lm);detail=`Blackjack ${r}:1${_sOn?' (Steel)':''}`;sfx('bj');}
     }
     else if(db){
       w=_betForHand*lm;
@@ -4821,7 +4821,7 @@ function settle(reason){
     else if(pv===dv)               {w=0;detail='Push';}
     else{
       // Desert card: protect against dealer win too
-      if(G.desertOn){w=0;detail='Desert Card — Protected';}
+      if(G.desertOn[hi]){w=0;detail='Desert Card — Protected';}
       else{
         // If free leverage card: only lose original stake
         const freeLev2=G.leverage&&G.leverage.startsWith('c');
@@ -4856,14 +4856,14 @@ function settle(reason){
   // Resolve desert outcome
   if(reason==='desert_push'){
     updateBonusEntry('Desert',{label:'Desert Card — saved (push)',type:'gain'});
-  } else if(G.desertOn){
+  } else if(G.desertOn[0]||G.desertOn[1]){
     updateBonusEntry('Desert',{label:'Desert Card — not triggered',type:'info'});
   }
   // Resolve steel outcome — update with actual BJ bonus if it paid out
-  if(G.steelOn&&(reason==='player_bj'||detail.includes('Steel'))){
-    const steelBonus=Math.floor(G.mainBet*0.5); // diff between 2:1 and 1.5:1
-    updateBonusEntry('Steel',{label:`Steel Card — BJ paid 2:1 (+${fmtKFC(steelBonus)} bonus)`,type:'gain'});
-  } else if(G.steelOn){
+  const _steelUsed=G.steelOn.some(Boolean);
+  if(_steelUsed&&detail.includes('Steel')){
+    updateBonusEntry('Steel',{label:'Steel Card — BJ paid 2:1',type:'gain'});
+  } else if(_steelUsed){
     updateBonusEntry('Steel',{label:'Steel Card — no BJ this hand',type:'info'});
   }
   // Insurance outcome is already pushed to _bonusPayouts above when it resolves
@@ -5394,8 +5394,8 @@ function closeResult(){
   // Full reset for next hand
   G.phase='bet';
   G.hands=[[]]; G.cur=0; G.splits=0; G.dealer=[];
-  G.arrowCounts=[0,0]; G.kruegerOn=false; G.desertOn=false; G.goldOn=false;
-  G.steelOn=false; G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.plagueOn=false;
+  G.arrowCounts=[0,0]; G.kruegerOn=[false,false]; G.desertOn=[false,false]; G.steelOn=[false,false]; G.goldOn=false;
+  G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.plagueOn=false;
   G.safetyTrigger=false; G.dealerJester=false; G._freeDoubleBet=0;
   G._handStartBal=0;
   G.mainBet=0;
