@@ -4637,8 +4637,11 @@ function advOrEnd(reason){
   }
   if(G.cur<G.hands.length-1){
     G.cur++; renderAll();
-    if(G.splits>0&&isBJ(G.hands[G.cur])){
-      notif('BLACKJACK on split hand!'); sfx('bj'); showBJ();
+    if(isBJ(G.hands[G.cur])){
+      // BJ on newly active hand — split hand OR second seat in two-hand mode
+      const _isH2Seat=G._hand2Active&&G.cur===1&&G.splits===0;
+      notif(_isH2Seat?'Hand 2: BLACKJACK!':'BLACKJACK on split hand!');
+      sfx('bj'); showBJ();
       setTimeout(()=>advOrEnd(),300);
     } else {
       setActions(true); msg('HAND '+(G.cur+1));
