@@ -2069,6 +2069,19 @@ body.hand2-active #chip-strip .chip { position: relative; }
 <!-- ══════════════ MODALS ══════════════ -->
 
 
+<!-- LEVERAGE HAND SELECT -->
+<div class="overlay" id="lev-hand-modal">
+  <div class="modal" style="min-width:300px;max-width:340px;text-align:center">
+    <div style="font-size:11px;letter-spacing:4px;color:var(--purple);text-transform:uppercase;margin-bottom:16px">Blood Jester — Which Hand?</div>
+    <div style="font-family:var(--mono);font-size:12px;color:var(--muted2);margin-bottom:24px;line-height:1.6">Apply the <span style="color:var(--gold-hi);font-weight:700">2× leverage</span> to which hand?</div>
+    <div style="display:flex;gap:8px;margin-bottom:8px">
+      <button class="btn-primary" style="flex:1" onclick="confirmLevHand(0)">Hand 1</button>
+      <button class="btn-primary" style="flex:1;background:var(--purple);border-color:var(--purple)" onclick="confirmLevHand(1)">Hand 2</button>
+    </div>
+    <button class="btn-ghost" style="width:100%;margin-top:4px" onclick="cancelLevHand()">Cancel (deactivate)</button>
+  </div>
+</div>
+
 <!-- HIT CONFIRM -->
 <div class="overlay" id="hit-confirm-modal">
   <div class="modal" style="min-width:300px;max-width:320px;text-align:center">
@@ -3970,8 +3983,7 @@ function clearBets(){
   _betHistory.length=0; // clear undo stack on full clear
   G.mainBet=0;
   SB_NAMES.forEach(n=>G.sideBets[n]=0);
-  G.leverage=null;
-  // Also clear hand 2 if active
+  G.leverage=null; G._levTargetHand=0; G._pendingLevKey=null;
   if(G._hand2Active){ clearHand2(); }
   updateBetPanel();   // updates bet circle + deal btn
   buildSideBets();
@@ -4113,7 +4125,32 @@ function toggleLev(key){
     notif('Jester cards can only be evoked before dealing');
     return;
   }
-  G.leverage=G.leverage===key?null:key;
+  // Deactivate if already selected
+  if(G.leverage===key){
+    G.leverage=null; G._levTargetHand=0;
+    buildLevPanel(); updateBetPanel(); updateInventoryBar();
+    return;
+  }
+  // Blood Jester + two hands active: ask which hand gets the multiplier
+  if(key.startsWith('c') && G._hand2Active && (G.mainBet2||0)>=G.s.min){
+    G._pendingLevKey=key;
+    openModal('lev-hand-modal');
+    return;
+  }
+  G.leverage=key; G._levTargetHand=0;
+  buildLevPanel(); updateBetPanel(); updateInventoryBar();
+}
+function confirmLevHand(handIdx){
+  G.leverage=G._pendingLevKey||null;
+  G._levTargetHand=handIdx;
+  G._pendingLevKey=null;
+  closeModal('lev-hand-modal');
+  buildLevPanel(); updateBetPanel(); updateInventoryBar();
+  notif('Blood Jester → Hand '+(handIdx+1)+' (2× multiplier)');
+}
+function cancelLevHand(){
+  G.leverage=null; G._levTargetHand=0; G._pendingLevKey=null;
+  closeModal('lev-hand-modal');
   buildLevPanel(); updateBetPanel(); updateInventoryBar();
 }
 
@@ -4280,6 +4317,13 @@ function deal(){
   if(d2.bonus&&d2.bonus.jester) onDealerJester(true);
   renderAll();
 
+  // Helper: advance to hand 2 after hand 0 BJ (when two hands are in play)
+  // Hand 0 BJ is flagged and settled correctly via isBJ() inside settle()'s per-hand loop.
+  function _advanceToHand2AfterBJ(){
+    G.cur=1; renderAll();
+    setActions(true); msg('HAND 1: BLACKJACK ✓  —  YOUR TURN (Hand 2)');
+  }
+
   // If dealer shows an Ace, offer insurance BEFORE peeking for BJ.
   // Dealer BJ is resolved inside declineInsurance / takeInsurance flow.
   if(dealerShowsAce()){
@@ -4287,26 +4331,32 @@ function deal(){
     setTimeout(()=>showMissedSideBets(false,0),400);
     // Check player BJ first (player may also have BJ — then it's push regardless)
     if(isBJ(G.hands[0])&&isBJ(G.dealer)){
-      // Both BJ — no insurance needed, immediate push
+      // Both BJ — no insurance needed, immediate push (both hands settle together)
       revealHole();
       if(G.puOwned.has('guard')){notif('BJ GUARD — PUSH');renderAll();setTimeout(()=>settle('push_guard'),500);return;}
       msg('PUSH — BOTH BLACKJACK','push');renderAll();setTimeout(()=>settle('push_player_bj'),500);return;
     }
-    // Player has BJ — no point offering insurance (outcome is win or push regardless)
+    // Hand 0 BJ — if second hand is live, advance to it before settling
     if(isBJ(G.hands[0])){
-      // Don't reveal hole yet — settle handles it; skip insurance entirely
-      setActions(false);
-      // Resolve immediately: if dealer has BJ it's a push, otherwise player BJ wins
       revealHole(); renderAll();
       if(isBJ(G.dealer)){
         msg('PUSH — BOTH BLACKJACK','push'); setTimeout(()=>settle('push_player_bj'),500);
+        return;
+      }
+      // Hand 0 wins with BJ; if hand 1 exists let it play first
+      if(_deal2){
+        sfx('bj'); showBJ();
+        notif('Hand 1: BLACKJACK! Now play Hand 2');
+        setTimeout(_advanceToHand2AfterBJ, 600);
+        return;
+      }
+      // Single hand — resolve immediately (with stamped boost if applicable)
+      setActions(false);
+      if(G.stampedOn){
+        msg('BLACKJACK! BOOST YOUR BET','bj'); sfx('bj');
+        evaluateEarlySideBets(); showStampedBoost(); G._pendingBJ=true;
       } else {
-        if(G.stampedOn){
-          msg('BLACKJACK! BOOST YOUR BET','bj'); sfx('bj');
-          evaluateEarlySideBets(); showStampedBoost(); G._pendingBJ=true;
-        } else {
-          msg('BLACKJACK!','bj'); sfx('bj'); showBJ(); setTimeout(()=>settle('player_bj'),500);
-        }
+        msg('BLACKJACK!','bj'); sfx('bj'); showBJ(); setTimeout(()=>settle('player_bj'),500);
       }
       return;
     }
@@ -4324,7 +4374,15 @@ function deal(){
     msg('DEALER BLACKJACK','lose');renderAll();setTimeout(()=>settle('dealer_bj'),500);return;
   }
   if(isBJ(G.hands[0])){
-    // If stamped card is active, let player boost before BJ payout
+    // Hand 0 BJ — if second hand is live, let it play before settling
+    if(_deal2){
+      sfx('bj'); showBJ(); revealHole(); renderAll();
+      evaluateEarlySideBets();
+      notif('Hand 1: BLACKJACK! Now play Hand 2');
+      setTimeout(_advanceToHand2AfterBJ, 600);
+      return;
+    }
+    // Single hand — stamped boost or immediate settle
     if(G.stampedOn){
       msg('BLACKJACK! BOOST YOUR BET','bj'); sfx('bj');
       revealHole(); renderAll();
@@ -4341,8 +4399,11 @@ function deal(){
   setActions(true); msg('YOUR TURN');
 }
 
-function getLevMult(){
+function getLevMult(handIdx){
   if(!G.leverage)return 1;
+  // For jester cards: only apply to the designated hand (default hand 0)
+  const target=G._levTargetHand||0;
+  if(G.leverage.startsWith('c') && (handIdx||0)!==target) return 1;
   if(G.leverage==='2x')return 2;
   if(G.leverage.startsWith('c')){
     const i=parseInt(G.leverage.slice(1));
@@ -4715,7 +4776,7 @@ function settle(reason){
     // For second seat (hi===1, no splits), use mainBet2; splits use mainBet
     const _isHand2Seat = hi===1 && G._hand2Active && G.hands.length>1 && G.splits===0;
     const _betForHand = _isHand2Seat ? G.mainBet2 : G.mainBet;
-    const lm=hi===0?getLevMult():1;
+    const lm=getLevMult(hi);
     let w=0;
     if(reason==='surrender'){
       const freeLev3=G.leverage&&G.leverage.startsWith('c');
@@ -4737,9 +4798,9 @@ function settle(reason){
       w=-_betForHand;detail='Dealer BJ'; // leverage card: lose full stake
     }
     else if(pbj&&reason==='normal'){
-      // Split hand BJ (ace + 10-value in exactly 2 cards) — pays BJ rate
+      // BJ on a hand that went through normal dealer play (split hand, or hand 0 in 2-hand mode)
       if(isBJ(G.dealer)){w=0;detail='Push — both BJ';}
-      else{const r=G.puOwned.has('novak')||G.steelOn?2:1.5;w=Math.floor(_betForHand*r*lm);detail=`Blackjack ${r}:1 (split)${G.steelOn?' (Steel)':''}`;sfx('bj');}
+      else{const r=G.puOwned.has('novak')||G.steelOn?2:1.5;w=Math.floor(_betForHand*r*lm);detail=`Blackjack ${r}:1${G.steelOn?' (Steel)':''}`;sfx('bj');}
     }
     else if(db){
       w=_betForHand*lm;
@@ -5336,8 +5397,7 @@ function closeResult(){
   // Also reset hand2 bets so they must be re-placed each round
   G.mainBet2=0;
   if(G.sideBets2) SB_NAMES.forEach(n=>G.sideBets2[n]=0);
-  G.leverage=null;
-  // Auto same-bet: restore last bets automatically BEFORE updating circles
+  G.leverage=null; G._levTargetHand=0; G._pendingLevKey=null;
   if(_autoSameBet&&G.lastMainBet>0){
     G.mainBet=G.lastMainBet;
     SB_NAMES.forEach(n=>G.sideBets[n]=(G.lastSideBets&&G.lastSideBets[n])||0);
