@@ -1765,6 +1765,28 @@ body.hand2-active #chip-strip .chip { position: relative; }
             <span class="sb-circle-label">DB</span><span class="sb-circle-amt" id="psbcamt-Dealer_Bust">—</span>
           </div>
         </div>
+        <!-- Hand 2 bet row — shown during play phase when 2nd hand is active -->
+        <div id="play-hand2-row" style="display:none;align-items:center;gap:8px;justify-content:center;padding-top:4px;border-top:1px solid rgba(201,168,76,.08);width:100%;margin-top:2px">
+          <div class="sb-circle sb-mini" id="ppsbc-Perfect_Pairs">
+            <span class="sb-circle-label">PP</span><span class="sb-circle-amt" id="ppsbcamt-Perfect_Pairs">—</span>
+          </div>
+          <div class="sb-circle sb-mini" id="ppsbc-21p3">
+            <span class="sb-circle-label">21+3</span><span class="sb-circle-amt" id="ppsbcamt-21p3">—</span>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:center">
+            <div id="play-hand2-bet-circle" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(201,168,76,0.5);background:rgba(10,11,13,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 0 20px rgba(201,168,76,0.1),inset 0 0 16px rgba(0,0,0,0.4);">
+              <div style="position:absolute;inset:6px;border-radius:50%;border:1px dashed rgba(201,168,76,0.2);pointer-events:none"></div>
+              <span id="play-hand2-bet-amt" style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--gold-hi);text-shadow:0 0 8px rgba(201,168,76,0.4);letter-spacing:0.5px;z-index:1;text-align:center;padding:0 3px;line-height:1.2"></span>
+            </div>
+            <div style="font-family:var(--mono);font-size:7px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;text-align:center;margin-top:3px">HAND 2</div>
+          </div>
+          <div class="sb-circle sb-mini" id="ppsbc-Crazy_7s">
+            <span class="sb-circle-label">C7s</span><span class="sb-circle-amt" id="ppsbcamt-Crazy_7s">—</span>
+          </div>
+          <div class="sb-circle sb-mini" id="ppsbc-Dealer_Bust">
+            <span class="sb-circle-label">DB</span><span class="sb-circle-amt" id="ppsbcamt-Dealer_Bust">—</span>
+          </div>
+        </div>
       </div><!-- end #play-bottom -->
 
       <!-- ═══ BETTING PHASE ZONE — collapses when deal pressed ═══ -->
@@ -4268,6 +4290,7 @@ function deal(){
   G._sessionActive=true; // mark session as active after first deal
   G.phase='play'; document.body.classList.remove('betting');
   _h2ChipTarget=false; setH2ChipTarget(false);
+  if(typeof updateHand2Panel==='function') updateHand2Panel(); // sync play-phase hand2 row
   // Clear previous hand state immediately
   clearMissedSideBets();
   const _ms=document.getElementById('msg-strip');if(_ms){_ms.className='';_ms.textContent='';}
@@ -6162,7 +6185,7 @@ function updateHand2Panel(){
   if(!G.sideBets2) G.sideBets2={};
   const amt = document.getElementById('hand2-bet-circle-amt');
   const circle = document.getElementById('hand2-bet-circle');
-  if(amt) amt.textContent = (G.mainBet2||0)>0 ? fmt(G.mainBet2) : '';
+  if(amt) amt.textContent = (G.mainBet2||0)>0 ? fmtKFC(G.mainBet2) : '';
   if(circle) circle.classList.toggle('visible', (G.mainBet2||0)>0);
   // Update deal button — require hand2 has min bet too if active
   const dealBtn=document.getElementById('btn-deal-top');
@@ -6172,15 +6195,33 @@ function updateHand2Panel(){
     dealBtn.disabled = !hand1ok || !hand2ok;
     dealBtn.style.opacity = (!hand1ok||!hand2ok)?'0.45':'1';
   }
-  // Update H2 SB circles
+  // Update H2 SB circles (betting phase)
   SB_NAMES.forEach(n=>{
     const key=n.replace(/ /g,'_').replace(/\+/g,'p');
     const amtEl=document.getElementById('h2sbcamt-'+key);
     const circEl=document.getElementById('h2sbc-'+key);
     const val=(G.sideBets2&&G.sideBets2[n])||0;
-    if(amtEl) amtEl.textContent=val>0?fmt(val):'—';
+    if(amtEl) amtEl.textContent=val>0?fmtKFC(val):'—';
     if(circEl) circEl.classList.toggle('active', val>0);
   });
+  // Sync play-phase hand2 row
+  const playH2Row=document.getElementById('play-hand2-row');
+  if(playH2Row){
+    const showRow=G._hand2Active&&(G.mainBet2||0)>0&&G.phase!=='bet';
+    playH2Row.style.display=showRow?'flex':'none';
+    if(showRow){
+      const h2amt=document.getElementById('play-hand2-bet-amt');
+      if(h2amt) h2amt.textContent=fmtKFC(G.mainBet2);
+      SB_NAMES.forEach(n=>{
+        const key2=n.replace(/ /g,'_').replace(/\+/g,'p');
+        const pEl=document.getElementById('ppsbcamt-'+key2);
+        const pCirc=document.getElementById('ppsbc-'+key2);
+        const val2=(G.sideBets2&&G.sideBets2[n])||0;
+        if(pEl) pEl.textContent=val2>0?fmtKFC(val2):'—';
+        if(pCirc) pCirc.classList.toggle('active',val2>0);
+      });
+    }
+  }
   if(G.phase==='bet' && !G._atCashout) saveSession();
 }
 
