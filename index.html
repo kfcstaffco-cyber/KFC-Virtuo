@@ -711,7 +711,7 @@ body:not(.betting) #betting-spacer { flex: 0; }
   .sb-circle-amt { font-size: 8px !important; }
 
   /* ── PLAY-BOTTOM / BET CIRCLE ── */
-  #play-bet-circle { width: 64px !important; height: 64px !important; }
+  #play-bet-circle, #play-hand2-bet-circle { width: 64px !important; height: 64px !important; }
   #bet-circle      { width: 64px !important; height: 64px !important; }
   #bet-circle-row  { flex-shrink: 0; }
   #betting-deal-row { gap: 6px; }
@@ -844,7 +844,7 @@ body:not(.betting) #betting-spacer { flex: 0; }
   }
   #sb-circles::-webkit-scrollbar { display: none; }
   #play-actions .act { font-size: 8px; padding: 8px 1px; letter-spacing: 0; }
-  #play-bet-circle { width: 60px !important; height: 60px !important; }
+  #play-bet-circle, #play-hand2-bet-circle { width: 60px !important; height: 60px !important; }
   #bet-circle { width: 56px !important; height: 56px !important; }
   .shortcut-btn { font-size: 7px; padding: 4px 3px; }
 }
@@ -1026,7 +1026,8 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
 #play-bet-circle-wrap {
   display: flex; flex-direction: column; align-items: center;
 }
-#play-bet-circle {
+#play-bet-circle,
+#play-hand2-bet-circle {
   width: 86px; height: 86px; border-radius: 50%;
   border: 2px solid rgba(201,168,76,0.5);
   background: rgba(10,11,13,0.6);
@@ -1042,11 +1043,18 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
   border-color: rgba(201,168,76,0.8);
   box-shadow: 0 0 40px rgba(201,168,76,0.2), inset 0 0 20px rgba(0,0,0,0.4);
 }
-#play-bet-circle-inner {
+#play-hand2-bet-circle {
+  opacity: 1;
+  border-color: rgba(201,168,76,0.8);
+  box-shadow: 0 0 40px rgba(201,168,76,0.2), inset 0 0 20px rgba(0,0,0,0.4);
+}
+#play-bet-circle-inner,
+#play-hand2-bet-circle-inner {
   position: absolute; inset: 8px; border-radius: 50%;
   border: 1px dashed rgba(201,168,76,0.2); pointer-events: none;
 }
-#play-bet-circle-amt {
+#play-bet-circle-amt,
+#play-hand2-bet-amt {
   font-family: var(--mono); font-size: 10px; font-weight: 700;
   color: var(--gold-hi); text-shadow: 0 0 8px rgba(201,168,76,0.4);
   letter-spacing: 0.5px; z-index: 1; text-align: center; padding: 0 3px; line-height: 1.2;
@@ -1774,9 +1782,9 @@ body.hand2-active #chip-strip .chip { position: relative; }
             <span class="sb-circle-label">21+3</span><span class="sb-circle-amt" id="ppsbcamt-21p3">—</span>
           </div>
           <div style="display:flex;flex-direction:column;align-items:center">
-            <div id="play-hand2-bet-circle" style="width:60px;height:60px;border-radius:50%;border:2px solid rgba(201,168,76,0.5);background:rgba(10,11,13,0.6);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 0 20px rgba(201,168,76,0.1),inset 0 0 16px rgba(0,0,0,0.4);">
-              <div style="position:absolute;inset:6px;border-radius:50%;border:1px dashed rgba(201,168,76,0.2);pointer-events:none"></div>
-              <span id="play-hand2-bet-amt" style="font-family:var(--mono);font-size:9px;font-weight:700;color:var(--gold-hi);text-shadow:0 0 8px rgba(201,168,76,0.4);letter-spacing:0.5px;z-index:1;text-align:center;padding:0 3px;line-height:1.2"></span>
+            <div id="play-hand2-bet-circle">
+              <div id="play-hand2-bet-circle-inner"></div>
+              <span id="play-hand2-bet-amt"></span>
             </div>
             <div style="font-family:var(--mono);font-size:7px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;text-align:center;margin-top:3px">HAND 2</div>
           </div>
@@ -4347,6 +4355,14 @@ function deal(){
   // Hand 0 BJ is flagged and settled correctly via isBJ() inside settle()'s per-hand loop.
   function _advanceToHand2AfterBJ(){
     G.cur=1; renderAll();
+    // If hand 2 is also a BJ, trigger animation and settle — don't give player actions
+    if(isBJ(G.hands[1])){
+      sfx('bj'); showBJ();
+      msg('HAND 2: BLACKJACK!','bj');
+      setActions(false);
+      setTimeout(()=>settle('player_bj'), 600);
+      return;
+    }
     setActions(true); msg('HAND 1: BLACKJACK ✓  —  YOUR TURN (Hand 2)');
   }
 
@@ -4668,9 +4684,16 @@ function advOrEnd(reason){
     if(isBJ(G.hands[G.cur])){
       // BJ on newly active hand — split hand OR second seat in two-hand mode
       const _isH2Seat=G._hand2Active&&G.cur===1&&G.splits===0;
-      notif(_isH2Seat?'Hand 2: BLACKJACK!':'BLACKJACK on split hand!');
       sfx('bj'); showBJ();
-      setTimeout(()=>advOrEnd(),300);
+      if(_isH2Seat){
+        // Two-hand mode: hand 2 is a BJ — show animation then settle (both hands)
+        msg('HAND 2: BLACKJACK!','bj');
+        setActions(false);
+        setTimeout(()=>settle('player_bj'), 600);
+      } else {
+        notif('BLACKJACK on split hand!');
+        setTimeout(()=>advOrEnd(),300);
+      }
     } else {
       setActions(true); msg('HAND '+(G.cur+1));
     }
