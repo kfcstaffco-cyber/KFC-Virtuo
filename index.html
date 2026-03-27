@@ -6234,7 +6234,7 @@ function updateHand2Panel(){
     const amtEl=document.getElementById('h2sbcamt-'+key);
     const circEl=document.getElementById('h2sbc-'+key);
     const val=(G.sideBets2&&G.sideBets2[n])||0;
-    if(amtEl) amtEl.textContent=val>0?fmtKFC(val):'—';
+    if(amtEl) amtEl.textContent=val>0?fmt(val):'—';
     if(circEl) circEl.classList.toggle('active', val>0);
   });
   // Sync play-phase hand2 row
@@ -6250,7 +6250,7 @@ function updateHand2Panel(){
         const pEl=document.getElementById('ppsbcamt-'+key2);
         const pCirc=document.getElementById('ppsbc-'+key2);
         const val2=(G.sideBets2&&G.sideBets2[n])||0;
-        if(pEl) pEl.textContent=val2>0?fmtKFC(val2):'—';
+        if(pEl) pEl.textContent=val2>0?fmt(val2):'—';
         if(pCirc) pCirc.classList.toggle('active',val2>0);
       });
     }
