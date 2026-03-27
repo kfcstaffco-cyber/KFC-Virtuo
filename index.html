@@ -2341,7 +2341,7 @@ const G = {
   puOwned:new Set(), puPending:new Set(), puActive:null,
   phase:'bet', // bet | play | dealer | done
   // bonus card flags
-  arrowCounts:[0,0], kruegerOn:[false,false], desertOn:[false,false], steelOn:[false,false], goldOn:false, stampedOn:false, stampedInitialBet:0, stampedCardsViewed:0,
+  arrowCounts:[0,0], kruegerOn:[false,false], desertOn:[false,false], steelOn:[false,false], goldOn:false, stampedOn:false, stampedInitialBet:0, stampedCardsViewed:0, stampedOn2:false, stampedInitialBet2:0, stampedCardsViewed2:0,
   safetyTrigger:false, dealerJester:false,
   _hand2Active:false, mainBet2:0, sideBets2:{},
   log:[],
@@ -2830,9 +2830,11 @@ function hideStampedBoost(){
   if(btn) btn.style.display='none';
 }
 function useStampedBoost(){
-  if(!G.stampedOn){hideStampedBoost();return;}
-  // Open the stamped boost modal
-  const maxBoost=G.stampedInitialBet;
+  if(!G.stampedOn&&!G.stampedOn2){hideStampedBoost();return;}
+  // Open the stamped boost modal — use hand2 values when on hand 2
+  const _isH2Stamped = G.stampedOn2 && !G.stampedOn;
+  const maxBoost = _isH2Stamped ? G.stampedInitialBet2 : G.stampedInitialBet;
+  const curBet = _isH2Stamped ? (G.mainBet2||0) : G.mainBet;
   const slider=document.getElementById('stamped-slider');
   const lbl=document.getElementById('stamped-boost-lbl');
   const hint=document.getElementById('stamped-boost-hint');
@@ -2840,33 +2842,37 @@ function useStampedBoost(){
     slider.min=0; slider.max=maxBoost; slider.step=G.s.sMin; slider.value=maxBoost;
   }
   if(lbl) lbl.textContent=fmtKFC(maxBoost);
-  if(hint) hint.textContent='Max: '+fmtKFC(maxBoost)+' · Current bet: '+fmtKFC(G.mainBet);
+  if(hint) hint.textContent='Max: '+fmtKFC(maxBoost)+' · Current bet: '+fmtKFC(curBet)+(_isH2Stamped?' (Hand 2)':'');
   const smx=document.getElementById('stamped-slider-max'); if(smx) smx.textContent=fmtKFC(maxBoost);
   openModal('stamped-modal');
 }
 function confirmStampedBoost(){
-  if(!G.stampedOn){closeModal('stamped-modal');return;}
+  if(!G.stampedOn&&!G.stampedOn2){closeModal('stamped-modal');return;}
+  const _isH2Stamped = G.stampedOn2 && !G.stampedOn;
   const slider=document.getElementById('stamped-slider');
   const boost=parseFloat(slider?slider.value:0);
   if(!boost||boost<=0){
-    closeModal('stamped-modal');hideStampedBoost();G.stampedOn=false;
+    closeModal('stamped-modal');hideStampedBoost();
+    if(_isH2Stamped){ G.stampedOn2=false; } else { G.stampedOn=false; }
     if(G._pendingBJ){G._pendingBJ=false;setTimeout(()=>settle('player_bj'),300);}
     else if(G._pendingStand){G._pendingStand=false;advOrEnd();}
     return;
   }
-  if(boost>G.stampedInitialBet){notif('Exceeds max boost');return;}
+  const maxBoost = _isH2Stamped ? G.stampedInitialBet2 : G.stampedInitialBet;
+  if(boost>maxBoost){notif('Exceeds max boost');return;}
   if(G.balance<boost){notif('Not enough balance');return;}
   G.balance-=boost;
   G.preDealBal-=boost;
-  G.mainBet+=boost;
-  G.stampedOn=false;
+  if(_isH2Stamped){ G.mainBet2=(G.mainBet2||0)+boost; G.stampedOn2=false; }
+  else { G.mainBet+=boost; G.stampedOn=false; }
   closeModal('stamped-modal');
   hideStampedBoost();
+  const handLabel = _isH2Stamped ? ' (Hand 2)' : '';
   const existingStamped=G._bonusPayouts.find(b=>b.label.startsWith('Stamped'));
-  if(existingStamped){existingStamped.label=`Stamped Card — bet boosted +${fmtKFC(boost)}`;existingStamped.pl=0;existingStamped.type='info';}
-  else{G._bonusPayouts.push({label:`Stamped Card — bet boosted +${fmtKFC(boost)}`,pl:0,type:'info'});}
-  updateUI();updateBetPanel();sfx('chip');
-  notif('Bet boosted → '+fmtKFC(G.mainBet));
+  if(existingStamped){existingStamped.label=`Stamped Card${handLabel} — bet boosted +${fmtKFC(boost)}`;existingStamped.pl=0;existingStamped.type='info';}
+  else{G._bonusPayouts.push({label:`Stamped Card${handLabel} — bet boosted +${fmtKFC(boost)}`,pl:0,type:'info'});}
+  updateUI();updateBetPanel();if(typeof updateHand2Panel==='function')updateHand2Panel();sfx('chip');
+  notif('Bet boosted → '+fmtKFC(_isH2Stamped?(G.mainBet2||0):G.mainBet)+(_isH2Stamped?' (Hand 2)':''));
   if(G._pendingBJ){G._pendingBJ=false;setTimeout(()=>settle('player_bj'),400);}
   else if(G._pendingStand){G._pendingStand=false;advOrEnd();}
 }
@@ -4293,7 +4299,7 @@ function deal(){
     G._usedLevCardIdx=parseInt(G.leverage.slice(1));
   }
   G.arrowCounts=[0,0]; G.kruegerOn=[false,false]; G.desertOn=[false,false]; G.steelOn=[false,false]; G.goldOn=false;
-  G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.plagueOn=false;
+  G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.stampedOn2=false; G.stampedInitialBet2=0; G.stampedCardsViewed2=0; G.plagueOn=false;
   G.safetyTrigger=false; G.dealerJester=false; G.insuranceBet=0; G._freeDoubleBet=0; G._freeLevBet=0;
   G._sessionActive=true; // mark session as active after first deal
   G.phase='play'; document.body.classList.remove('betting');
@@ -4467,8 +4473,13 @@ function onBonusCard(bc, cardIndex, handIdx){
   // Note: stamped only works on hand 1 (can't boost hand 2 mid-deal)
   switch(bc.id){
     case 'stamped':
-      if(!isHand2){ G.stampedOn=true; G.stampedInitialBet=G.mainBet; G.stampedCardsViewed=0; bonusToast(bc,'View 3 cards, then boost your bet'); showStampedBoost(); }
-      else bonusToast(bc,'View cards (boost not available on Hand 2)');
+      if(!isHand2){
+        G.stampedOn=true; G.stampedInitialBet=G.mainBet; G.stampedCardsViewed=0;
+        bonusToast(bc,'View 3 cards, then boost your bet'); showStampedBoost();
+      } else {
+        G.stampedOn2=true; G.stampedInitialBet2=G.mainBet2||0; G.stampedCardsViewed2=0;
+        bonusToast(bc,'View 3 cards, then boost Hand 2 bet'); showStampedBoost();
+      }
       break;
     case 'gold':{
       G.goldOn=true;
@@ -4546,22 +4557,20 @@ function hit(){
   if(G.phase!=='play')return;
   sfx('card');
   const h=G.hands[G.cur]; const c=draw(); h.push(c);
-  if(G.stampedOn){
-    G.stampedCardsViewed++;
-    // Boost window: player can boost AFTER seeing 3rd card (one hit)
-    // Show boost button if just saw 3rd card; close if already used or 4th card
-    if(G.stampedCardsViewed===1){
-      // Just drew 3rd card — show boost opportunity
+  const _stampedActive = G.cur===1 ? G.stampedOn2 : G.stampedOn;
+  if(_stampedActive){
+    if(G.cur===1){ G.stampedCardsViewed2++; } else { G.stampedCardsViewed++; }
+    const _viewed = G.cur===1 ? G.stampedCardsViewed2 : G.stampedCardsViewed;
+    if(_viewed===1){
       showStampedBoost();
     } else {
-      // Saw 4th+ card without boosting — close window
       hideStampedBoost();
-      G.stampedOn=false;
+      if(G.cur===1){ G.stampedOn2=false; } else { G.stampedOn=false; }
     }
   }
   if(c.bonus){
     const hitIdx=h.length-1;
-    onBonusCard(c.bonus, hitIdx);
+    onBonusCard(c.bonus, hitIdx, G.cur);
     // Jester: stays in hand as 0-value card, effect already triggered above.
     // No replacement drawn — fall through to normal renderAll/score check below.
   }
@@ -4575,10 +4584,11 @@ function hit(){
     advOrEnd('bust');
   } else if(v===21){
     // If stamped card is active, let player boost their bet before the hand ends
-    if(G.stampedOn&&G.stampedCardsViewed>=1){
+    const _sActive21 = G.cur===1 ? G.stampedOn2 : G.stampedOn;
+    const _sViewed21 = G.cur===1 ? G.stampedCardsViewed2 : G.stampedCardsViewed;
+    if(_sActive21&&_sViewed21>=1){
       msg('21 — BOOST BET BEFORE STANDING?','bj');
       showStampedBoost();
-      // Don't auto-advance — player must use or skip the boost
       G._pendingStand=true;
       setActions(false);
       return;
@@ -4588,7 +4598,7 @@ function hit(){
   else { renderScores(); setActions(true); updateStrategyHint(); }
 }
 
-function stand(){ if(G.phase!=='play')return; sfx('button'); hideStampedBoost(); G.stampedOn=false; advOrEnd(); }
+function stand(){ if(G.phase!=='play')return; sfx('button'); hideStampedBoost(); G.stampedOn=false; G.stampedOn2=false; advOrEnd(); }
 
 function dbl(){
   if(G.phase!=='play')return;
@@ -4665,7 +4675,7 @@ function split(){
 }
 
 function advOrEnd(reason){
-  hideStampedBoost(); G.stampedOn=false; // always clear boost button when advancing
+  hideStampedBoost(); G.stampedOn=false; G.stampedOn2=false; // always clear boost button when advancing
   if(reason==='safety'){
     // Safety net: immediate push, skip dealer
     renderScores();
@@ -5452,7 +5462,7 @@ function closeResult(){
   G.phase='bet';
   G.hands=[[]]; G.cur=0; G.splits=0; G.dealer=[];
   G.arrowCounts=[0,0]; G.kruegerOn=[false,false]; G.desertOn=[false,false]; G.steelOn=[false,false]; G.goldOn=false;
-  G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.plagueOn=false;
+  G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.stampedOn2=false; G.stampedInitialBet2=0; G.stampedCardsViewed2=0; G.plagueOn=false;
   G.safetyTrigger=false; G.dealerJester=false; G._freeDoubleBet=0;
   G._handStartBal=0;
   G.mainBet=0;
