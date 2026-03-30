@@ -3092,7 +3092,7 @@ function _afterInsurance(){
   if(isBJ(G.dealer)){
     revealHole(); renderAll();
     if(G.puOwned.has('guard')){notif('BJ GUARD — PUSH');setTimeout(()=>settle('push_guard'),500);return;}
-    if(isBJ(G.hands[0])){msg('PUSH — BOTH BLACKJACK','push');setTimeout(()=>settle('push_player_bj'),500);return;}
+    if(isBJ(G.hands[0])){msg('PUSH — BOTH BLACKJACK','push');renderAll();setTimeout(()=>settle('push_player_bj'),500);return;}
     sfx('dealer_bj'); msg('DEALER BLACKJACK','lose');setTimeout(()=>settle('dealer_bj'),500);return;
   }
   // Dealer does not have BJ — insurance lost (already deducted), continue play
@@ -4407,7 +4407,7 @@ function deal(){
   if(d1.bonus&&d1.bonus.jester){
     onDealerJester(false);
     const extra=draw();
-    G.dealer.splice(1,0,extra); // insert before hole card so hole stays last
+    G.dealer.push(extra); // append after hole card — jester stays left, extra goes right, hole stays at index 1
   }
   // Check for dealer hole card jester effect
   if(d2.bonus&&d2.bonus.jester) onDealerJester(true);
@@ -4851,7 +4851,7 @@ function revealHole(){
   const dc=document.getElementById('dealer-cards');
   if(!dc) return;
   const cards=dc.children;
-  const holeIdx=G.dealer.length-1;
+  const holeIdx=1; // hole card is always the second card dealt (index 1)
   if(cards.length>holeIdx){
     const holeEl=cards[holeIdx];
     const c=G.dealer[holeIdx];
@@ -5220,7 +5220,7 @@ function addSlot(idx){
 function renderAll(){
   // Dealer
   const dc=document.getElementById('dealer-cards');
-  const holeIdx=G.dealer.length-1; // hole card is always the last card
+  const holeIdx=1; // hole card is always the second card dealt (index 1), regardless of jesters appended after
   const alreadyDealerRendered=dc.children.length;
   const needsFullDealerRender=G._dealStagger || alreadyDealerRendered===0 || alreadyDealerRendered>G.dealer.length;
   if(needsFullDealerRender){
@@ -5384,8 +5384,8 @@ function renderScores(){
   const ds=document.getElementById('dealer-score');
   if(ds){
     if(G.phase==='play' && !G.holeRevealed){
-      // Hole still hidden — only sum face-up cards (all except the last/hole card)
-      const visibleCards=G.dealer.slice(0,G.dealer.length-1);
+      // Hole still hidden — only sum face-up cards (all except index 1 which is always the hole card)
+      const visibleCards=G.dealer.filter((_,i)=>i!==1);
       const v=visibleCards.reduce((sum,c)=>c.bonus&&c.bonus.jester?sum:sum+cv(c),0);
       ds.innerHTML=`showing <span>${v||'?'}</span>`;
     } else {
