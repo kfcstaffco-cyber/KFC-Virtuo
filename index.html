@@ -4322,31 +4322,27 @@ function deal(){
   G._dealStagger=false;
   // Staggered card sounds
   [0,300,600,900].forEach(t=>setTimeout(()=>sfx('card'),t));
-  // Process bonuses for hand 1
-  [p1,p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i,0);});
-  // Bonus processing for second hand — pass handIdx=1 so effects scope correctly
-  if(_deal2&&h2p1&&h2p2){ [h2p1,h2p2].forEach((c,i)=>{if(c.bonus)onBonusCard(c.bonus,i,1);}); }
-  // Jesters stay in the hand as 0-value cards with their effect triggered above.
-  // But since a jester fills a card slot without contributing value, draw one extra
-  // card per jester in the initial deal so the player always has 2 value cards.
-  [p1,p2].forEach((c)=>{
-    if(c.bonus&&c.bonus.jester){
-      const extra=draw();
-      G.hands[0].push(extra);
-      // Extra card replaces a jester from the initial 2 — always counts as within first two cards (index 1)
-      if(extra.bonus) onBonusCard(extra.bonus, 1, 0);
+
+  // Helper: fire bonuses for the initial two drawn cards (p1, p2 style),
+  // then keep drawing replacements until the hand has 2 non-jester value cards.
+  // Any card drawn during this process (at any physical index) is part of the
+  // "initial deal" and its bonus is valid.
+  function _fillInitialHand(hand, firstTwo, hIdx){
+    // Fire bonuses for the originally drawn pair
+    firstTwo.forEach((c,i)=>{ if(c.bonus) onBonusCard(c.bonus, i, hIdx); });
+    // Count value cards (non-jesters). Keep drawing until we have 2.
+    let valueCount = hand.filter(c=>!(c.bonus&&c.bonus.jester)).length;
+    while(valueCount < 2){
+      const extra = draw();
+      hand.push(extra);
+      // All cards drawn here are part of the initial deal — bonus is always valid (pass 1)
+      if(extra.bonus) onBonusCard(extra.bonus, 1, hIdx);
+      if(!(extra.bonus&&extra.bonus.jester)) valueCount++;
     }
-  });
-  if(_deal2&&h2p1&&h2p2){
-    [h2p1,h2p2].forEach((c)=>{
-      if(c.bonus&&c.bonus.jester){
-        const extra=draw();
-        G.hands[1].push(extra);
-        // Extra card replaces a jester from the initial 2 — always counts as within first two cards (index 1)
-        if(extra.bonus) onBonusCard(extra.bonus, 1, 1);
-      }
-    });
   }
+
+  _fillInitialHand(G.hands[0], [p1,p2], 0);
+  if(_deal2&&h2p1&&h2p2) _fillInitialHand(G.hands[1], [h2p1,h2p2], 1);
   // Dealer face-up jester: dealer also needs an extra card to have a real value showing
   if(d1.bonus&&d1.bonus.jester){
     onDealerJester(false);
@@ -4386,19 +4382,21 @@ function deal(){
     }
     // Hand 0 BJ — if second hand is live, advance to it before settling
     if(isBJ(G.hands[0])){
-      revealHole(); renderAll();
       if(isBJ(G.dealer)){
+        // Both have BJ — reveal and settle immediately (no hand 2 matters)
+        revealHole(); renderAll();
         msg('PUSH — BOTH BLACKJACK','push'); setTimeout(()=>settle('push_player_bj'),500);
         return;
       }
-      // Hand 0 wins with BJ; if hand 1 exists let it play first
+      // Hand 0 wins with BJ; if hand 2 exists let it play first — don't reveal hole yet
       if(_deal2){
-        sfx('bj'); showBJ();
+        sfx('bj'); showBJ(); renderAll();
         notif('Hand 1: BLACKJACK! Now play Hand 2');
         setTimeout(_advanceToHand2AfterBJ, 600);
         return;
       }
       // Single hand — resolve immediately (with stamped boost if applicable)
+      revealHole(); renderAll();
       setActions(false);
       if(G.stampedOn){
         msg('BLACKJACK! BOOST YOUR BET','bj'); sfx('bj');
@@ -4422,9 +4420,9 @@ function deal(){
     msg('DEALER BLACKJACK','lose');renderAll();setTimeout(()=>settle('dealer_bj'),500);return;
   }
   if(isBJ(G.hands[0])){
-    // Hand 0 BJ — if second hand is live, let it play before settling
+    // Hand 0 BJ — if second hand is live, let it play before settling — don't reveal hole yet
     if(_deal2){
-      sfx('bj'); showBJ(); revealHole(); renderAll();
+      sfx('bj'); showBJ(); renderAll();
       evaluateEarlySideBets();
       notif('Hand 1: BLACKJACK! Now play Hand 2');
       setTimeout(_advanceToHand2AfterBJ, 600);
@@ -4464,10 +4462,12 @@ function getLevMult(handIdx){
 function onBonusCard(bc, cardIndex, handIdx){
   // handIdx: 0 = hand 1 (default), 1 = hand 2
   const isHand2 = handIdx===1;
-  // Bonus card effects only valid on first two player cards (index 0 or 1)
-  // Jesters are always valid (they replace themselves)
+  // Bonus card effects only valid on first two player cards (index 0 or 1).
+  // Jesters always fire their own effect regardless of position.
+  // Initial deal replacements for jesters pass cardIndex=1 (always valid).
+  // Hit/dbl replacements pass the actual position (2+ = invalid for non-jester bonuses).
   const effectValid = (cardIndex===undefined || cardIndex<=1 || bc.jester);
-  if(!effectValid){ return; } // silently ignore — no toast for cards drawn after 2nd
+  if(!effectValid){ return; } // silently ignore bonus cards drawn after the 2nd card (during play)
   // For hand 2: instant payouts (scarface, ice) credit normally; 
   // hand-state flags (stampedOn etc.) — arrowCounts is per-hand so effects stay scoped correctly
   // Note: stamped only works on hand 1 (can't boost hand 2 mid-deal)
@@ -4553,10 +4553,29 @@ function bonusToast(bc,extra){
 }
 
 // ── PLAYER ACTIONS ──────────────────────────────────────────────
+
+// Draw a card into hand h; if it's a jester, trigger its effect and draw another replacement.
+// bonusCardIndex: the position index for effectValid checking in onBonusCard.
+// For initial deal replacements, pass 1 (always valid). For hit/dbl, pass the actual index (2+ = not valid for non-jester bonuses).
+function drawIntoHand(h, bonusCardIndex, handIdx){
+  const c = draw(); h.push(c);
+  if(c.bonus){
+    onBonusCard(c.bonus, bonusCardIndex, handIdx);
+    if(c.bonus.jester){
+      sfx('card');
+      // Jester occupies a slot but has no value — draw a replacement.
+      // Pass same bonusCardIndex so the replacement inherits the same validity context.
+      return drawIntoHand(h, bonusCardIndex, handIdx);
+    }
+  }
+  return c;
+}
+
 function hit(){
   if(G.phase!=='play')return;
   sfx('card');
-  const h=G.hands[G.cur]; const c=draw(); h.push(c);
+  const h=G.hands[G.cur];
+  const hitIdx=h.length; // index this new card will occupy (before push)
   const _stampedActive = G.cur===1 ? G.stampedOn2 : G.stampedOn;
   if(_stampedActive){
     if(G.cur===1){ G.stampedCardsViewed2++; } else { G.stampedCardsViewed++; }
@@ -4568,12 +4587,8 @@ function hit(){
       if(G.cur===1){ G.stampedOn2=false; } else { G.stampedOn=false; }
     }
   }
-  if(c.bonus){
-    const hitIdx=h.length-1;
-    onBonusCard(c.bonus, hitIdx, G.cur);
-    // Jester: stays in hand as 0-value card, effect already triggered above.
-    // No replacement drawn — fall through to normal renderAll/score check below.
-  }
+  // Draw card — jester replacements are drawn automatically with same bonus validity
+  drawIntoHand(h, hitIdx, G.cur);
   renderAll();
   const v=hv(h);
   if(v===22&&G.puOwned.has('net')){ G.safetyTrigger=true; notif('SAFETY NET — PUSH'); advOrEnd('safety');return; }
@@ -4626,9 +4641,9 @@ function dbl(){
     if(G.balance<G.mainBet){notif('Not enough balance');return;}
     G.balance-=G.mainBet; G.mainBet*=2; updateUI(); updateBetPanel();
   }
-  const c=draw(); h.push(c);
-  if(c.bonus) onBonusCard(c.bonus, h.length-1);
-  // Jester stays as a 0-value card — no replacement, just fall through
+  const dblIdx=h.length; // index of the double-down card before push
+  drawIntoHand(h, dblIdx, G.cur);
+  // Jester replacement handled inside drawIntoHand — no need for manual check
   renderAll(); advOrEnd();
 }
 
@@ -4715,6 +4730,7 @@ function advOrEnd(reason){
 function dealerPlay(){
   G.phase='dealer';
   setActions(false);
+  revealHole(); // always reveal hole card when dealer's turn starts
   msg('DEALER DRAWING…','dealer-drawing');
   // Fully re-render dealer cards (all face-up) before the phase lock skips renderAll
   const _dc=document.getElementById('dealer-cards');
@@ -5364,11 +5380,13 @@ function setActions(playing){
     const el=document.getElementById(id);
     if(el) el.disabled=!playing;
   });
-  // Double-down only allowed on initial 2-card hand
+  // Double-down only allowed on initial 2-card hand — OR when arrow card grants a free double
   const dblEl=document.getElementById('btn-double');
   if(dblEl&&playing){
     const curHand=G.hands&&G.hands[G.cur];
-    dblEl.disabled=(curHand&&curHand.length!==2);
+    const _hasArrow=(G.arrowCounts&&G.arrowCounts[G.cur||0])||0;
+    // Arrow card overrides the 2-card restriction (free double from bonus card)
+    dblEl.disabled=(curHand&&curHand.length!==2)&&!_hasArrow;
   }
   // Split: only show when a valid split is available
   const splitEl=document.getElementById('btn-split');
