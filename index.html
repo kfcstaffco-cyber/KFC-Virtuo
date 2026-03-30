@@ -2664,6 +2664,35 @@ function initAudio(){
   SFX.button  = tone(480,0.05,'sine',0.1);
   SFX.notif   = tone(700,0.07,'sine',0.12);
   SFX.shuffle = ()=>{ for(let i=0;i<8;i++) setTimeout(()=>noise(0.03,0.06)(),i*60); };
+  // ── DEALER BLACKJACK: ominous descending tones + low drone ──
+  SFX.dealer_bj = ()=>{ ctx.resume().then(()=>{ try{
+    const t=ctx.currentTime;
+    // Low ominous drone
+    const drone=ctx.createOscillator(); drone.type='sawtooth'; drone.frequency.value=55;
+    const droneG=ctx.createGain(); droneG.gain.setValueAtTime(0,t);
+    droneG.gain.linearRampToValueAtTime(0.18,t+0.05);
+    droneG.gain.exponentialRampToValueAtTime(0.001,t+1.2);
+    const droneLpf=ctx.createBiquadFilter(); droneLpf.type='lowpass'; droneLpf.frequency.value=300;
+    drone.connect(droneLpf); droneLpf.connect(droneG); droneG.connect(ctx.destination);
+    drone.start(t); drone.stop(t+1.25);
+    // Descending arpeggio: A G F E (falling, tense)
+    [440,392,349,330].forEach((f,i)=>{
+      setTimeout(()=>{
+        const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=f;
+        const g=ctx.createGain(); g.gain.setValueAtTime(0,ctx.currentTime);
+        g.gain.linearRampToValueAtTime(0.15,ctx.currentTime+0.01);
+        g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.28);
+        o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime); o.stop(ctx.currentTime+0.3);
+      }, i*130);
+    });
+    // Final low thud
+    setTimeout(()=>{
+      const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=110;
+      const g=ctx.createGain(); g.gain.setValueAtTime(0.22,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.55);
+      o.connect(g); g.connect(ctx.destination); o.start(ctx.currentTime); o.stop(ctx.currentTime+0.6);
+    }, 560);
+  }catch(e){}});};
   G._audioReady=true;
 }
 function sfx(name){ if(!G._audioReady){try{initAudio();}catch(e){}} if(SFX[name]) SFX[name](); }
@@ -3064,7 +3093,7 @@ function _afterInsurance(){
     revealHole(); renderAll();
     if(G.puOwned.has('guard')){notif('BJ GUARD — PUSH');setTimeout(()=>settle('push_guard'),500);return;}
     if(isBJ(G.hands[0])){msg('PUSH — BOTH BLACKJACK','push');setTimeout(()=>settle('push_player_bj'),500);return;}
-    msg('DEALER BLACKJACK','lose');setTimeout(()=>settle('dealer_bj'),500);return;
+    sfx('dealer_bj'); msg('DEALER BLACKJACK','lose');setTimeout(()=>settle('dealer_bj'),500);return;
   }
   // Dealer does not have BJ — insurance lost (already deducted), continue play
   if(G.insuranceBet>0) notif('No dealer blackjack — insurance lost');
@@ -3396,6 +3425,8 @@ window.addEventListener('beforeunload', (e)=>{
   // Only act when mid-session (hand has been dealt, not cashed out, not at cashout screen)
   if(G.player && !G.cashedOut && !G._atCashout && G._sessionActive){
     saveSession(); // persist session so it can be restored on return
+    // Fire-and-forget beacon sync to Google Sheets so data isn't lost if they don't return
+    _beaconSync();
     e.preventDefault(); // trigger browser leave confirmation
     e.returnValue = ''; // required for Chrome
   }
@@ -3405,8 +3436,37 @@ window.addEventListener('beforeunload', (e)=>{
 window.addEventListener('pagehide', ()=>{
   if(G.player && !G.cashedOut && !G._atCashout && G._sessionActive){
     saveSession();
+    _beaconSync();
   }
 });
+
+// Send a best-effort sync beacon when the player leaves without cashing out.
+// Uses navigator.sendBeacon which is guaranteed to complete even as the page unloads.
+function _beaconSync(){
+  if(!G.url || !G.username || !G._cachedPin || !G.balance) return;
+  try{
+    const params = new URLSearchParams({
+      action: 'updatebalance',
+      username: G.username,
+      player: G.player,
+      balance: String(G.balance),
+      sessionPL: String(G.balance - (G.sessionStart||G.balance)),
+      buyIn: String(G.sessionStart||G.balance),
+      date: new Date().toISOString(),
+      stake: G.s ? G.s.label : '',
+      pin: G._cachedPin || ''
+    });
+    // sendBeacon sends a POST — Apps Script reads e.parameter from either GET or POST
+    const blob = new Blob([params.toString()], {type:'application/x-www-form-urlencoded'});
+    navigator.sendBeacon(G.url, blob);
+    // Also mark session as needsSync=false since we just fired the beacon
+    try{
+      const s=JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
+      s.needsSync=false;
+      localStorage.setItem(SESSION_KEY,JSON.stringify(s));
+    }catch(e){}
+  }catch(e){ /* sendBeacon not supported — silent fail, needsSync flag will handle it on return */ }
+}
 
 // Back-button trap: push a dummy history entry so back button triggers popstate
 // instead of leaving the page
@@ -4417,7 +4477,7 @@ function deal(){
     revealHole();
     if(G.puOwned.has('guard')){notif('BJ GUARD — PUSH');renderAll();setTimeout(()=>settle('push_guard'),500);return;}
     if(isBJ(G.hands[0])){msg('PUSH — BOTH BLACKJACK','push');renderAll();setTimeout(()=>settle('push_player_bj'),500);return;}
-    msg('DEALER BLACKJACK','lose');renderAll();setTimeout(()=>settle('dealer_bj'),500);return;
+    sfx('dealer_bj'); msg('DEALER BLACKJACK','lose');renderAll();setTimeout(()=>settle('dealer_bj'),500);return;
   }
   if(isBJ(G.hands[0])){
     // Hand 0 BJ — if second hand is live, let it play before settling — don't reveal hole yet
@@ -4753,7 +4813,7 @@ function dealerPlay(){
   }
   renderAll();
   if(isBJ(G.dealer)){
-    msg('DEALER BLACKJACK','lose');
+    sfx('dealer_bj'); msg('DEALER BLACKJACK','lose');
     setTimeout(()=>settle('dealer_bj'), 900);
     return;
   }
