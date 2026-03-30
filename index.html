@@ -136,6 +136,14 @@ select option { background: var(--bg2); }
   position: absolute; left: 50%; transform: translateX(-50%);
 }
 .tb-logo { font-size: 11px; letter-spacing: 5px; color: var(--gold); font-weight: 700; text-transform: uppercase; }
+/* Music track selector buttons */
+.music-track-btn {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--muted2); padding: 6px 10px; border-radius: 2px; cursor: pointer;
+  border: 1px solid transparent; transition: all .15s;
+}
+.music-track-btn:hover { color: var(--white); border-color: var(--line2); background: rgba(255,255,255,.04); }
+.music-track-btn.active { color: var(--gold-hi); border-color: rgba(201,168,76,.35); background: rgba(201,168,76,.07); }
 .tb-center { display: flex; align-items: center; gap: 20px; pointer-events: none; }
 .tb-center > * { pointer-events: auto; }
 .tb-player { font-size: 13px; font-weight: 700; color: var(--white); }
@@ -1667,6 +1675,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
       <div class="badge" id="tb-stake">LOW</div>
     </div>
     <div class="tb-right">
+      <button class="btn-ghost" id="btn-music" onclick="toggleMusicPanel()" style="font-size:13px;padding:6px 10px;letter-spacing:1px;position:relative" title="Music">♪</button>
       <button class="btn-ghost" id="sidebar-toggle" onclick="toggleSidebar()" style="font-size:11px;padding:6px 10px;letter-spacing:1px" title="Toggle sidebar">⊞</button>
       <div class="badge" id="sync-badge">LOCAL</div>
       <button class="btn-ghost" onclick="showTopUp()" style="border-color:rgba(63,185,80,0.4);color:var(--green)" id="btn-topup">Top Up</button>
@@ -1675,6 +1684,35 @@ body.hand2-active #chip-strip .chip { position: relative; }
   </div>
 
 
+
+  </div>
+
+  <!-- MUSIC PANEL -->
+  <div id="music-panel" style="display:none;position:fixed;top:64px;right:16px;z-index:300;background:var(--bg2);border:1px solid var(--line2);border-radius:4px;padding:16px;width:220px;box-shadow:0 8px 32px rgba(0,0,0,0.6)">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+      <span style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase">Music</span>
+      <button onclick="toggleMusicMute()" id="music-mute-btn" style="background:none;border:none;color:var(--muted2);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:2px;transition:color .15s" title="Mute">🔊</button>
+    </div>
+    <!-- Track list -->
+    <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:14px" id="music-track-list">
+      <div class="music-track-btn active" onclick="selectTrack(0)">Casino Lounge Jazz</div>
+      <div class="music-track-btn" onclick="selectTrack(1)">Neon Vegas Ambient</div>
+      <div class="music-track-btn" onclick="selectTrack(2)">Cinematic High-Stakes</div>
+      <div class="music-track-btn" onclick="selectTrack(3)">Retro Arcade Casino</div>
+      <div class="music-track-btn" onclick="selectTrack(4)">Deep House Casino</div>
+      <div class="music-track-btn" onclick="selectTrack(5)">None</div>
+    </div>
+    <!-- Volume -->
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;flex-shrink:0">VOL</span>
+      <input type="range" id="music-volume" min="0" max="100" value="30"
+        oninput="setMusicVolume(this.value)"
+        style="flex:1;accent-color:var(--gold);height:3px;cursor:pointer">
+      <span id="music-vol-label" style="font-family:var(--mono);font-size:9px;color:var(--muted);width:26px;text-align:right">30%</span>
+    </div>
+    <!-- Now playing -->
+    <div id="music-now-playing" style="margin-top:10px;font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;text-align:center;min-height:12px"></div>
+  </div>
 
   <!-- MAIN -->
   <div id="main">
@@ -2696,6 +2734,342 @@ function initAudio(){
   G._audioReady=true;
 }
 function sfx(name){ if(!G._audioReady){try{initAudio();}catch(e){}} if(SFX[name]) SFX[name](); }
+
+// ══════════════════════════════════════════════════════════
+// BACKGROUND MUSIC ENGINE
+// ══════════════════════════════════════════════════════════
+const MUSIC = {
+  ctx: null, gainNode: null, nodes: [], currentTrack: -1,
+  muted: false, volume: 0.30, loopTimer: null
+};
+
+function _musicCtx(){
+  if(!MUSIC.ctx){ MUSIC.ctx=new(window.AudioContext||window.webkitAudioContext)(); }
+  if(MUSIC.ctx.state==='suspended') MUSIC.ctx.resume();
+  if(!MUSIC.gainNode){
+    MUSIC.gainNode=MUSIC.ctx.createGain();
+    MUSIC.gainNode.gain.value=MUSIC.muted?0:MUSIC.volume;
+    MUSIC.gainNode.connect(MUSIC.ctx.destination);
+  }
+  return MUSIC.ctx;
+}
+
+function _stopMusic(){
+  clearTimeout(MUSIC.loopTimer);
+  MUSIC.nodes.forEach(n=>{ try{n.stop();}catch(e){} });
+  MUSIC.nodes=[];
+}
+
+// Each track builder returns a duration in seconds and starts nodes into MUSIC.gainNode
+const MUSIC_TRACKS = [
+  // 0 — Casino Lounge Jazz
+  function jazzTrack(ctx, out){
+    const bpm=88, beat=60/bpm, bar=beat*4, bars=8, dur=bar*bars;
+    const t=ctx.currentTime+0.05;
+    const notes={ bass:[0,7,5,3,5,7,0,12], chord1:[60,64,67,71], chord2:[60,63,67,70], walk:[36,38,40,41,43,45,47,48] };
+    // Walking bass
+    for(let b=0;b<bars*4;b++){
+      const freq=220*Math.pow(2,(notes.walk[b%8]-48)/12);
+      const bt=t+b*beat;
+      const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=freq;
+      const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.28,bt+0.02);
+      g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.85);
+      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
+    }
+    // Piano chord stabs (beats 2 and 4)
+    const chordFreqs=[[261,330,392,494],[261,311,392,466]];
+    for(let bar2=0;bar2<bars;bar2++){
+      [1,3].forEach((beatPos,ci)=>{
+        const bt=t+bar2*bar*1+beatPos*beat;
+        chordFreqs[ci%2].forEach(f=>{
+          const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=f;
+          const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.055,bt+0.01);
+          g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.7);
+          o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
+        });
+      });
+    }
+    // Hi-hat brush (every beat)
+    for(let b=0;b<bars*4;b++){
+      const bt=t+b*beat;
+      const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.04),ctx.sampleRate);
+      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length);
+      const s=ctx.createBufferSource(); s.buffer=buf;
+      const hpf=ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=7000;
+      const g=ctx.createGain(); g.gain.value=b%2===0?0.07:0.04;
+      s.connect(hpf); hpf.connect(g); g.connect(out); s.start(bt); MUSIC.nodes.push(s);
+    }
+    // Melody (simple jazz phrase)
+    const mel=[0,2,4,7,9,7,4,2, 0,4,7,9,12,9,7,4, 3,5,7,10,12,10,7,5, 0,2,4,7,9,7,4,0];
+    mel.forEach((semi,i)=>{
+      const freq=329.63*Math.pow(2,semi/12);
+      const bt=t+i*beat*0.5;
+      const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=freq;
+      const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.09,bt+0.03);
+      g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.4+0.1);
+      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat*0.5); MUSIC.nodes.push(o);
+    });
+    return dur;
+  },
+
+  // 1 — Neon Vegas Ambient
+  function neonTrack(ctx, out){
+    const dur=12;
+    const t=ctx.currentTime+0.05;
+    // Deep sub pulse
+    [0,3,6,9].forEach((bi)=>{
+      const bt=t+bi*3;
+      const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=55;
+      const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.25,bt+0.08);
+      g.gain.exponentialRampToValueAtTime(0.001,bt+2.5);
+      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+3); MUSIC.nodes.push(o);
+    });
+    // Shimmering synth pad (chord layers)
+    [[110,138.6,165],[138.6,165,220],[165,220,277.2]].forEach((freqs,pi)=>{
+      freqs.forEach(f=>{
+        const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+        const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=600+pi*200;
+        const g=ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.04,t+1.5);
+        g.gain.setValueAtTime(0.04,t+dur-1.5); g.gain.linearRampToValueAtTime(0,t+dur);
+        o.connect(lpf); lpf.connect(g); g.connect(out); o.start(t); o.stop(t+dur); MUSIC.nodes.push(o);
+      });
+    });
+    // Arpeggio melody
+    const arp=[220,277.2,329.6,440,369.99,329.6,277.2,220];
+    arp.forEach((f,i)=>{
+      for(let rep=0;rep<3;rep++){
+        const bt=t+i*0.38+rep*3.04;
+        if(bt>t+dur) return;
+        const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=f;
+        const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.06,bt+0.02);
+        g.gain.exponentialRampToValueAtTime(0.001,bt+0.3);
+        o.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.32); MUSIC.nodes.push(o);
+      }
+    });
+    return dur;
+  },
+
+  // 2 — Cinematic High-Stakes
+  function cinematicTrack(ctx, out){
+    const dur=16;
+    const t=ctx.currentTime+0.05;
+    // Low strings ostinato
+    const ostFreqs=[73.4,82.4,73.4,69.3,73.4,82.4,92.5,82.4];
+    ostFreqs.forEach((f,i)=>{
+      for(let rep=0;rep<4;rep++){
+        const bt=t+i*0.5+rep*4;
+        if(bt>t+dur) return;
+        const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+        const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=350;
+        const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.12,bt+0.06);
+        g.gain.exponentialRampToValueAtTime(0.001,bt+0.45);
+        o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.5); MUSIC.nodes.push(o);
+      }
+    });
+    // Brass swells
+    [[110,138.6],[146.8,185],[123.5,155.6]].forEach(([f1,f2],bi)=>{
+      const bt=t+bi*5.3;
+      [f1,f2].forEach(f=>{
+        const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+        const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=800;
+        const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.1,bt+0.4);
+        g.gain.setValueAtTime(0.1,bt+2.5); g.gain.linearRampToValueAtTime(0,bt+3.5);
+        o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+4); MUSIC.nodes.push(o);
+      });
+    });
+    // Ticking percussion
+    for(let i=0;i<dur*2;i++){
+      const bt=t+i*0.5;
+      const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.025),ctx.sampleRate);
+      const d=buf.getChannelData(0); for(let j=0;j<d.length;j++) d[j]=(Math.random()*2-1)*(1-j/d.length);
+      const s=ctx.createBufferSource(); s.buffer=buf;
+      const bpf=ctx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=1200;
+      const g=ctx.createGain(); g.gain.value=i%4===0?0.14:0.06;
+      s.connect(bpf); bpf.connect(g); g.connect(out); s.start(bt); MUSIC.nodes.push(s);
+    }
+    return dur;
+  },
+
+  // 3 — Retro Arcade Casino
+  function arcadeTrack(ctx, out){
+    const bpm=140, beat=60/bpm, dur=beat*32;
+    const t=ctx.currentTime+0.05;
+    // Melody in C major pentatonic
+    const mel=[0,2,4,7,9,12,9,7, 4,7,9,12,14,12,9,7, 0,4,7,9,7,4,2,0, 5,7,9,12,9,7,5,4];
+    mel.forEach((semi,i)=>{
+      const f=523.25*Math.pow(2,semi/12);
+      const bt=t+i*beat;
+      const o=ctx.createOscillator(); o.type='square'; o.frequency.value=f;
+      const g=ctx.createGain(); g.gain.setValueAtTime(0.1,bt); g.gain.setValueAtTime(0.001,bt+beat*0.75);
+      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
+    });
+    // Bass line
+    const bass=[0,0,7,7,5,5,3,3, 0,0,7,7,5,5,3,0, 0,0,5,5,3,3,2,2, 5,5,3,3,2,2,0,0];
+    bass.forEach((semi,i)=>{
+      const f=130.81*Math.pow(2,semi/12);
+      const bt=t+i*beat;
+      const o=ctx.createOscillator(); o.type='square'; o.frequency.value=f;
+      const g=ctx.createGain(); g.gain.setValueAtTime(0.08,bt); g.gain.setValueAtTime(0.001,bt+beat*0.8);
+      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
+    });
+    // Kick drum
+    for(let i=0;i<32;i+=4){
+      const bt=t+i*beat;
+      const o=ctx.createOscillator(); o.frequency.setValueAtTime(160,bt); o.frequency.exponentialRampToValueAtTime(40,bt+0.08);
+      const g=ctx.createGain(); g.gain.setValueAtTime(0.3,bt); g.gain.exponentialRampToValueAtTime(0.001,bt+0.12);
+      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.14); MUSIC.nodes.push(o);
+    }
+    // Snare
+    for(let i=2;i<32;i+=4){
+      const bt=t+i*beat;
+      const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.1),ctx.sampleRate);
+      const d=buf.getChannelData(0); for(let j=0;j<d.length;j++) d[j]=(Math.random()*2-1)*(1-j/d.length);
+      const s=ctx.createBufferSource(); s.buffer=buf;
+      const g=ctx.createGain(); g.gain.value=0.15;
+      s.connect(g); g.connect(out); s.start(bt); MUSIC.nodes.push(s);
+    }
+    return dur;
+  },
+
+  // 4 — Deep House Casino
+  function houseTrack(ctx, out){
+    const bpm=122, beat=60/bpm, bar=beat*4, bars=8, dur=bar*bars;
+    const t=ctx.currentTime+0.05;
+    // Four-on-floor kick
+    for(let b=0;b<bars*4;b++){
+      const bt=t+b*beat;
+      const o=ctx.createOscillator(); o.frequency.setValueAtTime(120,bt); o.frequency.exponentialRampToValueAtTime(45,bt+0.1);
+      const g=ctx.createGain(); g.gain.setValueAtTime(0.4,bt); g.gain.exponentialRampToValueAtTime(0.001,bt+0.18);
+      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.2); MUSIC.nodes.push(o);
+    }
+    // Off-beat hi-hats
+    for(let b=0;b<bars*4;b++){
+      const bt=t+b*beat+beat*0.5;
+      const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.05),ctx.sampleRate);
+      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length);
+      const s=ctx.createBufferSource(); s.buffer=buf;
+      const hpf=ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=9000;
+      const g=ctx.createGain(); g.gain.value=0.06;
+      s.connect(hpf); hpf.connect(g); g.connect(out); s.start(bt); MUSIC.nodes.push(s);
+    }
+    // Bass groove
+    const bassLine=[0,0,3,0, 5,0,3,5, 0,0,3,0, 7,5,3,0,
+                    0,0,3,0, 5,0,3,5, 0,3,5,7, 5,3,0,5];
+    bassLine.forEach((semi,i)=>{
+      const f=55*Math.pow(2,semi/12);
+      const bt=t+i*beat*0.5;
+      const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+      const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=400;
+      const g=ctx.createGain(); g.gain.setValueAtTime(0.22,bt); g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.45);
+      o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat*0.5); MUSIC.nodes.push(o);
+    });
+    // Chord stabs (every 2 beats)
+    const chords=[[220,277.2,330],[246.9,311.1,370],[196,246.9,293.7],[220,277.2,349.2]];
+    for(let b=0;b<bars*2;b++){
+      const bt=t+b*beat*2;
+      chords[b%4].forEach(f=>{
+        const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+        const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=1200;
+        const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.055,bt+0.02);
+        g.gain.exponentialRampToValueAtTime(0.001,bt+0.35);
+        o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.4); MUSIC.nodes.push(o);
+      });
+    }
+    // Lead melody
+    const lead=[0,3,5,7,10,7,5,3, 0,5,7,10,12,10,7,5];
+    lead.forEach((semi,i)=>{
+      const f=440*Math.pow(2,semi/12);
+      const bt=t+i*beat;
+      const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=f;
+      const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.07,bt+0.03);
+      g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.85);
+      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
+    });
+    return dur;
+  }
+];
+
+const TRACK_NAMES=['Casino Lounge Jazz','Neon Vegas Ambient','Cinematic High-Stakes','Retro Arcade Casino','Deep House Casino'];
+
+function selectTrack(idx){
+  // Update active state in UI
+  document.querySelectorAll('.music-track-btn').forEach((el,i)=>{
+    el.classList.toggle('active', i===idx);
+  });
+  if(idx===5){ // None
+    _stopMusic();
+    MUSIC.currentTrack=-1;
+    const np=document.getElementById('music-now-playing');
+    if(np) np.textContent='';
+    const btn=document.getElementById('btn-music');
+    if(btn) btn.style.color='';
+    return;
+  }
+  MUSIC.currentTrack=idx;
+  _playTrack(idx);
+  const np=document.getElementById('music-now-playing');
+  if(np) np.textContent='▶ '+TRACK_NAMES[idx];
+  const btn=document.getElementById('btn-music');
+  if(btn){ btn.style.color=MUSIC.muted?'var(--muted)':'var(--gold-hi)'; }
+}
+
+function _playTrack(idx){
+  _stopMusic();
+  if(idx<0||idx>4) return;
+  try{
+    const ctx=_musicCtx();
+    const dur=MUSIC_TRACKS[idx](ctx, MUSIC.gainNode);
+    // Schedule seamless loop
+    const scheduleLoop=()=>{
+      MUSIC.loopTimer=setTimeout(()=>{
+        if(MUSIC.currentTrack===idx){
+          _stopMusic();
+          MUSIC_TRACKS[idx](ctx, MUSIC.gainNode);
+          scheduleLoop();
+        }
+      }, (dur-0.05)*1000);
+    };
+    scheduleLoop();
+  }catch(e){ console.warn('Music error:',e); }
+}
+
+function toggleMusicPanel(){
+  const panel=document.getElementById('music-panel');
+  if(!panel) return;
+  const visible=panel.style.display!=='none';
+  panel.style.display=visible?'none':'block';
+  // Start default track on first open
+  if(!visible && MUSIC.currentTrack===-1){
+    selectTrack(0);
+  }
+}
+
+function toggleMusicMute(){
+  MUSIC.muted=!MUSIC.muted;
+  if(MUSIC.gainNode) MUSIC.gainNode.gain.value=MUSIC.muted?0:MUSIC.volume;
+  const btn=document.getElementById('music-mute-btn');
+  if(btn) btn.textContent=MUSIC.muted?'🔇':'🔊';
+  const mbtn=document.getElementById('btn-music');
+  if(mbtn) mbtn.style.color=MUSIC.muted?'var(--muted)':(MUSIC.currentTrack>=0?'var(--gold-hi)':'');
+}
+
+function setMusicVolume(val){
+  MUSIC.volume=val/100;
+  if(MUSIC.gainNode && !MUSIC.muted) MUSIC.gainNode.gain.value=MUSIC.volume;
+  const lbl=document.getElementById('music-vol-label');
+  if(lbl) lbl.textContent=val+'%';
+}
+
+// Close music panel when clicking outside
+document.addEventListener('click',(e)=>{
+  const panel=document.getElementById('music-panel');
+  const btn=document.getElementById('btn-music');
+  if(panel&&btn&&panel.style.display!=='none'){
+    if(!panel.contains(e.target)&&!btn.contains(e.target)){
+      panel.style.display='none';
+    }
+  }
+});
 
 
 let _pendingLogin = null;
