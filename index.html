@@ -2731,6 +2731,53 @@ function initAudio(){
 }
 function sfx(name){ if(!G._audioReady){try{initAudio();}catch(e){}} if(SFX[name]) SFX[name](); }
 
+// Welcome sound — S6 variant B: descend → sweep → muffled deep bell
+function playWelcomeSound(){
+  try{
+    if(!G._audioReady) initAudio();
+    const ctx2=ctx; // use the shared audio context
+    ctx2.resume().then(()=>{
+      const t=ctx2.currentTime+0.02;
+      function mfw(m){return 440*Math.pow(2,(m-69)/12);}
+
+      // Phase 1: descending tone (door opening)
+      const od=ctx2.createOscillator(); od.type='sine';
+      od.frequency.setValueAtTime(mfw(72),t); od.frequency.exponentialRampToValueAtTime(mfw(52),t+0.28);
+      const gd=ctx2.createGain(); gd.gain.setValueAtTime(0,t); gd.gain.linearRampToValueAtTime(0.10,t+0.04);
+      gd.gain.exponentialRampToValueAtTime(0.0001,t+0.30);
+      od.connect(gd); gd.connect(ctx2.destination); od.start(t); od.stop(t+0.32);
+
+      // Phase 2: rising sweep
+      const or2=ctx2.createOscillator(); or2.type='sine';
+      or2.frequency.setValueAtTime(mfw(52),t+0.25); or2.frequency.exponentialRampToValueAtTime(mfw(72),t+0.70);
+      const slpf=ctx2.createBiquadFilter(); slpf.type='lowpass';
+      slpf.frequency.setValueAtTime(mfw(52)*2,t+0.25); slpf.frequency.exponentialRampToValueAtTime(mfw(72)*3,t+0.70);
+      const gr=ctx2.createGain(); gr.gain.setValueAtTime(0,t+0.25); gr.gain.linearRampToValueAtTime(0.13,t+0.45);
+      gr.gain.exponentialRampToValueAtTime(0.0001,t+0.72);
+      or2.connect(slpf); slpf.connect(gr); gr.connect(ctx2.destination); or2.start(t+0.25); or2.stop(t+0.75);
+      // Noise shimmer on sweep
+      const sr=ctx2.sampleRate, buf=ctx2.createBuffer(1,Math.floor(sr*0.5),sr), d=buf.getChannelData(0);
+      for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length);
+      const ns=ctx2.createBufferSource(); ns.buffer=buf;
+      const nhpf=ctx2.createBiquadFilter(); nhpf.type='highpass'; nhpf.frequency.value=3000;
+      const ng=ctx2.createGain(); ng.gain.setValueAtTime(0,t+0.25); ng.gain.linearRampToValueAtTime(0.018,t+0.40);
+      ng.gain.exponentialRampToValueAtTime(0.0001,t+0.72);
+      ns.connect(nhpf); nhpf.connect(ng); ng.connect(ctx2.destination); ns.start(t+0.25);
+
+      // Phase 3: muffled deep bell (LPF 600Hz — variant B)
+      [[60,0.68,0.26],[67,0.78,0.18]].forEach(([midi,dt,vol])=>{
+        [[1,vol],[2,vol*0.28],[3,vol*0.10]].forEach(([h,v])=>{
+          const o=ctx2.createOscillator(); o.type='sine'; o.frequency.value=mfw(midi)*h;
+          const lpf=ctx2.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=600; lpf.Q.value=0.5;
+          const g=ctx2.createGain(); g.gain.setValueAtTime(0,t+dt); g.gain.linearRampToValueAtTime(v,t+dt+0.015);
+          g.gain.exponentialRampToValueAtTime(0.0001,t+dt+0.95-(h-1)*0.12);
+          o.connect(lpf); lpf.connect(g); g.connect(ctx2.destination); o.start(t+dt); o.stop(t+dt+1.0);
+        });
+      });
+    });
+  }catch(e){}
+}
+
 // ══════════════════════════════════════════════════════════
 // BACKGROUND MUSIC ENGINE  — seamless AudioContext looping
 // ══════════════════════════════════════════════════════════
@@ -4113,6 +4160,7 @@ function openApp(displayName, balance){
   setSyncBadge(G.url?'live':'', G.url?'LIVE':'LOCAL');
   if(!G.deck||G.deck.length===0) G.deck=buildShoe();
   msg('PLACE YOUR BET');
+  setTimeout(()=>playWelcomeSound(), 300); // slight delay so audio context is ready
   const db2=document.getElementById('btn-deal'); if(db2) db2.disabled=true;
   // Retry any previously failed sync in background
   if(G.url){ const q=getSyncQueue(); if(q){ setTimeout(async()=>{ try{ await attemptSync(q); clearSyncQueue(); setSyncBadge('live','LIVE'); notif('Pending sync completed'); }catch(e){} },2000); } }
