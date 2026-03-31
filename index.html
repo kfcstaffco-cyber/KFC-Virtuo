@@ -4333,22 +4333,23 @@ function chipNotchColor(v){
   return (idx>=0&&idx<notches.length)?notches[idx]:'#FFFFFF';
 }
 function makeChipSVG(v,lbl){
-  // v = numeric value, lbl = display string
   const col=chipColor(v);
   const notch=chipNotchColor(v);
-  // Light chips (grey, cream) need dark text; dark chips get white text
   const isLight=['#909090','#E8E2D4','#A8A8A8','#E8E0D0','#DDDDD0'].includes(col);
-  const textCol=isLight?'#222':'#FFF';
-  let n='';
-  for(let i=0;i<8;i++) n+=`<rect x="23" y="2" width="6" height="9" rx="2" fill="${notch}" opacity="0.92" transform="rotate(${i*45} 26 26)"/>`;
+  const textCol=isLight?'#222':'#111';
   const fs=lbl.length>4?6:lbl.length>3?7:lbl.length>2?9:11;
+  // A5 — Fine Detail: 12 slim notches, two nested dashed rings, small crisp white center
+  let n='';
+  for(let i=0;i<12;i++) n+=`<rect x="23.5" y="2" width="5" height="8.5" rx="2" fill="${notch}" opacity="0.85" transform="rotate(${i*30} 26 26)"/>`;
   return `<svg viewBox="0 0 52 52" width="52" height="52" xmlns="http://www.w3.org/2000/svg" style="display:block">
     <circle cx="26" cy="26" r="26" fill="${col}"/>
+    <circle cx="26" cy="26" r="26" fill="none" stroke="rgba(0,0,0,0.32)" stroke-width="1.2"/>
     ${n}
-    <circle cx="26" cy="26" r="16" fill="none" stroke="${notch}" stroke-width="1.2" stroke-dasharray="3 2.5" opacity="0.6"/>
-    <circle cx="26" cy="26" r="13" fill="white" opacity="0.93"/>
-    <circle cx="26" cy="26" r="25" fill="none" stroke="rgba(0,0,0,0.3)" stroke-width="1.5"/>
-    <text x="26" y="26" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-weight="900" font-size="${fs}" fill="#111">${lbl}</text>
+    <circle cx="26" cy="26" r="17" fill="none" stroke="${notch}" stroke-width="0.9" stroke-dasharray="3 2.2" opacity="0.55"/>
+    <circle cx="26" cy="26" r="13.5" fill="none" stroke="${notch}" stroke-width="0.7" stroke-dasharray="2 2" opacity="0.4"/>
+    <circle cx="26" cy="26" r="11" fill="white" opacity="0.93"/>
+    <circle cx="26" cy="26" r="11" fill="none" stroke="rgba(0,0,0,0.1)" stroke-width="0.6"/>
+    <text x="26" y="26" text-anchor="middle" dominant-baseline="central" font-family="monospace" font-weight="900" font-size="${fs}" fill="${textCol}">${lbl}</text>
   </svg>`;
 }
 function buildChips(){['chip-row','chip-strip'].forEach(rowId=>{const c=document.getElementById(rowId);if(!c)return;c.innerHTML='';G.s.chips.forEach(v=>{const lbl=v>=1e9?(v/1e9).toFixed(v%1e9===0?0:1)+'B':v>=1e6?(v/1e6).toFixed(v%1e6===0?0:1)+'M':v>=1e3?(v/1e3).toFixed(v%1e3===0?0:1)+'K':String(v);const col=chipColor(v);const btn=document.createElement('button');btn.className='chip '+col;btn.setAttribute('data-val',lbl);btn.innerHTML=makeChipSVG(v,lbl);btn.title=fmt(v)+' KFC';btn.onclick=()=>{
