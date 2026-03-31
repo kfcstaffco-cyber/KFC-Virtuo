@@ -1683,10 +1683,6 @@ body.hand2-active #chip-strip .chip { position: relative; }
     </div>
   </div>
 
-
-
-  </div>
-
   <!-- MUSIC PANEL -->
   <div id="music-panel" style="display:none;position:fixed;top:64px;right:16px;z-index:300;background:var(--bg2);border:1px solid var(--line2);border-radius:4px;padding:16px;width:220px;box-shadow:0 8px 32px rgba(0,0,0,0.6)">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
@@ -2736,11 +2732,12 @@ function initAudio(){
 function sfx(name){ if(!G._audioReady){try{initAudio();}catch(e){}} if(SFX[name]) SFX[name](); }
 
 // ══════════════════════════════════════════════════════════
-// BACKGROUND MUSIC ENGINE
+// BACKGROUND MUSIC ENGINE  — seamless AudioContext looping
 // ══════════════════════════════════════════════════════════
 const MUSIC = {
   ctx: null, gainNode: null, nodes: [], currentTrack: -1,
-  muted: false, volume: 0.30, loopTimer: null
+  muted: false, volume: 0.30, loopHandle: null,
+  _nextLoopAt: 0  // AudioContext time when next loop iteration starts
 };
 
 function _musicCtx(){
@@ -2755,254 +2752,417 @@ function _musicCtx(){
 }
 
 function _stopMusic(){
-  clearTimeout(MUSIC.loopTimer);
-  MUSIC.nodes.forEach(n=>{ try{n.stop();}catch(e){} });
+  if(MUSIC.loopHandle){ clearTimeout(MUSIC.loopHandle); MUSIC.loopHandle=null; }
+  MUSIC.nodes.forEach(n=>{ try{n.stop(0);}catch(e){} });
   MUSIC.nodes=[];
+  MUSIC._nextLoopAt=0;
 }
 
-// Each track builder returns a duration in seconds and starts nodes into MUSIC.gainNode
+// ── Helpers ───────────────────────────────────────────────
+// Schedule one node; registers it for cleanup
+function _n(node){ MUSIC.nodes.push(node); return node; }
+
+// Piano-style note: triangle + slight detuned copy for warmth
+function _piano(ctx,out,freq,t,dur,vol){
+  const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=freq;
+  const o2=ctx.createOscillator(); o2.type='triangle'; o2.frequency.value=freq*1.003;
+  const g=ctx.createGain();
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol,t+0.015);
+  g.gain.exponentialRampToValueAtTime(vol*0.4,t+0.08);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+  o.connect(g); o2.connect(g); g.connect(out);
+  o.start(t); o.stop(t+dur+0.02); _n(o);
+  o2.start(t); o2.stop(t+dur+0.02); _n(o2);
+}
+
+// Bass note: sawtooth through lowpass
+function _bass(ctx,out,freq,t,dur,vol){
+  const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=freq;
+  const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=280; lpf.Q.value=1.2;
+  const g=ctx.createGain();
+  g.gain.setValueAtTime(0,t);
+  g.gain.linearRampToValueAtTime(vol,t+0.018);
+  g.gain.exponentialRampToValueAtTime(0.0001,t+dur*0.88);
+  o.connect(lpf); lpf.connect(g); g.connect(out);
+  o.start(t); o.stop(t+dur); _n(o);
+}
+
+// Kick drum
+function _kick(ctx,out,t,vol=0.5){
+  const o=ctx.createOscillator();
+  o.frequency.setValueAtTime(180,t); o.frequency.exponentialRampToValueAtTime(38,t+0.09);
+  const g=ctx.createGain();
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.0001,t+0.18);
+  o.connect(g); g.connect(out); o.start(t); o.stop(t+0.2); _n(o);
+}
+
+// Snare / clap
+function _snare(ctx,out,t,vol=0.18){
+  const sr=ctx.sampleRate;
+  const buf=ctx.createBuffer(1,Math.floor(sr*0.12),sr);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,1.5);
+  const s=ctx.createBufferSource(); s.buffer=buf;
+  const hpf=ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=1800;
+  const g=ctx.createGain(); g.gain.value=vol;
+  s.connect(hpf); hpf.connect(g); g.connect(out); s.start(t); _n(s);
+  // Add pitched snap
+  const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=220;
+  const og=ctx.createGain(); og.gain.setValueAtTime(vol*0.4,t); og.gain.exponentialRampToValueAtTime(0.0001,t+0.05);
+  o.connect(og); og.connect(out); o.start(t); o.stop(t+0.06); _n(o);
+}
+
+// Hi-hat
+function _hat(ctx,out,t,vol=0.06,dur=0.04){
+  const sr=ctx.sampleRate;
+  const buf=ctx.createBuffer(1,Math.floor(sr*dur),sr);
+  const d=buf.getChannelData(0);
+  for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length);
+  const s=ctx.createBufferSource(); s.buffer=buf;
+  const hpf=ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=8000;
+  const g=ctx.createGain(); g.gain.value=vol;
+  s.connect(hpf); hpf.connect(g); g.connect(out); s.start(t); _n(s);
+}
+
+// MIDI note to frequency (A4=69=440)
+function _mf(midi){ return 440*Math.pow(2,(midi-69)/12); }
+
+// ── Track builders ────────────────────────────────────────
+// Each receives (ctx, out, startTime) and returns loop duration in seconds
+
 const MUSIC_TRACKS = [
-  // 0 — Casino Lounge Jazz
-  function jazzTrack(ctx, out){
-    const bpm=88, beat=60/bpm, bar=beat*4, bars=8, dur=bar*bars;
-    const t=ctx.currentTime+0.05;
-    const notes={ bass:[0,7,5,3,5,7,0,12], chord1:[60,64,67,71], chord2:[60,63,67,70], walk:[36,38,40,41,43,45,47,48] };
-    // Walking bass
-    for(let b=0;b<bars*4;b++){
-      const freq=220*Math.pow(2,(notes.walk[b%8]-48)/12);
-      const bt=t+b*beat;
-      const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=freq;
-      const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.28,bt+0.02);
-      g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.85);
-      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
-    }
-    // Piano chord stabs (beats 2 and 4)
-    const chordFreqs=[[261,330,392,494],[261,311,392,466]];
-    for(let bar2=0;bar2<bars;bar2++){
-      [1,3].forEach((beatPos,ci)=>{
-        const bt=t+bar2*bar*1+beatPos*beat;
-        chordFreqs[ci%2].forEach(f=>{
-          const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=f;
-          const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.055,bt+0.01);
-          g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.7);
-          o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
-        });
-      });
-    }
-    // Hi-hat brush (every beat)
-    for(let b=0;b<bars*4;b++){
-      const bt=t+b*beat;
-      const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.04),ctx.sampleRate);
-      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length);
-      const s=ctx.createBufferSource(); s.buffer=buf;
-      const hpf=ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=7000;
-      const g=ctx.createGain(); g.gain.value=b%2===0?0.07:0.04;
-      s.connect(hpf); hpf.connect(g); g.connect(out); s.start(bt); MUSIC.nodes.push(s);
-    }
-    // Melody (simple jazz phrase)
-    const mel=[0,2,4,7,9,7,4,2, 0,4,7,9,12,9,7,4, 3,5,7,10,12,10,7,5, 0,2,4,7,9,7,4,0];
-    mel.forEach((semi,i)=>{
-      const freq=329.63*Math.pow(2,semi/12);
-      const bt=t+i*beat*0.5;
-      const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=freq;
-      const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.09,bt+0.03);
-      g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.4+0.1);
-      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat*0.5); MUSIC.nodes.push(o);
-    });
-    return dur;
-  },
 
-  // 1 — Neon Vegas Ambient
-  function neonTrack(ctx, out){
-    const dur=12;
-    const t=ctx.currentTime+0.05;
-    // Deep sub pulse
-    [0,3,6,9].forEach((bi)=>{
-      const bt=t+bi*3;
-      const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=55;
-      const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.25,bt+0.08);
-      g.gain.exponentialRampToValueAtTime(0.001,bt+2.5);
-      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+3); MUSIC.nodes.push(o);
-    });
-    // Shimmering synth pad (chord layers)
-    [[110,138.6,165],[138.6,165,220],[165,220,277.2]].forEach((freqs,pi)=>{
-      freqs.forEach(f=>{
-        const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
-        const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=600+pi*200;
-        const g=ctx.createGain(); g.gain.setValueAtTime(0,t); g.gain.linearRampToValueAtTime(0.04,t+1.5);
-        g.gain.setValueAtTime(0.04,t+dur-1.5); g.gain.linearRampToValueAtTime(0,t+dur);
-        o.connect(lpf); lpf.connect(g); g.connect(out); o.start(t); o.stop(t+dur); MUSIC.nodes.push(o);
-      });
-    });
-    // Arpeggio melody
-    const arp=[220,277.2,329.6,440,369.99,329.6,277.2,220];
-    arp.forEach((f,i)=>{
-      for(let rep=0;rep<3;rep++){
-        const bt=t+i*0.38+rep*3.04;
-        if(bt>t+dur) return;
-        const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=f;
-        const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.06,bt+0.02);
-        g.gain.exponentialRampToValueAtTime(0.001,bt+0.3);
-        o.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.32); MUSIC.nodes.push(o);
-      }
-    });
-    return dur;
-  },
+// 0 — Casino Lounge Jazz  (88bpm, 8 bars = ~21.8s)
+function jazzTrack(ctx,out,t){
+  const bpm=88, beat=60/bpm, bar=beat*4, bars=8, dur=bar*bars;
 
-  // 2 — Cinematic High-Stakes
-  function cinematicTrack(ctx, out){
-    const dur=16;
-    const t=ctx.currentTime+0.05;
-    // Low strings ostinato
-    const ostFreqs=[73.4,82.4,73.4,69.3,73.4,82.4,92.5,82.4];
-    ostFreqs.forEach((f,i)=>{
-      for(let rep=0;rep<4;rep++){
-        const bt=t+i*0.5+rep*4;
-        if(bt>t+dur) return;
-        const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
-        const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=350;
-        const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.12,bt+0.06);
-        g.gain.exponentialRampToValueAtTime(0.001,bt+0.45);
-        o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.5); MUSIC.nodes.push(o);
-      }
-    });
-    // Brass swells
-    [[110,138.6],[146.8,185],[123.5,155.6]].forEach(([f1,f2],bi)=>{
-      const bt=t+bi*5.3;
-      [f1,f2].forEach(f=>{
-        const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
-        const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=800;
-        const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.1,bt+0.4);
-        g.gain.setValueAtTime(0.1,bt+2.5); g.gain.linearRampToValueAtTime(0,bt+3.5);
-        o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+4); MUSIC.nodes.push(o);
-      });
-    });
-    // Ticking percussion
-    for(let i=0;i<dur*2;i++){
-      const bt=t+i*0.5;
-      const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.025),ctx.sampleRate);
-      const d=buf.getChannelData(0); for(let j=0;j<d.length;j++) d[j]=(Math.random()*2-1)*(1-j/d.length);
-      const s=ctx.createBufferSource(); s.buffer=buf;
-      const bpf=ctx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=1200;
-      const g=ctx.createGain(); g.gain.value=i%4===0?0.14:0.06;
-      s.connect(bpf); bpf.connect(g); g.connect(out); s.start(bt); MUSIC.nodes.push(s);
-    }
-    return dur;
-  },
-
-  // 3 — Retro Arcade Casino
-  function arcadeTrack(ctx, out){
-    const bpm=140, beat=60/bpm, dur=beat*32;
-    const t=ctx.currentTime+0.05;
-    // Melody in C major pentatonic
-    const mel=[0,2,4,7,9,12,9,7, 4,7,9,12,14,12,9,7, 0,4,7,9,7,4,2,0, 5,7,9,12,9,7,5,4];
-    mel.forEach((semi,i)=>{
-      const f=523.25*Math.pow(2,semi/12);
-      const bt=t+i*beat;
-      const o=ctx.createOscillator(); o.type='square'; o.frequency.value=f;
-      const g=ctx.createGain(); g.gain.setValueAtTime(0.1,bt); g.gain.setValueAtTime(0.001,bt+beat*0.75);
-      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
-    });
-    // Bass line
-    const bass=[0,0,7,7,5,5,3,3, 0,0,7,7,5,5,3,0, 0,0,5,5,3,3,2,2, 5,5,3,3,2,2,0,0];
-    bass.forEach((semi,i)=>{
-      const f=130.81*Math.pow(2,semi/12);
-      const bt=t+i*beat;
-      const o=ctx.createOscillator(); o.type='square'; o.frequency.value=f;
-      const g=ctx.createGain(); g.gain.setValueAtTime(0.08,bt); g.gain.setValueAtTime(0.001,bt+beat*0.8);
-      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
-    });
-    // Kick drum
-    for(let i=0;i<32;i+=4){
-      const bt=t+i*beat;
-      const o=ctx.createOscillator(); o.frequency.setValueAtTime(160,bt); o.frequency.exponentialRampToValueAtTime(40,bt+0.08);
-      const g=ctx.createGain(); g.gain.setValueAtTime(0.3,bt); g.gain.exponentialRampToValueAtTime(0.001,bt+0.12);
-      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.14); MUSIC.nodes.push(o);
-    }
-    // Snare
-    for(let i=2;i<32;i+=4){
-      const bt=t+i*beat;
-      const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.1),ctx.sampleRate);
-      const d=buf.getChannelData(0); for(let j=0;j<d.length;j++) d[j]=(Math.random()*2-1)*(1-j/d.length);
-      const s=ctx.createBufferSource(); s.buffer=buf;
-      const g=ctx.createGain(); g.gain.value=0.15;
-      s.connect(g); g.connect(out); s.start(bt); MUSIC.nodes.push(s);
-    }
-    return dur;
-  },
-
-  // 4 — Deep House Casino
-  function houseTrack(ctx, out){
-    const bpm=122, beat=60/bpm, bar=beat*4, bars=8, dur=bar*bars;
-    const t=ctx.currentTime+0.05;
-    // Four-on-floor kick
-    for(let b=0;b<bars*4;b++){
-      const bt=t+b*beat;
-      const o=ctx.createOscillator(); o.frequency.setValueAtTime(120,bt); o.frequency.exponentialRampToValueAtTime(45,bt+0.1);
-      const g=ctx.createGain(); g.gain.setValueAtTime(0.4,bt); g.gain.exponentialRampToValueAtTime(0.001,bt+0.18);
-      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.2); MUSIC.nodes.push(o);
-    }
-    // Off-beat hi-hats
-    for(let b=0;b<bars*4;b++){
-      const bt=t+b*beat+beat*0.5;
-      const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.05),ctx.sampleRate);
-      const d=buf.getChannelData(0); for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*(1-i/d.length);
-      const s=ctx.createBufferSource(); s.buffer=buf;
-      const hpf=ctx.createBiquadFilter(); hpf.type='highpass'; hpf.frequency.value=9000;
-      const g=ctx.createGain(); g.gain.value=0.06;
-      s.connect(hpf); hpf.connect(g); g.connect(out); s.start(bt); MUSIC.nodes.push(s);
-    }
-    // Bass groove
-    const bassLine=[0,0,3,0, 5,0,3,5, 0,0,3,0, 7,5,3,0,
-                    0,0,3,0, 5,0,3,5, 0,3,5,7, 5,3,0,5];
-    bassLine.forEach((semi,i)=>{
-      const f=55*Math.pow(2,semi/12);
-      const bt=t+i*beat*0.5;
-      const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
-      const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=400;
-      const g=ctx.createGain(); g.gain.setValueAtTime(0.22,bt); g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.45);
-      o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat*0.5); MUSIC.nodes.push(o);
-    });
-    // Chord stabs (every 2 beats)
-    const chords=[[220,277.2,330],[246.9,311.1,370],[196,246.9,293.7],[220,277.2,349.2]];
-    for(let b=0;b<bars*2;b++){
-      const bt=t+b*beat*2;
-      chords[b%4].forEach(f=>{
-        const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
-        const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=1200;
-        const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.055,bt+0.02);
-        g.gain.exponentialRampToValueAtTime(0.001,bt+0.35);
-        o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.4); MUSIC.nodes.push(o);
-      });
-    }
-    // Lead melody
-    const lead=[0,3,5,7,10,7,5,3, 0,5,7,10,12,10,7,5];
-    lead.forEach((semi,i)=>{
-      const f=440*Math.pow(2,semi/12);
-      const bt=t+i*beat;
-      const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=f;
-      const g=ctx.createGain(); g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.07,bt+0.03);
-      g.gain.exponentialRampToValueAtTime(0.001,bt+beat*0.85);
-      o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat); MUSIC.nodes.push(o);
-    });
-    return dur;
+  // Walking bass: C D E F G A Bb C  (MIDI 48-60 region, two octaves)
+  const walkMidi=[48,50,52,53,55,57,58,60, 60,58,57,55,53,52,50,48,
+                  48,52,55,57,58,57,55,52, 48,53,55,57,60,57,55,53];
+  for(let b=0;b<bars*4;b++){
+    _bass(ctx,out,_mf(walkMidi[b%walkMidi.length]),t+b*beat,beat*0.9,0.32);
   }
-];
+
+  // Piano chords — comp on beats 2&4 of each bar
+  // Cmaj7, Am7, Dm7, G7 (4-bar progression, repeated)
+  const progMidi=[
+    [60,64,67,71], // Cmaj7
+    [57,60,64,67], // Am7
+    [62,65,69,72], // Dm7
+    [55,59,62,65], // G7
+  ];
+  for(let bar=0;bar<bars;bar++){
+    const chord=progMidi[bar%4];
+    [1,3].forEach(beatPos=>{
+      const bt=t+bar*4*beat+beatPos*beat;
+      chord.forEach(midi=>_piano(ctx,out,_mf(midi),bt,beat*0.65,0.045));
+    });
+  }
+
+  // Brush hi-hat: alternating downbeat/upbeat
+  for(let b=0;b<bars*4;b++){
+    _hat(ctx,out,t+b*beat, b%2===0?0.07:0.04, 0.05);
+    _hat(ctx,out,t+b*beat+beat*0.5, 0.03, 0.03); // eighth-note ghost
+  }
+
+  // Ride cymbal: dotted feel on beats 1,2,3,4 + triplet feel
+  for(let b=0;b<bars*4;b+=2){
+    _hat(ctx,out,t+b*beat,0.055,0.08);
+    _hat(ctx,out,t+b*beat+beat*0.67,0.035,0.06);
+    _hat(ctx,out,t+b*beat+beat,0.055,0.08);
+    _hat(ctx,out,t+b*beat+beat*1.67,0.035,0.06);
+  }
+
+  // Melody — sax-like sine, 2-bar phrase repeated
+  // C major scale: C D E F G A Bb  (jazz-ish)
+  const melMidi=[72,74,76,77,79,77,76,74, 72,76,79,81,79,77,76,72,
+                 77,79,81,82,81,79,77,74, 72,74,76,77,72,0,0,0];
+  melMidi.forEach((midi,i)=>{
+    if(!midi) return;
+    const bt=t+i*beat*0.5;
+    if(bt>=t+dur) return;
+    const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=_mf(midi);
+    const vib=ctx.createOscillator(); vib.frequency.value=5.5;
+    const vibGain=ctx.createGain(); vibGain.gain.value=2.5;
+    vib.connect(vibGain); vibGain.connect(o.frequency);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.09,bt+0.04);
+    g.gain.setValueAtTime(0.09,bt+beat*0.35); g.gain.exponentialRampToValueAtTime(0.0001,bt+beat*0.48);
+    o.connect(g); g.connect(out);
+    o.start(bt); vib.start(bt); o.stop(bt+beat*0.5); vib.stop(bt+beat*0.5);
+    _n(o); _n(vib);
+  });
+
+  return dur;
+},
+
+// 1 — Neon Vegas Ambient  (no BPM, 16s smooth loop)
+function neonTrack(ctx,out,t){
+  const dur=16;
+
+  // Sub bass pulse: one long tone, constant (no fade in/out at boundaries)
+  const sub=ctx.createOscillator(); sub.type='sine'; sub.frequency.value=55;
+  const subG=ctx.createGain(); subG.gain.value=0.22;
+  sub.connect(subG); subG.connect(out); sub.start(t); sub.stop(t+dur); _n(sub);
+
+  // Slow LFO tremolo on sub
+  const lfo=ctx.createOscillator(); lfo.frequency.value=0.5;
+  const lfoG=ctx.createGain(); lfoG.gain.value=0.06;
+  lfo.connect(lfoG); lfoG.connect(subG.gain); lfo.start(t); lfo.stop(t+dur); _n(lfo);
+
+  // Synth pads: layered sawtooth through lowpass, constant volume (no fade)
+  [[110,0],[138.6,0.3],[165,0.6],[220,0.9],[277.2,1.2]].forEach(([f,detune])=>{
+    const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f*(1+detune*0.0003);
+    const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=500;
+    lpf.Q.value=1.5;
+    const g=ctx.createGain(); g.gain.value=0.038;
+    o.connect(lpf); lpf.connect(g); g.connect(out);
+    o.start(t); o.stop(t+dur); _n(o);
+  });
+
+  // Slow filter sweep on a dedicated pad layer
+  const sweep=ctx.createOscillator(); sweep.type='sawtooth'; sweep.frequency.value=165;
+  const sweepLpf=ctx.createBiquadFilter(); sweepLpf.type='lowpass';
+  sweepLpf.frequency.setValueAtTime(300,t);
+  sweepLpf.frequency.linearRampToValueAtTime(1200,t+dur*0.5);
+  sweepLpf.frequency.linearRampToValueAtTime(300,t+dur);
+  const sweepG=ctx.createGain(); sweepG.gain.value=0.04;
+  sweep.connect(sweepLpf); sweepLpf.connect(sweepG); sweepG.connect(out);
+  sweep.start(t); sweep.stop(t+dur); _n(sweep);
+
+  // Arpeggio — perfectly timed to dur (16 notes × 1s = 16s)
+  const arpMidi=[57,60,64,67,69,67,64,60, 57,62,65,69,71,69,65,62];
+  arpMidi.forEach((midi,i)=>{
+    const bt=t+i*(dur/arpMidi.length);
+    const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=_mf(midi);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.065,bt+0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001,bt+0.7);
+    o.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.8); _n(o);
+  });
+
+  return dur;
+},
+
+// 2 — Cinematic High-Stakes  (no BPM, 16s)
+function cinematicTrack(ctx,out,t){
+  const dur=16;
+
+  // Constant low drone (no fades)
+  [55,82.4].forEach((f,i)=>{
+    const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+    const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=200;
+    const g=ctx.createGain(); g.gain.value=i===0?0.14:0.07;
+    o.connect(lpf); lpf.connect(g); g.connect(out); o.start(t); o.stop(t+dur); _n(o);
+  });
+
+  // Strings ostinato: 16th-note pattern, 2-bar phrase × 4
+  // Pattern in A minor: A B C D E D C B
+  const ostMidi=[57,59,60,62,64,62,60,59];
+  const ostStep=dur/(ostMidi.length*4); // 16s / 32 notes = 0.5s each
+  for(let i=0;i<ostMidi.length*4;i++){
+    const f=_mf(ostMidi[i%ostMidi.length]);
+    const bt=t+i*ostStep;
+    const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+    const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=600;
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.10,bt+0.04);
+    g.gain.exponentialRampToValueAtTime(0.0001,bt+ostStep*0.85);
+    o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+ostStep); _n(o);
+  }
+
+  // Brass swells: 4 swells evenly spaced (dur/4 = 4s each), no fade at boundaries
+  [[69,73],[65,69],[67,71],[64,67]].forEach(([m1,m2],bi)=>{
+    const bt=t+bi*4;
+    [_mf(m1),_mf(m2)].forEach(f=>{
+      const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=f;
+      const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=900;
+      const g=ctx.createGain();
+      g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.09,bt+0.5);
+      g.gain.setValueAtTime(0.09,bt+2.8); g.gain.linearRampToValueAtTime(0.0001,bt+4.0);
+      o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+4.05); _n(o);
+    });
+  });
+
+  // Ticking: every 0.5s, accent on bar boundaries
+  for(let i=0;i<dur*2;i++){
+    const bt=t+i*0.5;
+    const vol=i%8===0?0.18:i%4===0?0.1:0.055;
+    const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.03),ctx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let j=0;j<d.length;j++) d[j]=(Math.random()*2-1)*Math.pow(1-j/d.length,2);
+    const s=ctx.createBufferSource(); s.buffer=buf;
+    const bpf=ctx.createBiquadFilter(); bpf.type='bandpass'; bpf.frequency.value=1800; bpf.Q.value=2;
+    const g=ctx.createGain(); g.gain.value=vol;
+    s.connect(bpf); bpf.connect(g); g.connect(out); s.start(bt); _n(s);
+  }
+
+  return dur;
+},
+
+// 3 — Retro Arcade Casino  (140bpm, 16 bars = ~27.4s)
+function arcadeTrack(ctx,out,t){
+  const bpm=140, beat=60/bpm, bar=beat*4, bars=16, dur=bar*bars;
+
+  // Melody: C major, two 8-bar phrases (each phrase = 16 melody notes, one per beat)
+  // Phrase A then Phrase B, each 8 bars
+  const melA=[72,74,76,79,81,79,76,74, 72,76,79,81,84,81,79,76,
+              77,79,81,84,81,79,77,74, 72,74,76,77,79,77,76,74];
+  const melB=[84,81,79,76,74,76,79,81, 84,79,77,76,74,76,77,79,
+              72,74,76,79,81,83,84,83, 81,79,77,76,74,72,74,76];
+  [...melA,...melB].forEach((midi,i)=>{
+    const bt=t+i*beat;
+    const o=ctx.createOscillator(); o.type='square'; o.frequency.value=_mf(midi);
+    const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=2200; // tame the buzz
+    const g=ctx.createGain(); g.gain.setValueAtTime(0.09,bt); g.gain.setValueAtTime(0.0001,bt+beat*0.72);
+    o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat*0.75); _n(o);
+  });
+
+  // Bass: one octave below melody root notes, half-time feel
+  const bassA=[48,48,53,53, 55,55,53,53, 48,48,53,53, 55,55,53,48];
+  const bassB=[48,48,50,50, 52,52,50,50, 48,48,50,50, 52,50,48,48];
+  [...bassA,...bassB].forEach((midi,i)=>{
+    const bt=t+i*beat*2; // half-time
+    if(bt>=t+dur) return;
+    const o=ctx.createOscillator(); o.type='square'; o.frequency.value=_mf(midi);
+    const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=600;
+    const g=ctx.createGain(); g.gain.setValueAtTime(0.12,bt); g.gain.setValueAtTime(0.0001,bt+beat*1.8);
+    o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat*2); _n(o);
+  });
+
+  // Drums
+  for(let b=0;b<bars*4;b++){
+    const bt=t+b*beat;
+    if(b%4===0) _kick(ctx,out,bt,0.45);   // beat 1
+    if(b%4===2) _snare(ctx,out,bt,0.15);  // beat 3 (half-time snare)
+    _hat(ctx,out,bt,0.05,0.035);          // 8th hats
+    _hat(ctx,out,bt+beat*0.5,0.035,0.025);
+  }
+
+  return dur;
+},
+
+// 4 — Deep House Casino  (122bpm, 8 bars = ~15.7s)
+function houseTrack(ctx,out,t){
+  const bpm=122, beat=60/bpm, bar=beat*4, bars=8, dur=bar*bars;
+
+  // Four-on-floor kick
+  for(let b=0;b<bars*4;b++){
+    _kick(ctx,out,t+b*beat,0.52);
+  }
+
+  // Snare on 2 and 4
+  for(let b=1;b<bars*4;b+=2){
+    _snare(ctx,out,t+b*beat,0.16);
+  }
+
+  // Hi-hats: off-beat 8ths
+  for(let b=0;b<bars*4;b++){
+    _hat(ctx,out,t+b*beat+beat*0.5,0.055,0.05);
+    _hat(ctx,out,t+b*beat,0.025,0.03); // ghost on downbeat
+  }
+
+  // Bass groove (Am pentatonic: A C D E G)
+  // 2-bar pattern × 4
+  const bassPattern=[
+    {midi:45,len:0.5},{midi:45,len:0.25},{midi:48,len:0.25},
+    {midi:50,len:0.5},{midi:45,len:0.25},{midi:48,len:0.25},
+    {midi:52,len:0.5},{midi:50,len:0.25},{midi:48,len:0.25},
+    {midi:50,len:0.5},{midi:48,len:0.5}
+  ];
+  const patDur=bassPattern.reduce((s,n)=>s+n.len,0)*beat; // ~3.28s
+  for(let rep=0;rep<Math.ceil(dur/patDur);rep++){
+    let off=0;
+    bassPattern.forEach(n=>{
+      const bt=t+rep*patDur+off*beat;
+      if(bt>=t+dur) return;
+      _bass(ctx,out,_mf(n.midi),bt,n.len*beat*0.88,0.28);
+      off+=n.len;
+    });
+  }
+
+  // Chord stabs: Am7, C, Dm7, E7  on offbeats (every 2 beats, 8th-note stab)
+  const chordProg=[
+    [57,60,64,67], // Am7
+    [60,64,67,72], // C
+    [62,65,69,72], // Dm7
+    [64,67,71,74], // E7
+  ];
+  for(let b=0;b<bars*2;b++){
+    const bt=t+b*beat*2+beat*0.5; // on the offbeat
+    chordProg[b%4].forEach(midi=>{
+      const o=ctx.createOscillator(); o.type='sawtooth'; o.frequency.value=_mf(midi);
+      const lpf=ctx.createBiquadFilter(); lpf.type='lowpass'; lpf.frequency.value=1400;
+      const g=ctx.createGain();
+      g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.042,bt+0.015);
+      g.gain.exponentialRampToValueAtTime(0.0001,bt+0.28);
+      o.connect(lpf); lpf.connect(g); g.connect(out); o.start(bt); o.stop(bt+0.3); _n(o);
+    });
+  }
+
+  // Lead: triangle wave, 2-bar phrase × 4, Am pentatonic
+  const leadMidi=[69,72,74,76,79,76,74,72, 69,74,76,79,81,79,76,74,
+                  72,74,76,79,76,74,72,69, 74,76,79,81,79,76,74,69];
+  leadMidi.forEach((midi,i)=>{
+    const bt=t+i*beat*0.5;
+    if(bt>=t+dur) return;
+    const o=ctx.createOscillator(); o.type='triangle'; o.frequency.value=_mf(midi);
+    const g=ctx.createGain();
+    g.gain.setValueAtTime(0,bt); g.gain.linearRampToValueAtTime(0.07,bt+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001,bt+beat*0.42);
+    o.connect(g); g.connect(out); o.start(bt); o.stop(bt+beat*0.5); _n(o);
+  });
+
+  return dur;
+}
+
+]; // end MUSIC_TRACKS
 
 const TRACK_NAMES=['Casino Lounge Jazz','Neon Vegas Ambient','Cinematic High-Stakes','Retro Arcade Casino','Deep House Casino'];
 
+// ── Seamless loop engine ──────────────────────────────────
+// Instead of setTimeout drift, we schedule the next loop iteration
+// at exactly (startTime + dur) using the AudioContext clock.
+// The gap between scheduling and playback is only ~50ms of wall-clock polling.
+
+function _playTrack(idx){
+  _stopMusic();
+  if(idx<0||idx>4) return;
+  const ctx=_musicCtx();
+
+  function _scheduleIteration(startAt){
+    // Build one loop iteration starting at startAt
+    let dur;
+    try{ dur=MUSIC_TRACKS[idx](ctx,MUSIC.gainNode,startAt); }
+    catch(e){ console.warn('Music build error:',e); return; }
+    const nextAt=startAt+dur;
+
+    // Poll: when AudioContext clock is ~200ms from nextAt, schedule the next iteration
+    const checkInterval=100; // ms polling interval
+    function _poll(){
+      if(MUSIC.currentTrack!==idx) return; // track changed, stop
+      const remaining=(nextAt-ctx.currentTime)*1000;
+      if(remaining<=200){
+        _scheduleIteration(nextAt);
+      } else {
+        MUSIC.loopHandle=setTimeout(_poll,Math.min(checkInterval,remaining-150));
+      }
+    }
+    MUSIC.loopHandle=setTimeout(_poll,checkInterval);
+  }
+
+  _scheduleIteration(ctx.currentTime+0.05);
+}
+
 function selectTrack(idx){
-  // Update active state in UI
   document.querySelectorAll('.music-track-btn').forEach((el,i)=>{
     el.classList.toggle('active', i===idx);
   });
-  if(idx===5){ // None
-    _stopMusic();
-    MUSIC.currentTrack=-1;
-    const np=document.getElementById('music-now-playing');
-    if(np) np.textContent='';
-    const btn=document.getElementById('btn-music');
-    if(btn) btn.style.color='';
+  if(idx===5){
+    _stopMusic(); MUSIC.currentTrack=-1;
+    const np=document.getElementById('music-now-playing'); if(np) np.textContent='';
+    const btn=document.getElementById('btn-music'); if(btn) btn.style.color='';
     return;
   }
   MUSIC.currentTrack=idx;
@@ -3010,27 +3170,7 @@ function selectTrack(idx){
   const np=document.getElementById('music-now-playing');
   if(np) np.textContent='▶ '+TRACK_NAMES[idx];
   const btn=document.getElementById('btn-music');
-  if(btn){ btn.style.color=MUSIC.muted?'var(--muted)':'var(--gold-hi)'; }
-}
-
-function _playTrack(idx){
-  _stopMusic();
-  if(idx<0||idx>4) return;
-  try{
-    const ctx=_musicCtx();
-    const dur=MUSIC_TRACKS[idx](ctx, MUSIC.gainNode);
-    // Schedule seamless loop
-    const scheduleLoop=()=>{
-      MUSIC.loopTimer=setTimeout(()=>{
-        if(MUSIC.currentTrack===idx){
-          _stopMusic();
-          MUSIC_TRACKS[idx](ctx, MUSIC.gainNode);
-          scheduleLoop();
-        }
-      }, (dur-0.05)*1000);
-    };
-    scheduleLoop();
-  }catch(e){ console.warn('Music error:',e); }
+  if(btn) btn.style.color=MUSIC.muted?'var(--muted)':'var(--gold-hi)';
 }
 
 function toggleMusicPanel(){
@@ -3038,38 +3178,41 @@ function toggleMusicPanel(){
   if(!panel) return;
   const visible=panel.style.display!=='none';
   panel.style.display=visible?'none':'block';
-  // Start default track on first open
-  if(!visible && MUSIC.currentTrack===-1){
-    selectTrack(0);
-  }
+  if(!visible && MUSIC.currentTrack===-1) selectTrack(0);
 }
 
 function toggleMusicMute(){
   MUSIC.muted=!MUSIC.muted;
-  if(MUSIC.gainNode) MUSIC.gainNode.gain.value=MUSIC.muted?0:MUSIC.volume;
-  const btn=document.getElementById('music-mute-btn');
-  if(btn) btn.textContent=MUSIC.muted?'🔇':'🔊';
-  const mbtn=document.getElementById('btn-music');
-  if(mbtn) mbtn.style.color=MUSIC.muted?'var(--muted)':(MUSIC.currentTrack>=0?'var(--gold-hi)':'');
+  if(MUSIC.gainNode) MUSIC.gainNode.gain.linearRampToValueAtTime(MUSIC.muted?0:MUSIC.volume, MUSIC.ctx.currentTime+0.05);
+  const btn=document.getElementById('music-mute-btn'); if(btn) btn.textContent=MUSIC.muted?'🔇':'🔊';
+  const mbtn=document.getElementById('btn-music'); if(mbtn) mbtn.style.color=MUSIC.muted?'var(--muted)':(MUSIC.currentTrack>=0?'var(--gold-hi)':'');
 }
 
 function setMusicVolume(val){
   MUSIC.volume=val/100;
-  if(MUSIC.gainNode && !MUSIC.muted) MUSIC.gainNode.gain.value=MUSIC.volume;
-  const lbl=document.getElementById('music-vol-label');
-  if(lbl) lbl.textContent=val+'%';
+  if(MUSIC.gainNode&&!MUSIC.muted) MUSIC.gainNode.gain.linearRampToValueAtTime(MUSIC.volume, MUSIC.ctx?MUSIC.ctx.currentTime+0.02:0);
+  const lbl=document.getElementById('music-vol-label'); if(lbl) lbl.textContent=val+'%';
 }
 
-// Close music panel when clicking outside
 document.addEventListener('click',(e)=>{
   const panel=document.getElementById('music-panel');
   const btn=document.getElementById('btn-music');
   if(panel&&btn&&panel.style.display!=='none'){
-    if(!panel.contains(e.target)&&!btn.contains(e.target)){
-      panel.style.display='none';
-    }
+    if(!panel.contains(e.target)&&!btn.contains(e.target)) panel.style.display='none';
   }
 });
+
+function _musicCtx(){
+  if(!MUSIC.ctx){ MUSIC.ctx=new(window.AudioContext||window.webkitAudioContext)(); }
+  if(MUSIC.ctx.state==='suspended') MUSIC.ctx.resume();
+  if(!MUSIC.gainNode){
+    MUSIC.gainNode=MUSIC.ctx.createGain();
+    MUSIC.gainNode.gain.value=MUSIC.muted?0:MUSIC.volume;
+    MUSIC.gainNode.connect(MUSIC.ctx.destination);
+  }
+  return MUSIC.ctx;
+}
+
 
 
 let _pendingLogin = null;
