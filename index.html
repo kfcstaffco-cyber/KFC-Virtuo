@@ -182,7 +182,76 @@ body:not(.betting) #betting-spacer { flex: 0; }
   background-size: contain; background-repeat: no-repeat; background-position: center;
   opacity: 0.04; mix-blend-mode: screen; pointer-events: none; z-index: 0;
 }
-/* Felt texture removed */
+/* ── PASS PLAYER BADGE ── */
+#tb-pass-badge {
+  display: none;
+  font-size: 14px;
+  line-height: 1;
+  filter: drop-shadow(0 0 6px rgba(201,168,76,0.7));
+  animation: passGlow 2.5s ease-in-out infinite;
+}
+@keyframes passGlow {
+  0%,100% { filter: drop-shadow(0 0 4px rgba(201,168,76,0.5)); }
+  50%      { filter: drop-shadow(0 0 10px rgba(201,168,76,1)); }
+}
+body.pass-player .chip { box-shadow: 0 3px 8px rgba(0,0,0,.5), 0 0 12px rgba(201,168,76,0.25); }
+body.pass-player .chip:hover { box-shadow: 0 3px 8px rgba(0,0,0,.5), 0 0 20px rgba(201,168,76,0.5); }
+
+/* ── STREAK BADGE ── */
+#streak-badge {
+  display: none;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  padding: 2px 7px;
+  border-radius: 20px;
+  white-space: nowrap;
+  transition: all .3s;
+}
+#streak-badge.hot { background: rgba(248,81,73,0.15); border: 1px solid rgba(248,81,73,0.4); color: #f97316; }
+#streak-badge.cold { background: rgba(88,166,255,0.12); border: 1px solid rgba(88,166,255,0.35); color: #60a5fa; }
+
+/* ── HOT/COLD SHOE ── */
+#shoe-temp {
+  display: none;
+  font-size: 13px;
+  line-height: 1;
+  transition: all .5s;
+  cursor: help;
+}
+
+/* ── PERSONAL BEST FLASH ── */
+@keyframes pbBurst {
+  0%   { opacity:0; transform:translate(-50%,-50%) scale(0.5); }
+  15%  { opacity:1; transform:translate(-50%,-50%) scale(1.1); }
+  80%  { opacity:1; transform:translate(-50%,-50%) scale(1); }
+  100% { opacity:0; transform:translate(-50%,-50%) scale(1.05); }
+}
+#pb-flash {
+  display: none;
+  position: fixed;
+  top: 38%; left: var(--announce-cx, 50%);
+  transform: translate(-50%,-50%);
+  z-index: 860;
+  background: rgba(14,15,18,0.95);
+  border: 2px solid var(--gold);
+  padding: 10px 24px;
+  border-radius: 4px;
+  text-align: center;
+  font-family: var(--sans);
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: var(--gold-hi);
+  font-size: 12px;
+  pointer-events: none;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 0 30px rgba(201,168,76,0.4);
+}
+
+/* ── SHOE SUMMARY MODAL ── */
+#shoe-summary-modal .shoe-summary-pl { font-family:var(--mono); font-size:22px; font-weight:700; margin:8px 0 4px; }
+#shoe-summary-modal .shoe-summary-sub { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:2px; }
 
 /* ─────────────────────────────────────────────
    ZONE HEADERS
@@ -1643,8 +1712,10 @@ body.hand2-active #chip-strip .chip { position: relative; }
     </div>
     <div class="tb-center">
       <div class="tb-player" id="tb-name">—</div>
+      <span id="tb-pass-badge" title="21 Club Pass">👑</span>
       <div class="tb-balance" id="tb-bal">0</div>
       <div class="badge" id="tb-stake">LOW</div>
+      <span id="streak-badge"></span>
     </div>
     <div class="tb-right">
       <button class="btn-ghost" id="btn-music" onclick="toggleMusicPanel()" style="font-size:13px;padding:6px 10px;letter-spacing:1px;position:relative" title="Music">♪</button>
@@ -1695,6 +1766,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
         <div id="shoe-info">
           <span id="shoe-count">216</span>
           <span style="color:var(--muted);font-size:9px;display:block;letter-spacing:1.5px">CARDS</span>
+          <span id="shoe-temp" title="Shoe temperature (pass players only)"></span>
         </div>
         <!-- P&L inline chart — sits right of card count, hidden until first hand -->
         <div id="session-chart-bar" style="display:none;flex:1;align-items:center;gap:8px;min-width:0;overflow:hidden">
@@ -2328,6 +2400,14 @@ const BONUS_CARDS = [
 // ── STATE ──────────────────────────────────────────────
 // ── SHOE LIMITS ──────────────────────────────────────────────────────────────
 // Change these two values at any time to adjust the daily shoe allowances.
+// ── STREAK / PERSONAL BEST / SHOE LOG ───────────────────────────────────────
+let _streak = 0;          // positive = win streak, negative = loss streak
+let _shoeLog = [];        // log entries for the current shoe (reset on new shoe)
+let _shoeHandCount = 0;   // hands played in this shoe
+function _pbKey(u){ return 'kfc_pb_'+(u||'').toLowerCase(); }
+function _getPersonalBest(u){ return parseFloat(localStorage.getItem(_pbKey(u))||'0'); }
+function _setPersonalBest(u,v){ localStorage.setItem(_pbKey(u),String(v)); }
+
 const SHOES_PER_DAY_STANDARD = 5;   // regular players
 const SHOES_PER_DAY_PASS     = 15;  // 21 Club pass holders
 
@@ -4047,7 +4127,7 @@ window.onload=()=>{
             G._totalBalance=d.balance;
             // Always refresh clubPass from the live sheet response
             G._clubPass = !!d.clubPass;
-            updateBetPanel(); // re-evaluate 2nd hand button visibility etc.
+            _updatePassUI(); // re-evaluate badge, chip glow, hot/cold
             if(G.phase==='bet' && d.balance!==prevTotal){
               notif('Wallet synced — '+fmtKFC(d.balance));
             }
@@ -4183,6 +4263,9 @@ function openApp(displayName, balance){
   setSyncBadge(G.url?'live':'', G.url?'LIVE':'LOCAL');
   if(!G.deck||G.deck.length===0) G.deck=buildShoe();
   msg('PLACE YOUR BET');
+  // Reset streak and shoe log on fresh session (not restore)
+  if(!G._sessionActive){ _streak=0; _shoeLog=[]; _shoeHandCount=0; }
+  _updatePassUI(); // crown badge, chip glow, hot/cold, PU panel
   // ── Audio: welcome sound + Velvet Underground ─────────────────────────────
   // G._welcomePlayed prevents the welcome sound firing more than once
   // (guards against the pointerdown listener AND deal()'s initAudio both triggering it).
@@ -4909,6 +4992,7 @@ function showBJ(){
   void el.offsetWidth;
   el.classList.add('show');
   setTimeout(()=>el.classList.remove('show'), 1900);
+  _launchConfetti(); // gold confetti burst on blackjack
 }
 function deal(){
   // Init audio on first deal if not already ready, but don't re-trigger welcome sound
@@ -5684,10 +5768,30 @@ function settle(reason){
     ? `H1: ${_h1Res.detail} / H2: ${_h2Res.detail}`
     : detail;
   G.log.push({detail:_logDetail,pl:totalPLForDisplay,bal:G.balance,breakdown});
+  _shoeLog.push({pl:totalPLForDisplay}); // track for shoe summary
+  _shoeHandCount++;
   renderLog();
-  // Update session P&L chart — running total of all hands this session
+  // Update session P&L chart
   const _sessionRunningPL = G.log.reduce((a,e)=>a+e.pl, 0);
   updateSessionChart(_sessionRunningPL);
+
+  // ── Streak tracker ──
+  if(totalPLForDisplay > 0)  _streak = _streak > 0 ? _streak + 1 : 1;
+  else if(totalPLForDisplay < 0) _streak = _streak < 0 ? _streak - 1 : -1;
+  else _streak = 0;
+  _updateStreakBadge();
+
+  // ── Personal best ──
+  if(totalPLForDisplay > 0){
+    const pb = _getPersonalBest(G.username||G.player);
+    if(totalPLForDisplay > pb){
+      _setPersonalBest(G.username||G.player, totalPLForDisplay);
+      _showPersonalBest(totalPLForDisplay);
+    }
+  }
+
+  // ── Hot/cold shoe update ──
+  _updateShoeTemp();
   if(totalPLForDisplay>0){if(totalPLForDisplay>G.s.min*10)sfx('cash');else sfx('win');} else if(totalPLForDisplay<0){} else sfx('push');
   // Show missed side bet payouts (including Dealer Bust if it busted)
   if(db){
@@ -6191,6 +6295,8 @@ function closeResult(){
       return;
     }
     _incrementShoesPlayed(G.username||G.player);
+    _showShoeSummary(); // show summary before clearing shoe log
+    _shoeLog = []; _shoeHandCount = 0;
     G.deck=buildShoe();
     G.puOwned.clear();
     G.puPending.clear();
@@ -6199,6 +6305,8 @@ function closeResult(){
     const rem=_shoesRemaining();
     notif('New shoe — '+rem+' shoe'+(rem===1?'':'s')+' remaining today');
   } else if(G.deck.length<40){
+    _showShoeSummary();
+    _shoeLog = []; _shoeHandCount = 0;
     G.puOwned.clear();
     G.puPending.clear();
     G.levCards=[]; G._levCardsPending=[]; // Jester cards expire at end of shoe
@@ -6872,6 +6980,156 @@ function _drawChart(canvas, pts) {
   ctx.fill();
 }
 
+// ── STREAK BADGE ─────────────────────────────────────────────────────────────
+function _updateStreakBadge(){
+  const el = document.getElementById('streak-badge');
+  if(!el) return;
+  if(Math.abs(_streak) < 2){ el.style.display='none'; return; }
+  el.style.display = 'inline-block';
+  if(_streak > 0){
+    el.className = 'hot';
+    el.textContent = '🔥 ' + _streak;
+    el.title = _streak + '-hand win streak';
+  } else {
+    el.className = 'cold';
+    el.textContent = '🥶 ' + Math.abs(_streak);
+    el.title = Math.abs(_streak) + '-hand loss streak';
+  }
+}
+
+// ── HOT/COLD SHOE (pass players only) ────────────────────────────────────────
+// Low cards (2-6) favour the player; many remaining = "hot"
+// High cards (10,J,Q,K,A) remaining in excess = "cold" (dealer-friendly)
+function _updateShoeTemp(){
+  const el = document.getElementById('shoe-temp');
+  if(!el) return;
+  if(!G._clubPass){ el.style.display='none'; return; }
+  const deck = G.deck || [];
+  if(deck.length < 20){ el.style.display='none'; return; }
+  let low=0, high=0;
+  for(const c of deck){
+    if(!c || c.cutCard || c.bonus) continue;
+    const r = c.r;
+    if(['2','3','4','5','6'].includes(r)) low++;
+    else if(['10','J','Q','K','A'].includes(r)) high++;
+  }
+  const total = low + high;
+  if(total === 0){ el.style.display='none'; return; }
+  const ratio = (low - high) / total; // positive = more low cards = hotter for player
+  el.style.display = 'inline-block';
+  if(ratio > 0.15){
+    el.textContent = '🔥';
+    el.title = 'Hot shoe — low cards rich, favours player';
+    el.style.filter = 'drop-shadow(0 0 4px #f97316)';
+  } else if(ratio < -0.15){
+    el.textContent = '🧊';
+    el.title = 'Cold shoe — high cards rich, favours dealer';
+    el.style.filter = 'drop-shadow(0 0 4px #60a5fa)';
+  } else {
+    el.textContent = '〰️';
+    el.title = 'Neutral shoe';
+    el.style.filter = 'none';
+  }
+}
+
+// ── PERSONAL BEST FLASH ───────────────────────────────────────────────────────
+function _showPersonalBest(amount){
+  const el = document.getElementById('pb-flash');
+  if(!el) return;
+  el.style.display = 'block';
+  el.innerHTML = '🏆 NEW PERSONAL BEST<br><span style="font-size:16px;color:var(--gold-hi)">' + fmtKFC(amount) + '</span>';
+  el.style.animation = 'none';
+  void el.offsetWidth;
+  el.style.animation = 'pbBurst 2.2s ease forwards';
+  el.addEventListener('animationend', ()=>{ el.style.display='none'; }, {once:true});
+}
+
+// ── SHOE SUMMARY ─────────────────────────────────────────────────────────────
+function _showShoeSummary(){
+  if(_shoeHandCount < 2) return; // don't show for < 2 hands
+  const shoePL = _shoeLog.reduce((a,e)=>a+e.pl, 0);
+  const plEl = document.getElementById('shoe-summary-pl');
+  const handsEl = document.getElementById('shoe-summary-hands');
+  const bestEl = document.getElementById('shoe-summary-best');
+  if(plEl){
+    plEl.textContent = (shoePL>=0?'+':'') + fmtKFC(shoePL);
+    plEl.style.color = shoePL>0 ? 'var(--green)' : shoePL<0 ? 'var(--red)' : 'var(--muted2)';
+  }
+  if(handsEl) handsEl.textContent = _shoeHandCount;
+  // Best hand this shoe
+  if(bestEl){
+    const best = _shoeLog.reduce((max,e)=>e.pl>max?e.pl:max, 0);
+    if(best > 0){
+      bestEl.style.display = 'block';
+      bestEl.textContent = 'BEST HAND THIS SHOE: +' + fmtKFC(best);
+    } else {
+      bestEl.style.display = 'none';
+    }
+  }
+  setTimeout(()=>openModal('shoe-summary-modal'), 400);
+}
+
+// ── GOLD CONFETTI BURST (blackjack) ──────────────────────────────────────────
+function _launchConfetti(){
+  const canvas = document.getElementById('confetti-canvas');
+  if(!canvas) return;
+  canvas.style.display = 'block';
+  const ctx = canvas.getContext('2d');
+  const W = window.innerWidth, H = window.innerHeight;
+  canvas.width = W; canvas.height = H;
+  const COLOURS = ['#C9A84C','#EFC84A','#F5D76E','#fff8dc','#d4af37'];
+  const N = 90;
+  const cx = W * 0.5, cy = H * 0.35; // burst from card area
+  const particles = Array.from({length:N}, ()=>({
+    x: cx + (Math.random()-0.5)*60,
+    y: cy,
+    vx: (Math.random()-0.5)*10,
+    vy: -Math.random()*12 - 4,
+    size: 3 + Math.random()*5,
+    rot: Math.random()*360,
+    rotV: (Math.random()-0.5)*12,
+    col: COLOURS[Math.floor(Math.random()*COLOURS.length)],
+    life: 1,
+    shape: Math.random() > 0.5 ? 'rect' : 'circle',
+  }));
+  let frame = 0;
+  function draw(){
+    ctx.clearRect(0,0,W,H);
+    let alive = false;
+    for(const p of particles){
+      p.x += p.vx; p.vy += 0.35; p.y += p.vy;
+      p.rot += p.rotV; p.life -= 0.015;
+      if(p.life <= 0) continue;
+      alive = true;
+      ctx.save();
+      ctx.globalAlpha = p.life;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot * Math.PI/180);
+      ctx.fillStyle = p.col;
+      if(p.shape === 'rect'){
+        ctx.fillRect(-p.size/2, -p.size/4, p.size, p.size/2);
+      } else {
+        ctx.beginPath(); ctx.arc(0,0,p.size/2,0,Math.PI*2); ctx.fill();
+      }
+      ctx.restore();
+    }
+    if(alive && frame++ < 180) requestAnimationFrame(draw);
+    else { ctx.clearRect(0,0,W,H); canvas.style.display='none'; }
+  }
+  requestAnimationFrame(draw);
+}
+
+// ── PASS PLAYER UI UPDATE ─────────────────────────────────────────────────────
+function _updatePassUI(){
+  const badge = document.getElementById('tb-pass-badge');
+  if(badge) badge.style.display = G._clubPass ? 'inline' : 'none';
+  if(G._clubPass) document.body.classList.add('pass-player');
+  else document.body.classList.remove('pass-player');
+  _updateShoeTemp();
+  buildPuPanel();
+  updateBetPanel();
+}
+
 function resetSessionChart() {
   if (_chartAnimId) { cancelAnimationFrame(_chartAnimId); _chartAnimId = null; }
   _chartPts.length = 0;
@@ -7166,6 +7424,21 @@ function resetHand2State(){
 <div id="bj-splash">
   <div id="bj-text">Blackjack!</div>
   <div id="bj-sub">Natural 21</div>
+</div>
+<!-- PERSONAL BEST FLASH -->
+<div id="pb-flash">🏆 NEW PERSONAL BEST</div>
+<!-- CONFETTI CANVAS -->
+<canvas id="confetti-canvas" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:900;display:none"></canvas>
+<!-- SHOE SUMMARY MODAL -->
+<div class="overlay" id="shoe-summary-modal">
+  <div class="modal-box" style="min-width:280px;max-width:360px;text-align:center">
+    <div class="modal-title" style="margin-bottom:16px">SHOE COMPLETE</div>
+    <div class="shoe-summary-sub">SESSION P&L THIS SHOE</div>
+    <div class="shoe-summary-pl" id="shoe-summary-pl">—</div>
+    <div class="shoe-summary-sub" style="margin-bottom:16px"><span id="shoe-summary-hands">—</span> HANDS PLAYED</div>
+    <div id="shoe-summary-best" style="display:none;font-family:var(--mono);font-size:9px;color:var(--gold);letter-spacing:1px;margin-bottom:12px"></div>
+    <button class="btn-primary" style="width:100%" onclick="closeModal('shoe-summary-modal')">New Shoe →</button>
+  </div>
 </div>
 </body>
 </html>
