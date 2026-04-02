@@ -176,7 +176,7 @@ body:not(.betting) #betting-spacer { flex: 0; }
 /* betting-zone and playing-zone need to NOT both expand simultaneously */
 #betting-zone, #playing-zone { width: 100%; }
 #table-area .felt-logo {
-  position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
+  position: absolute; top: 39%; left: 50%; transform: translate(-50%, -50%);
   width: min(360px, 90vw); height: min(360px, 90vw);
   background-image: url("KFC_LOGO.png");
   background-size: contain; background-repeat: no-repeat; background-position: center;
@@ -2330,6 +2330,19 @@ const BONUS_CARDS = [
 // Change these two values at any time to adjust the daily shoe allowances.
 const SHOES_PER_DAY_STANDARD = 5;   // regular players
 const SHOES_PER_DAY_PASS     = 15;  // 21 Club pass holders
+
+// ── POWER-UP LIMITS ──────────────────────────────────────────────────────────
+// Max power-ups a player can hold at once per shoe.
+const PU_LIMIT_STANDARD = 1;   // regular players
+const PU_LIMIT_PASS     = 2;   // 21 Club pass holders
+// Pass players also get 1 free power-up per day (usable across any shoe that day).
+// localStorage key: kfc_freepu_YYYY-MM-DD_username  → 'used' or absent (available)
+function _puLimit(){ return G._clubPass ? PU_LIMIT_PASS : PU_LIMIT_STANDARD; }
+function _freePuKey(username){ return 'kfc_freepu_'+new Date().toISOString().slice(0,10)+'_'+(username||'').toLowerCase(); }
+function _freePuAvailable(){ return G._clubPass && !localStorage.getItem(_freePuKey(G.username||G.player)); }
+function _markFreePuUsed(){ localStorage.setItem(_freePuKey(G.username||G.player),'used'); }
+
+// ── SHOE HELPERS ─────────────────────────────────────────────────────────────
 // localStorage key pattern: kfc_shoes_YYYY-MM-DD_username
 function _shoeKey(username){ return 'kfc_shoes_'+new Date().toISOString().slice(0,10)+'_'+(username||'').toLowerCase(); }
 function _shoesPlayedToday(username){ return parseInt(localStorage.getItem(_shoeKey(username))||'0',10); }
@@ -4793,23 +4806,50 @@ function buildPuPanel(){
   const c=document.getElementById('panel-pu');
   if(!c)return;
   c.innerHTML='';
+  // Show free PU availability for pass players
+  if(G._clubPass){
+    const freeBadge=document.createElement('div');
+    const avail=_freePuAvailable();
+    freeBadge.style.cssText='font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:4px 8px 6px;color:'+(avail?'var(--gold)':'var(--muted)')+';text-align:center';
+    freeBadge.textContent=avail?'🏆 FREE POWER-UP AVAILABLE TODAY':'🏆 Free power-up used today';
+    c.appendChild(freeBadge);
+  }
   const stakeIdx=STAKE_ORDER.indexOf(G.stake);
   POWERUPS.forEach(pu=>{
     const minIdx=STAKE_ORDER.indexOf(pu.minStake);
     const available=stakeIdx>=minIdx;
     const owned=G.puOwned.has(pu.id);
     const kfcCost=G.s.min*(pu.ratio||5);
-    const subText=owned?'Active — expires end of shoe':pu.sub+' · '+fmtKFC(kfcCost);
+    const isFreeNext=_freePuAvailable()&&!owned;
+    const costLabel=isFreeNext?'FREE (pass perk)':fmtKFC(kfcCost);
+    const subText=owned?'Active — expires end of shoe':pu.sub+' · '+costLabel;
     addItemBtn(c,pu.label,subText,'pu-'+pu.id,owned,(!available&&!owned)?'locked':null,()=>buyPu(pu,kfcCost));
   });
 }
 
 function buyPu(pu,cost){
   if(G.puOwned.has(pu.id)){notif(pu.label+' is already active');return;}
-  if(G.puOwned.size>=2){notif('Max 2 power-ups active at a time');return;}
+  // Enforce per-shoe power-up limit (1 for standard, 2 for pass)
+  if(G.puOwned.size>=_puLimit()){
+    if(G._clubPass){
+      notif('Max '+_puLimit()+' power-ups active at a time');
+    } else {
+      notif('🏆 Standard players get 1 power-up per shoe — upgrade to the 21 Club Pass for 2');
+    }
+    return;
+  }
   const stakeIdx=STAKE_ORDER.indexOf(G.stake); const minIdx=STAKE_ORDER.indexOf(pu.minStake);
   if(stakeIdx < minIdx){notif('Unlocks at '+pu.minStake.charAt(0).toUpperCase()+pu.minStake.slice(1)+' stakes');return;}
   if(G.phase==='play'||G.phase==='dealer'){notif('Power-ups must be bought before dealing');return;}
+
+  // Free daily power-up for pass players
+  if(_freePuAvailable()){
+    _markFreePuUsed();
+    G.puOwned.add(pu.id); updateUI(); buildPuPanel();
+    sfx('buy'); notif('🏆 '+pu.label+' activated FREE (daily pass perk) — good for this shoe');
+    return;
+  }
+
   if(G.balance<cost){notif('Not enough balance');return;}
   G.balance-=cost; G.puOwned.add(pu.id); updateUI(); buildPuPanel();
   sfx('buy'); notif(pu.label+' activated — good for this shoe');
