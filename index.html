@@ -193,7 +193,7 @@ body:not(.betting) #betting-spacer { flex: 0; }
   pointer-events: none;
 }
 #table-area .felt-logo {
-  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
   width: min(360px, 90vw); height: min(360px, 90vw);
   background-image: url("KFC_LOGO.png");
   background-size: contain; background-repeat: no-repeat; background-position: center;
@@ -3127,7 +3127,10 @@ function _setNowPlaying(name){
 }
 
 function startMusic(){
-  if(MUSIC.currentTrack === 0 && MUSIC.mode === 'synth') return; // already playing
+  // Already playing synth track 0 — do nothing
+  if(MUSIC.mode === 'synth' && MUSIC.currentTrack === 0 && MUSIC.nodes.length > 0) return;
+  // An MP3 is playing — don't override the user's choice
+  if(MUSIC.mode === 'mp3' && _mp3El && !_mp3El.paused) return;
   MUSIC.mode = 'synth';
   MUSIC.currentTrack = 0;
   _playTrack(0);
@@ -3834,7 +3837,7 @@ function saveSession(){
       mainBet2:G.mainBet2||0,
       sideBets2:{...G.sideBets2||{}},
       chartPts:[..._chartPts],
-      needsSync: !G.cashedOut && !G._atCashout, // flag: closed without cashing out
+      needsSync: false, // sheet writes only happen on explicit cashout
       ts:Date.now()
     };
     localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
@@ -3846,10 +3849,17 @@ function restoreSession(){
     const raw=localStorage.getItem(SESSION_KEY);
     if(!raw) return false;
     const snap=JSON.parse(raw);
-    // Only restore if recent (within 4 hours) and player hadn't cashed out
-    if(!snap||!snap.player||(Date.now()-snap.ts)>4*60*60*1000) return false;
-    if(snap.cashedOut) return false; // don't restore after cash out
-    if(!snap.sessionActive) return false; // don't restore if no hand was ever dealt
+    if(!snap||!snap.player) return false;
+    if(snap.cashedOut) { localStorage.removeItem(SESSION_KEY); return false; } // already done
+    if(!snap.sessionActive) { localStorage.removeItem(SESSION_KEY); return false; } // no hand played
+
+    // STALE SESSION: >4 hours old — auto-sync balance to sheet so chips aren't lost, then discard
+    if((Date.now()-snap.ts)>4*60*60*1000){
+      _expireStaleSession(snap); // fire-and-forget async sync
+      localStorage.removeItem(SESSION_KEY);
+      return false;
+    }
+
     // Restore state
     G.player=snap.player; G.username=snap.username||snap.player;
     G._cachedPin=snap.cachedPin||'';
@@ -3892,13 +3902,38 @@ function clearSession(){
   localStorage.removeItem(SESSION_KEY);
 }
 
+// Auto-sync a stale session (>4h) to the sheet so chips aren't lost.
+// Fires silently in the background — player never sees this UI-side.
+async function _expireStaleSession(snap){
+  if(!snap||!snap.player||!snap.balance) return;
+  const url=localStorage.getItem('kfc_url')||G.url;
+  if(!url||!snap.cachedPin) return; // no sheet configured, nothing to do
+  try{
+    const params=new URLSearchParams({
+      action:    'updatebalance',
+      username:  snap.username||snap.player,
+      player:    snap.player,
+      balance:   String(snap.balance),
+      sessionPL: String(snap.balance-(snap.sessionStart||snap.balance)),
+      buyIn:     String(snap.sessionStart||snap.balance),
+      date:      new Date().toISOString(),
+      stake:     'AUTO-EXPIRE', // distinguishable from normal cashouts in the log
+      pin:       snap.cachedPin||''
+    });
+    await fetch(url+'?'+params.toString(),{method:'GET',redirect:'follow',cache:'no-store'});
+    console.log('[KFC] Stale session auto-expired and synced for',snap.player);
+  }catch(e){
+    console.warn('[KFC] Stale session sync failed — balance may be unrecorded',e);
+  }
+}
+
 // Save session to localStorage when window/tab is closed
+// NOTE: We do NOT sync to Google Sheets here — sheet writes only happen on explicit cashout.
+// This prevents every page reload from creating a new session log entry.
 window.addEventListener('beforeunload', (e)=>{
   // Only act when mid-session (hand has been dealt, not cashed out, not at cashout screen)
   if(G.player && !G.cashedOut && !G._atCashout && G._sessionActive){
-    saveSession(); // persist session so it can be restored on return
-    // Fire-and-forget beacon sync to Google Sheets so data isn't lost if they don't return
-    _beaconSync();
+    saveSession(); // persist to localStorage only — restores on return
     e.preventDefault(); // trigger browser leave confirmation
     e.returnValue = ''; // required for Chrome
   }
@@ -3907,38 +3942,9 @@ window.addEventListener('beforeunload', (e)=>{
 // pagehide fires on mobile when page is hidden/navigated away (more reliable than beforeunload)
 window.addEventListener('pagehide', ()=>{
   if(G.player && !G.cashedOut && !G._atCashout && G._sessionActive){
-    saveSession();
-    _beaconSync();
+    saveSession(); // localStorage only, no sheet write
   }
 });
-
-// Send a best-effort sync beacon when the player leaves without cashing out.
-// Uses navigator.sendBeacon which is guaranteed to complete even as the page unloads.
-function _beaconSync(){
-  if(!G.url || !G.username || !G._cachedPin || !G.balance) return;
-  try{
-    const params = new URLSearchParams({
-      action: 'updatebalance',
-      username: G.username,
-      player: G.player,
-      balance: String(G.balance),
-      sessionPL: String(G.balance - (G.sessionStart||G.balance)),
-      buyIn: String(G.sessionStart||G.balance),
-      date: new Date().toISOString(),
-      stake: G.s ? G.s.label : '',
-      pin: G._cachedPin || ''
-    });
-    // sendBeacon sends a POST — Apps Script reads e.parameter from either GET or POST
-    const blob = new Blob([params.toString()], {type:'application/x-www-form-urlencoded'});
-    navigator.sendBeacon(G.url, blob);
-    // Also mark session as needsSync=false since we just fired the beacon
-    try{
-      const s=JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
-      s.needsSync=false;
-      localStorage.setItem(SESSION_KEY,JSON.stringify(s));
-    }catch(e){}
-  }catch(e){ /* sendBeacon not supported — silent fail, needsSync flag will handle it on return */ }
-}
 
 // Back-button trap: push a dummy history entry so back button triggers popstate
 // instead of leaving the page
@@ -4009,43 +4015,6 @@ window.onload=()=>{
     notif('Session restored — welcome back, '+G.player);
     _afterRestoreChart();
 
-    // If session was closed without cashing out, auto-sync current balance to sheet
-    const _snap = JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
-    if(_snap.needsSync && G.url && G.username && G._cachedPin){
-      setTimeout(async()=>{
-        try{
-          const autoPayload={
-            username:G.username, player:G.player,
-            balance:G.balance,
-            sessionPL:G.balance - G.sessionStart,
-            buyIn:G.sessionStart,
-            date:new Date().toISOString(),
-            stake:G.s.label, pin:G._cachedPin||''
-          };
-          await attemptSync(autoPayload);
-          clearSyncQueue();
-          // Clear the needsSync flag now that it's saved
-          try{
-            const s=JSON.parse(localStorage.getItem(SESSION_KEY)||'{}');
-            s.needsSync=false;
-            localStorage.setItem(SESSION_KEY,JSON.stringify(s));
-          }catch(e){}
-          setSyncBadge('live','LIVE');
-          notif('✓ Auto-saved to sheet');
-        }catch(e){
-          // Sync failed — store in queue so next cashout retries
-          storeSyncQueue({
-            username:G.username, player:G.player,
-            balance:G.balance, sessionPL:G.balance-G.sessionStart,
-            buyIn:G.sessionStart, date:new Date().toISOString(),
-            stake:G.s.label, pin:G._cachedPin||''
-          });
-          setSyncBadge('error','UNSAVED');
-          notif('Auto-save failed — will retry on cashout');
-        }
-      }, 2500); // short delay so page finishes loading first
-    }
-
     // Silently re-fetch balance from sheet to catch any changes since last close
     if(G.url && G.username && G._cachedPin){
       sheetGet(G.url+'?action=getBalance&username='+encodeURIComponent(G.username)+'&pin='+encodeURIComponent(G._cachedPin))
@@ -4088,6 +4057,26 @@ async function doLogin(){
         err.textContent='';
         G.username=username;
         G._cachedPin=pin;
+        // Check localStorage for a live session belonging to this player
+        // This handles reloads and multi-device: if they have a saved session, restore it
+        try{
+          const raw=localStorage.getItem(SESSION_KEY);
+          if(raw){
+            const snap=JSON.parse(raw);
+            const samePlayer=(snap.username===username||snap.player===d.playerName||snap.player===username);
+            const fresh=(Date.now()-snap.ts)<4*60*60*1000;
+            if(snap&&samePlayer&&fresh&&!snap.cashedOut&&snap.sessionActive){
+              // Restore the saved session directly — skip stake selection
+              G._cachedPin=pin;
+              if(restoreSession()){
+                openApp(G.player, G.balance);
+                notif('Session restored — welcome back, '+G.player);
+                _afterRestoreChart();
+                return;
+              }
+            }
+          }
+        }catch(e){}
         _pendingLogin={name:d.playerName||username,balance:d.balance};
         document.getElementById('login-step1').style.display='none';
         goLoginStep(2);
@@ -4107,6 +4096,23 @@ async function doLogin(){
   err.textContent='';
   G.username=username;
   G._cachedPin=pin; // cache for re-auth
+  // Check for a saved local session for this player
+  try{
+    const raw=localStorage.getItem(SESSION_KEY);
+    if(raw){
+      const snap=JSON.parse(raw);
+      const samePlayer=(snap.username===username||snap.player===username);
+      const fresh=(Date.now()-snap.ts)<4*60*60*1000;
+      if(snap&&samePlayer&&fresh&&!snap.cashedOut&&snap.sessionActive){
+        if(restoreSession()){
+          openApp(G.player, G.balance);
+          notif('Session restored — welcome back, '+G.player);
+          _afterRestoreChart();
+          return;
+        }
+      }
+    }
+  }catch(e){}
   const localBal=parseFloat(localStorage.getItem('kfc_bal_'+username)||'0');
   _pendingLogin={name:username,balance:localBal}; // G.player set only in openApp
   document.getElementById('login-step1').style.display='none';
@@ -4149,17 +4155,34 @@ function openApp(displayName, balance){
   setSyncBadge(G.url?'live':'', G.url?'LIVE':'LOCAL');
   if(!G.deck||G.deck.length===0) G.deck=buildShoe();
   msg('PLACE YOUR BET');
-  setTimeout(()=>playWelcomeSound(), 300); // slight delay so audio context is ready
-  setTimeout(()=>startMusic(), 800); // start Velvet Underground after welcome sound
-  // On session restore (page reload), AudioContext may still be suspended before a user gesture.
-  // Schedule a one-shot retry the moment the user first interacts with the page.
-  (function scheduleWelcomeSoundRetry(){
-    const ctx2=window._kfcCtx;
-    if(ctx2&&ctx2.state==='suspended'){
-      const once=()=>{ playWelcomeSound(); startMusic(); document.removeEventListener('pointerdown',once); document.removeEventListener('keydown',once); };
-      document.addEventListener('pointerdown',once,{once:true});
-      document.addEventListener('keydown',once,{once:true});
+  // ── Audio: welcome sound + Velvet Underground ─────────────────────────────
+  // Welcome sound plays as soon as AudioContext is running (immediately on fresh
+  // login after a click; deferred to first gesture on page-load session restore).
+  // Music starts ~800ms after the welcome sound to avoid clashing.
+  (function _scheduleAudio(){
+    function _playAll(){
+      playWelcomeSound();
+      setTimeout(()=>startMusic(), 800);
     }
+    // Try immediately — works if user just clicked the login button
+    try{
+      if(!G._audioReady) initAudio();
+      const ctx2=window._kfcCtx;
+      if(ctx2 && ctx2.state==='running'){
+        setTimeout(_playAll, 300);
+        return;
+      }
+      // Context suspended (page-load restore) — defer to first user gesture
+      const once=()=>{
+        _playAll();
+        document.removeEventListener('pointerdown', once);
+        document.removeEventListener('keydown', once);
+      };
+      document.addEventListener('pointerdown', once, {once:true});
+      document.addEventListener('keydown', once, {once:true});
+      // Also try resuming immediately — some browsers allow it after a short delay
+      if(ctx2) ctx2.resume().then(()=>{ if(ctx2.state==='running'){ setTimeout(_playAll,300); document.removeEventListener('pointerdown',once); document.removeEventListener('keydown',once); } }).catch(()=>{});
+    }catch(e){}
   })();
   const db2=document.getElementById('btn-deal'); if(db2) db2.disabled=true;
   // Retry any previously failed sync in background
@@ -6344,6 +6367,7 @@ async function confirmCashout(){
       badge.style.color='var(--green)';
       if(leaveBtn){ leaveBtn.disabled=false; leaveBtn.textContent='Leave Table'; }
       if(stayBtn) stayBtn.style.display='block';
+      G.balance=0; updateUI();
       notif('Saved locally');
       return;
     }
@@ -6353,11 +6377,13 @@ async function confirmCashout(){
       clearSyncQueue();
       clearSession(); localStorage.removeItem('kfc_cashout_snap'); // safe to wipe now
       setSyncBadge('live','SYNCED');
-      badge.textContent='✓ Synced — ready to leave';
+      badge.textContent='✓ Synced — chips returned to wallet';
       badge.style.color='var(--green)';
       if(leaveBtn){ leaveBtn.disabled=false; leaveBtn.textContent='Leave Table'; }
       if(stayBtn) stayBtn.style.display='block';
-      notif('Session saved');
+      // Reset balance to 0 — chips have been cashed back into wallet
+      G.balance=0; updateUI();
+      notif('Session saved — balance returned to wallet');
     }catch(e){
       // Failed — store in queue, lock leave, show retry
       storeSyncQueue(payload);
