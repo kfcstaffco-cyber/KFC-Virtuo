@@ -47,17 +47,6 @@ body {
 /* Default to betting phase so playing-zone is hidden before login */
 
 /* ─────────────────────────────────────────────
-   GRID NOISE TEXTURE
-───────────────────────────────────────────── */
-body::before {
-  content: '';
-  position: fixed; inset: 0; z-index: 0; pointer-events: none;
-  background-image:
-    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
 /* ─────────────────────────────────────────────
    SCROLLBAR
 ───────────────────────────────────────────── */
@@ -186,14 +175,8 @@ body.betting #betting-spacer { flex: 1; }
 body:not(.betting) #betting-spacer { flex: 0; }
 /* betting-zone and playing-zone need to NOT both expand simultaneously */
 #betting-zone, #playing-zone { width: 100%; }
-#table-area::before {
-  content: '';
-  position: absolute; inset: 0;
-  background: radial-gradient(ellipse at 50% 50%, rgba(255,255,255,0.015) 0%, transparent 70%);
-  pointer-events: none;
-}
 #table-area .felt-logo {
-  position: absolute; top: 38%; left: 50%; transform: translate(-50%, -50%);
+  position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
   width: min(360px, 90vw); height: min(360px, 90vw);
   background-image: url("KFC_LOGO.png");
   background-size: contain; background-repeat: no-repeat; background-position: center;
