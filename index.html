@@ -263,8 +263,14 @@ body.pass-player #topbar {
 }
 
 /* ── GREEN FELT TABLE (pass players only) ── */
-body.felt-green #table-area { background: radial-gradient(ellipse at 50% 40%, #0a2a16 0%, #071a0f 55%, #030d07 100%) !important; }
-body.felt-green .felt-logo { filter: hue-rotate(60deg) saturate(0.6); }
+body.felt-green    #table-area { background: radial-gradient(ellipse at 50% 40%, #061a0d 0%, #040f08 55%, #020705 100%) !important; }
+body.felt-green    .felt-logo  { filter: hue-rotate(60deg) saturate(0.5); }
+body.felt-burgundy #table-area { background: radial-gradient(ellipse at 50% 40%, #1a0608 0%, #0f0405 55%, #070203 100%) !important; }
+body.felt-burgundy .felt-logo  { filter: hue-rotate(320deg) saturate(0.5); }
+body.felt-purple   #table-area { background: radial-gradient(ellipse at 50% 40%, #12071a 0%, #0b040f 55%, #060207 100%) !important; }
+body.felt-purple   .felt-logo  { filter: hue-rotate(250deg) saturate(0.5); }
+body.felt-blue     #table-area { background: radial-gradient(ellipse at 50% 40%, #06101a 0%, #040b0f 55%, #020507 100%) !important; }
+body.felt-blue     .felt-logo  { filter: hue-rotate(180deg) saturate(0.5); }
 
 /* ── CARD BACK GEOMETRIC PATTERN ── */
 .card.down {
@@ -2094,7 +2100,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
           <div>⚡ <span style="color:var(--white)">2 power-ups/shoe</span> <span style="opacity:.5">(standard: 1)</span></div>
           <div>🎁 <span style="color:var(--white)">1 free power-up/day</span></div>
           <div>🌡️ <span style="color:var(--white)">Hot/cold shoe indicator</span></div>
-          <div>🎨 <span style="color:var(--white)">Table colour toggle</span></div>
+          <div>🎨 <span style="color:var(--white)">Table colour</span> <span style="opacity:.5">dark / green / burgundy / purple / blue</span></div>
         </div>
       </div>
 
@@ -7269,18 +7275,25 @@ function _animateBalance(from, to){
 }
 
 // ── FELT COLOUR TOGGLE (pass players only) ────────────────────────────────────
+const _FELT_COLOURS = ['dark','green','burgundy','purple','blue'];
+const _FELT_LABELS  = { dark:'🖤 Dark', green:'♠ Green', burgundy:'🍷 Burgundy', purple:'🔮 Purple', blue:'🌊 Blue' };
+
 function toggleFelt(){
   if(!G._clubPass) return;
-  const green = document.body.classList.toggle('felt-green');
-  localStorage.setItem('kfc_felt', green ? 'green' : 'dark');
-  notif(green ? '🎨 Green felt' : '🎨 Dark felt');
+  const current = localStorage.getItem('kfc_felt') || 'dark';
+  const idx = _FELT_COLOURS.indexOf(current);
+  const next = _FELT_COLOURS[(idx + 1) % _FELT_COLOURS.length];
+  localStorage.setItem('kfc_felt', next);
+  _applyFelt();
+  notif('🎨 ' + _FELT_LABELS[next]);
 }
+
 function _applyFelt(){
-  if(G._clubPass && localStorage.getItem('kfc_felt') === 'green'){
-    document.body.classList.add('felt-green');
-  } else {
-    document.body.classList.remove('felt-green');
-  }
+  // Remove all felt classes first
+  _FELT_COLOURS.forEach(c => { if(c !== 'dark') document.body.classList.remove('felt-' + c); });
+  if(!G._clubPass) return;
+  const felt = localStorage.getItem('kfc_felt') || 'dark';
+  if(felt !== 'dark') document.body.classList.add('felt-' + felt);
 }
 
 // ── SESSION STATS ─────────────────────────────────────────────────────────────
