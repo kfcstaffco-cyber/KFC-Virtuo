@@ -3780,8 +3780,12 @@ function toggleSidebar(){
   mn.style.gridTemplateColumns=col?'1fr 0':'';
   if(btn) btn.textContent=col?'⊟':'⊞';
   localStorage.setItem('kfc_sb_col',col?'1':'0');
-  // Recalculate announce center after transition
-  setTimeout(updateAnnounceCx, 380);
+  // Recalculate announce center and redraw chart after CSS transition completes (~350ms)
+  setTimeout(()=>{
+    updateAnnounceCx();
+    const canvas=document.getElementById('session-chart-canvas');
+    if(canvas && _chartPts.length>1) _drawChart(canvas);
+  }, 380);
 }
 
 // Position tooltips via JS to escape overflow:hidden parent
@@ -4708,8 +4712,13 @@ function confirmTopUp(){
   G.log.push({detail:'Top Up +'+fmtKFC(amount),pl:0,bal:G.balance,topup:true});
   updateUI(); renderLog();
   closeModal('topup-modal');
-  // Reset _atCashout flag so the session continues normally
+  // Reset session flags — treat as a fresh session start after sync+top-up
+  // so that if the player reloads, the session restores correctly
   G._atCashout=false;
+  G.cashedOut=false;
+  // _sessionActive: keep as-is (false if no hand dealt yet, true if continuing)
+  // but for a post-cashout top-up, force a clean session start
+  G._sessionActive=false; // will become true again on first deal
   notif('✓ '+fmtKFC(amount)+' added to session');
   sfx('cash');
   saveSession();
@@ -5443,7 +5452,24 @@ function advOrEnd(reason){
   }
   if(reason==='desert_push'||reason==='bust'){
     renderScores();
-    if(G.cur<G.hands.length-1){G.cur++;renderAll();setActions(true);msg('HAND '+(G.cur+1));}
+    if(G.cur<G.hands.length-1){
+      G.cur++; renderAll();
+      // Check if the newly active hand is already a BJ (e.g. hand 1 busted, hand 2 has BJ)
+      if(isBJ(G.hands[G.cur])){
+        const _isH2Seat=G._hand2Active&&G.cur===1&&G.splits===0;
+        sfx('bj'); showBJ();
+        if(_isH2Seat){
+          msg('HAND 2: BLACKJACK!','bj');
+          setActions(false);
+          setTimeout(()=>settle('player_bj'), 600);
+        } else {
+          notif('BLACKJACK on split hand!');
+          setTimeout(()=>advOrEnd(),300);
+        }
+      } else {
+        setActions(true); msg('HAND '+(G.cur+1));
+      }
+    }
     else dealerPlay();
     return;
   }
