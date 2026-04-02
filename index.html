@@ -253,6 +253,60 @@ body.pass-player .chip:hover { box-shadow: 0 3px 8px rgba(0,0,0,.5), 0 0 20px rg
 #shoe-summary-modal .shoe-summary-pl { font-family:var(--mono); font-size:22px; font-weight:700; margin:8px 0 4px; }
 #shoe-summary-modal .shoe-summary-sub { font-family:var(--mono); font-size:10px; color:var(--muted); letter-spacing:2px; }
 
+/* ── PASS PLAYER TOPBAR GLOW LINE ── */
+body.pass-player #topbar {
+  border-bottom: 1px solid transparent;
+  background-image: linear-gradient(var(--bg1),var(--bg1)),
+    linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.5) 30%, rgba(201,168,76,0.8) 50%, rgba(201,168,76,0.5) 70%, transparent 100%);
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+}
+
+/* ── GREEN FELT TABLE (pass players only) ── */
+body.felt-green #table-area { background: radial-gradient(ellipse at 50% 40%, #0a2a16 0%, #071a0f 55%, #030d07 100%) !important; }
+body.felt-green .felt-logo { filter: hue-rotate(60deg) saturate(0.6); }
+
+/* ── CARD BACK GEOMETRIC PATTERN ── */
+.card.down {
+  background: #0d1f35;
+  border: 1px solid #1e3a5a;
+  overflow: hidden;
+}
+.card.down::before {
+  content: '';
+  position: absolute; inset: 0;
+  background-image: url("KFC_LOGO.png");
+  background-size: 68%;
+  background-repeat: no-repeat;
+  background-position: center;
+  mix-blend-mode: screen;
+  opacity: 0.55;
+}
+/* Geometric diamond pattern overlay on card back */
+.card.down::after {
+  content: '';
+  position: absolute; inset: 3px;
+  border: 1px solid rgba(201,168,76,0.35);
+  border-radius: 2px;
+  background-image:
+    repeating-linear-gradient(45deg, rgba(201,168,76,0.04) 0px, rgba(201,168,76,0.04) 1px, transparent 1px, transparent 8px),
+    repeating-linear-gradient(-45deg, rgba(201,168,76,0.04) 0px, rgba(201,168,76,0.04) 1px, transparent 1px, transparent 8px);
+  pointer-events: none;
+}
+
+/* ── SESSION STATS PANEL ── */
+#session-stats-wrap { overflow:hidden; transition:max-height .3s ease, opacity .3s ease; max-height:400px; opacity:1; }
+.stat-row { display:flex; justify-content:space-between; align-items:center; padding:3px 0; border-bottom:1px solid var(--line); }
+.stat-row:last-child { border-bottom:none; }
+.stat-label { font-family:var(--mono); font-size:9px; letter-spacing:1.5px; color:var(--muted); text-transform:uppercase; }
+.stat-val { font-family:var(--mono); font-size:11px; font-weight:600; color:var(--white); }
+.stat-val.pos { color:var(--green); }
+.stat-val.neg { color:var(--red); }
+
+/* ── FELT TOGGLE BUTTON ── */
+#felt-toggle-btn { display:none; }
+body.pass-player #felt-toggle-btn { display:flex; }
+
 /* ─────────────────────────────────────────────
    ZONE HEADERS
 ───────────────────────────────────────────── */
@@ -1720,6 +1774,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <div class="tb-right">
       <button class="btn-ghost" id="btn-music" onclick="toggleMusicPanel()" style="font-size:13px;padding:6px 10px;letter-spacing:1px;position:relative" title="Music">♪</button>
       <button class="btn-ghost" id="sidebar-toggle" onclick="toggleSidebar()" style="font-size:11px;padding:6px 10px;letter-spacing:1px" title="Toggle sidebar">⊞</button>
+      <button class="btn-ghost" id="felt-toggle-btn" onclick="toggleFelt()" style="font-size:11px;padding:6px 10px;letter-spacing:1px" title="Toggle table colour">🎨</button>
       <div class="badge" id="sync-badge">LOCAL</div>
       <button class="btn-ghost" onclick="showTopUp()" style="border-color:rgba(63,185,80,0.4);color:var(--green)" id="btn-topup">Top Up</button>
       <button class="btn-ghost" onclick="showCashout()">Cash Out</button>
@@ -2014,6 +2069,33 @@ body.hand2-active #chip-strip .chip { position: relative; }
         </div>
         <div id="panel-lev"></div>
         <div id="panel-pu" style="display:none"></div>
+      </div>
+
+      <!-- SESSION STATS -->
+      <div class="panel">
+        <div class="panel-title" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between" onclick="toggleSessionStats()">
+          Session Stats
+          <span id="stats-toggle-icon" style="font-size:11px;color:var(--muted);letter-spacing:1px;font-family:var(--mono);transition:transform .2s">▼</span>
+        </div>
+        <div id="session-stats-wrap">
+          <div id="session-stats-content" style="padding:6px 0"></div>
+        </div>
+      </div>
+
+      <!-- 21 CLUB PASS INFO (pass players only) -->
+      <div class="panel" id="pass-perks-panel" style="display:none">
+        <div class="panel-title" style="display:flex;align-items:center;gap:8px">
+          <span>👑</span> 21 Club Pass
+        </div>
+        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);line-height:1.9;padding:4px 0">
+          <div style="color:var(--gold);margin-bottom:4px;letter-spacing:1px">YOUR PERKS</div>
+          <div>🃏 <span style="color:var(--white)">15 shoes/day</span> <span style="opacity:.5">(standard: 5)</span></div>
+          <div>🤜 <span style="color:var(--white)">2nd hand</span> <span style="opacity:.5">unlocked</span></div>
+          <div>⚡ <span style="color:var(--white)">2 power-ups/shoe</span> <span style="opacity:.5">(standard: 1)</span></div>
+          <div>🎁 <span style="color:var(--white)">1 free power-up/day</span></div>
+          <div>🌡️ <span style="color:var(--white)">Hot/cold shoe indicator</span></div>
+          <div>🎨 <span style="color:var(--white)">Table colour toggle</span></div>
+        </div>
       </div>
 
       <!-- LOG -->
@@ -4078,6 +4160,7 @@ window.onload=()=>{
   const stEl=document.getElementById('strategy-toggle'); if(stEl) stEl.checked=_strategyOn;
   // Load auto same-bet preference
   _autoSameBet=localStorage.getItem('kfc_autobet')==='1';
+  // Felt colour preference is applied via _applyFelt() inside _updatePassUI()
   const abEl=document.getElementById('auto-same-bet-toggle'); if(abEl) abEl.checked=_autoSameBet;
   try{G.pins=JSON.parse(localStorage.getItem('kfc_pins')||'{}');}catch(e){G.pins={};}
   const cfgEl=document.getElementById('cfg-url');
@@ -4463,14 +4546,16 @@ function updateUI(){
   const balEl=document.getElementById('tb-bal');
   const prev=G._prevBalance;
   const cur=G.balance;
-  balEl.textContent=fmtKFC(cur);
-  // Flash balance on change
+  // Animate balance count-up/down instead of snapping
   if(prev!==undefined && cur!==prev){
+    _animateBalance(prev, cur);
     const cls=cur>prev?'flash-win':'flash-lose';
     balEl.classList.remove('flash-win','flash-lose');
-    void balEl.offsetWidth; // force reflow to restart animation
+    void balEl.offsetWidth;
     balEl.classList.add(cls);
     setTimeout(()=>balEl.classList.remove(cls),700);
+  } else {
+    balEl.textContent=fmtKFC(cur);
   }
   G._prevBalance=cur;
   // Subtract 1 for the cut card which is still in the deck
@@ -5062,7 +5147,7 @@ function deal(){
   const _ms=document.getElementById('msg-strip');if(_ms){_ms.className='';_ms.textContent='';}
   resetCards();
   const _bc=document.getElementById('bet-circle');if(_bc){_bc.classList.remove('visible');}
-  // Draw all 4 cards at once — stagger via CSS animation-delay
+  // Draw all 4 cards, then reveal one at a time with stagger
   const p1=draw(),p2=draw(),d1=draw(),d2=draw();
   G.hands[0].push(p1,p2); G.dealer.push(d1,d2);
   // Second hand — deal 2 more cards if active
@@ -5072,7 +5157,7 @@ function deal(){
   G._dealStagger=true;
   renderAll();
   G._dealStagger=false;
-  // Staggered card sounds
+  // Staggered card sounds — one click per card dealt
   [0,300,600,900].forEach(t=>setTimeout(()=>sfx('card'),t));
 
   // Helper: fire bonuses for the initial two drawn cards (p1, p2 style),
@@ -5533,7 +5618,9 @@ function dealerPlay(){
       if(c.bonus&&c.bonus.jester) onDealerJester(); // jester stays as 0-value, no replacement
       appendDealerCard(c);
       renderScores();
-      setTimeout(drawDealer, 900);
+      // Randomised pause 650–950ms — feels like a real dealer turning cards
+      const pause = 650 + Math.floor(Math.random()*300);
+      setTimeout(drawDealer, pause);
     } else {
       // Don't re-render dealer cards — they're already in the DOM via appendDealerCard
       // Just update scores and settle
@@ -6385,6 +6472,9 @@ function toggleLog(){
 function renderLog(){
   const c=document.getElementById('log');
   const rows=[...G.log].reverse();
+  // Keep session stats live
+  const statsWrap = document.getElementById('session-stats-wrap');
+  if(statsWrap && statsWrap.style.maxHeight !== '0px') _updateSessionStats();
   if(!rows.length){c.innerHTML='<div style="font-family:var(--mono);font-size:10px;color:var(--muted);padding:8px 0">No hands yet</div>';return;}
   c.innerHTML=rows.map(e=>{
     const bd=e.breakdown;
@@ -7151,9 +7241,90 @@ function _updatePassUI(){
   if(badge) badge.style.display = G._clubPass ? 'inline' : 'none';
   if(G._clubPass) document.body.classList.add('pass-player');
   else document.body.classList.remove('pass-player');
+  _applyFelt();
+  _updatePassPerksPanel();
   _updateShoeTemp();
   buildPuPanel();
   updateBetPanel();
+}
+
+// ── BALANCE COUNT-UP ANIMATION ───────────────────────────────────────────────
+let _balAnimId = null;
+function _animateBalance(from, to){
+  if(_balAnimId){ cancelAnimationFrame(_balAnimId); _balAnimId=null; }
+  const el = document.getElementById('tb-bal');
+  if(!el) return;
+  if(from === to){ el.textContent = fmtKFC(to); return; }
+  const DURATION = 600;
+  const start = performance.now();
+  function step(now){
+    const p = Math.min((now - start) / DURATION, 1);
+    const ease = 1 - Math.pow(1 - p, 3); // cubic ease-out
+    const cur = Math.round(from + (to - from) * ease);
+    el.textContent = fmtKFC(cur);
+    if(p < 1) _balAnimId = requestAnimationFrame(step);
+    else { el.textContent = fmtKFC(to); _balAnimId = null; }
+  }
+  _balAnimId = requestAnimationFrame(step);
+}
+
+// ── FELT COLOUR TOGGLE (pass players only) ────────────────────────────────────
+function toggleFelt(){
+  if(!G._clubPass) return;
+  const green = document.body.classList.toggle('felt-green');
+  localStorage.setItem('kfc_felt', green ? 'green' : 'dark');
+  notif(green ? '🎨 Green felt' : '🎨 Dark felt');
+}
+function _applyFelt(){
+  if(G._clubPass && localStorage.getItem('kfc_felt') === 'green'){
+    document.body.classList.add('felt-green');
+  } else {
+    document.body.classList.remove('felt-green');
+  }
+}
+
+// ── SESSION STATS ─────────────────────────────────────────────────────────────
+function _updateSessionStats(){
+  const el = document.getElementById('session-stats-content');
+  if(!el) return;
+  const hands = G.log.filter(e=>!e.topup);
+  const n = hands.length;
+  if(n === 0){ el.innerHTML = '<div style="font-family:var(--mono);font-size:10px;color:var(--muted);padding:4px 0">No hands yet</div>'; return; }
+  const wins   = hands.filter(e=>e.pl>0).length;
+  const losses = hands.filter(e=>e.pl<0).length;
+  const pushes = hands.filter(e=>e.pl===0).length;
+  const totalPL = hands.reduce((a,e)=>a+e.pl, 0);
+  const avgBet = hands.reduce((a,e)=>{ const b=e.breakdown&&e.breakdown.main?e.breakdown.main.bet:0; return a+b; }, 0) / n;
+  const bestHand = hands.reduce((mx,e)=>e.pl>mx?e.pl:mx, 0);
+  const worstHand = hands.reduce((mn,e)=>e.pl<mn?e.pl:mn, 0);
+  const winRate = Math.round(wins/n*100);
+
+  el.innerHTML = `
+    <div class="stat-row"><span class="stat-label">Hands</span><span class="stat-val">${n}</span></div>
+    <div class="stat-row"><span class="stat-label">Win Rate</span><span class="stat-val ${winRate>=50?'pos':'neg'}">${winRate}%</span></div>
+    <div class="stat-row"><span class="stat-label">W / L / P</span><span class="stat-val">${wins} / ${losses} / ${pushes}</span></div>
+    <div class="stat-row"><span class="stat-label">Session P&L</span><span class="stat-val ${totalPL>0?'pos':totalPL<0?'neg':''}">${totalPL>=0?'+':''}${fmtKFC(totalPL)}</span></div>
+    <div class="stat-row"><span class="stat-label">Avg Bet</span><span class="stat-val">${fmtKFC(Math.round(avgBet))}</span></div>
+    ${bestHand>0?`<div class="stat-row"><span class="stat-label">Best Hand</span><span class="stat-val pos">+${fmtKFC(bestHand)}</span></div>`:''}
+    ${worstHand<0?`<div class="stat-row"><span class="stat-label">Worst Hand</span><span class="stat-val neg">${fmtKFC(worstHand)}</span></div>`:''}
+  `;
+}
+
+function toggleSessionStats(){
+  const wrap = document.getElementById('session-stats-wrap');
+  const icon = document.getElementById('stats-toggle-icon');
+  if(!wrap) return;
+  const collapsed = wrap.style.maxHeight === '0px';
+  wrap.style.maxHeight = collapsed ? '400px' : '0px';
+  wrap.style.opacity   = collapsed ? '1'    : '0';
+  if(icon) icon.style.transform = collapsed ? '' : 'rotate(-90deg)';
+  if(collapsed) _updateSessionStats();
+}
+
+// ── PASS PERKS PANEL VISIBILITY ───────────────────────────────────────────────
+function _updatePassPerksPanel(){
+  const p = document.getElementById('pass-perks-panel');
+  if(p) p.style.display = G._clubPass ? 'block' : 'none';
 }
 
 function resetSessionChart() {
