@@ -176,7 +176,7 @@ body:not(.betting) #betting-spacer { flex: 0; }
 /* betting-zone and playing-zone need to NOT both expand simultaneously */
 #betting-zone, #playing-zone { width: 100%; }
 #table-area .felt-logo {
-  position: absolute; top: 39%; left: 50%; transform: translate(-50%, -50%);
+  position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
   width: min(360px, 90vw); height: min(360px, 90vw);
   background-image: url("KFC_LOGO.png");
   background-size: contain; background-repeat: no-repeat; background-position: center;
@@ -4464,6 +4464,21 @@ function buildChips(){['chip-row','chip-strip'].forEach(rowId=>{const c=document
 function updateBetPanel(){
   const bsa=document.getElementById('bet-strip-amount');
   if(bsa) bsa.textContent=G.mainBet>0?fmtKFC(G.mainBet):'—';
+  // 2nd hand button — dim and retitle for non-pass players
+  const h2wrap=document.getElementById('hand2-toggle-wrap');
+  const h2btn=document.getElementById('btn-hand2-toggle');
+  const h2lbl=document.getElementById('hand2-label');
+  if(h2wrap){
+    if(!G._clubPass){
+      h2wrap.title='🏆 21 Club Pass feature';
+      if(h2btn){ h2btn.style.opacity='0.3'; h2btn.style.cursor='not-allowed'; }
+      if(h2lbl){ h2lbl.style.opacity='0.3'; }
+    } else {
+      h2wrap.title='';
+      if(h2btn){ h2btn.style.opacity=''; h2btn.style.cursor=''; }
+      if(h2lbl){ h2lbl.style.opacity=''; }
+    }
+  }
   // Deal button (new top deal button) — disabled below stake minimum
   const dealBtnTop=document.getElementById('btn-deal-top');
   if(dealBtnTop){
@@ -6795,6 +6810,11 @@ function resetSessionChart() {
 // ── SECOND HAND ──────────────────────────────────────────────────
 
 function toggleHand2(){
+  // Second hand is a 21 Club pass exclusive feature
+  if(!G._clubPass){
+    notif('🏆 2nd hand is a 21 Club Pass feature — standard players play one hand');
+    return;
+  }
   G._hand2Active = !G._hand2Active;
   if(!G._hand2Active){
     G.mainBet2=0;
