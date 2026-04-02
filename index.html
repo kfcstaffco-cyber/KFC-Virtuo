@@ -137,14 +137,6 @@ select option { background: var(--bg2); }
   position: absolute; left: 50%; transform: translateX(-50%);
 }
 .tb-logo { font-size: 11px; letter-spacing: 5px; color: var(--gold); font-weight: 700; text-transform: uppercase; }
-/* Music track selector buttons */
-.music-track-btn {
-  font-family: var(--mono); font-size: 9px; letter-spacing: 1px; text-transform: uppercase;
-  color: var(--muted2); padding: 6px 10px; border-radius: 2px; cursor: pointer;
-  border: 1px solid transparent; transition: all .15s;
-}
-.music-track-btn:hover { color: var(--white); border-color: var(--line2); background: rgba(255,255,255,.04); }
-.music-track-btn.active { color: var(--gold-hi); border-color: rgba(201,168,76,.35); background: rgba(201,168,76,.07); }
 .tb-center { display: flex; align-items: center; gap: 20px; pointer-events: none; }
 .tb-center > * { pointer-events: auto; }
 .tb-player { font-size: 13px; font-weight: 700; color: var(--white); }
@@ -1676,21 +1668,11 @@ body.hand2-active #chip-strip .chip { position: relative; }
   </div>
 
   <!-- MUSIC PANEL -->
-  <div id="music-panel" style="display:none;position:fixed;top:64px;right:16px;z-index:300;background:var(--bg2);border:1px solid var(--line2);border-radius:4px;padding:16px;width:220px;box-shadow:0 8px 32px rgba(0,0,0,0.6)">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
-      <span style="font-family:var(--mono);font-size:10px;letter-spacing:2px;color:var(--gold);text-transform:uppercase">Music</span>
+  <div id="music-panel" style="display:none;position:fixed;top:64px;right:16px;z-index:300;background:var(--bg2);border:1px solid var(--line2);border-radius:4px;padding:14px 16px;width:200px;box-shadow:0 8px 32px rgba(0,0,0,0.6)">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
       <button onclick="toggleMusicMute()" id="music-mute-btn" style="background:none;border:none;color:var(--muted2);font-size:14px;cursor:pointer;padding:2px 6px;border-radius:2px;transition:color .15s" title="Mute">🔊</button>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px">VELVET UNDERGROUND</span>
     </div>
-    <!-- Track list -->
-    <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:14px" id="music-track-list">
-      <div class="music-track-btn active" onclick="selectTrack(0)">Monte Carlo Bossa Nova</div>
-      <div class="music-track-btn" onclick="selectTrack(1)">Velvet Underground</div>
-      <div class="music-track-btn" onclick="selectTrack(2)">The Long Game</div>
-      <div class="music-track-btn" onclick="selectTrack(3)">The Riviera</div>
-      <div class="music-track-btn" onclick="selectTrack(4)">High Limit Room</div>
-      <div class="music-track-btn" onclick="selectTrack(5)">None</div>
-    </div>
-    <!-- Volume -->
     <div style="display:flex;align-items:center;gap:8px">
       <span style="font-family:var(--mono);font-size:9px;color:var(--muted);letter-spacing:1px;flex-shrink:0">VOL</span>
       <input type="range" id="music-volume" min="0" max="100" value="30"
@@ -1698,8 +1680,6 @@ body.hand2-active #chip-strip .chip { position: relative; }
         style="flex:1;accent-color:var(--gold);height:3px;cursor:pointer">
       <span id="music-vol-label" style="font-family:var(--mono);font-size:9px;color:var(--muted);width:26px;text-align:right">30%</span>
     </div>
-    <!-- Now playing -->
-    <div id="music-now-playing" style="margin-top:10px;font-family:var(--mono);font-size:8px;color:var(--muted);letter-spacing:1px;text-align:center;min-height:12px"></div>
   </div>
 
   <!-- MAIN -->
@@ -2984,26 +2964,7 @@ function _mf(m){ return 440*Math.pow(2,(m-69)/12); }
 // ── Track builders: (ctx_unused, out, t) signature for _playTrack ────
 const MUSIC_TRACKS = [
 
-// 0 — Monte Carlo Bossa Nova
-function(_c,out,t){
-  const bpm=80,beat=60/bpm,bar=beat*4,bars=16,dur=bar*bars;
-  const bm=[53,55,57,53,52,50,52,55,45,47,49,52,50,52,53,57,
-            53,55,57,59,57,55,53,52,50,52,53,55,53,52,50,53,
-            53,55,57,53,52,50,52,55,45,47,49,52,50,52,53,57,
-            53,57,60,57,55,53,52,50,52,53,55,57,53,0,0,0];
-  for(let b=0;b<bars*4;b++){if(!bm[b%bm.length])continue;_bass(_mf(bm[b%bm.length]),t+b*beat,beat*0.62,0.22,out);}
-  const bc=[[53,57,60,64],[52,55,59,62],[45,49,52,57],[50,53,57,60]];
-  for(let b=0;b<bars;b++){const c=bc[b%4];[0,2.5].forEach(bp=>{const bt=t+b*bar+bp*beat;c.forEach((m,ci)=>_piano(_mf(m),bt+ci*0.007,beat*1.6,0.030,out));});}
-  for(let b=0;b<bars;b++){_kick(t+b*bar,0.38,out);_kick(t+b*bar+beat*2.5,0.26,out);}
-  for(let b=0;b<bars;b++){[1,2,3,3.5].forEach(bp=>_rimshot(t+b*bar+bp*beat,0.13,out));}
-  for(let b=0;b<bars*4;b++){_hat(t+b*beat,b%2===0?0.042:0.024,0.055,out);_hat(t+b*beat+beat*0.5,0.016,0.04,out);}
-  for(let b=0;b<bars*8;b++){_shaker(t+b*beat*0.5,0.028,out);}
-  const melDat=[[72,0.9],[69,0.4],[70,0.4],[67,1.2],[0,0.5],[65,0.4],[67,0.4],[69,0.4],[72,0.4],[74,0.9],[0,0.6],[72,0.5],[70,0.5],[69,0.9],[67,0.4],[65,1.4],[0,0.5],[67,0.4],[69,0.4],[70,0.4],[69,0.9],[67,0.6],[0,0.4],[72,0.9],[69,0.4],[70,0.4],[67,1.2],[0,0.5],[65,0.4],[67,0.4],[69,0.4],[72,0.4],[74,0.9],[0,0.6],[76,0.5],[74,0.5],[72,0.9],[70,0.4],[69,1.4],[0,0.5],[70,0.4],[69,0.4],[67,0.4],[65,1.2],[0,0.6],[76,1.2],[74,0.4],[72,0.4],[70,0.4],[69,0.6],[0,0.4],[70,0.4],[72,0.5],[74,0.5],[76,0.9],[77,0.4],[76,0.6],[74,0.5],[72,0.5],[70,0.5],[69,0.5],[67,0.9],[0,0.5],[68,0.4],[69,0.4],[70,0.4],[69,1.4],[0,0.6],[72,0.9],[69,0.4],[70,0.4],[67,1.2],[0,0.5],[65,0.4],[67,0.4],[69,0.4],[72,0.4],[74,0.9],[0,0.6],[72,0.5],[70,0.5],[69,0.5],[67,0.5],[65,0.9],[0,0.5],[64,0.4],[65,0.4],[67,0.9],[65,1.8],[0,0.5]];
-  let mt=t;melDat.forEach(([m,d])=>{if(m&&mt<t+dur)_piano(_mf(m),mt,Math.min(d*beat,beat*2),0.068,out);mt+=d*beat;});
-  return dur;
-},
-
-// 1 — Velvet Underground (Gradual Beat)
+// 0 — Velvet Underground (Gradual Beat)
 function(_c,out,t){
   const dur=40,bpm=72,beat=60/bpm,bar=beat*4;
   [[57,60,64],[52,55,59],[45,48,52]].forEach(c=>c.forEach(m=>_pad(_mf(m),t,dur,0.050,out)));
@@ -3019,70 +2980,11 @@ function(_c,out,t){
     if((b%4===2||b%4===3)&&snareVol>0.005)_snare(bt,snareVol,out);
   }
   return dur;
-},
-
-// 2 — The Long Game (Cinematic Hybrid)
-function(_c,out,t){
-  const bpm=82,beat=60/bpm,bar=beat*4,bars=16,dur=bar*bars;
-  [[57,60,64,67],[53,57,60,65],[48,52,55,60],[52,56,59,64],[57,60,64,67],[53,57,60,65],[48,52,55,60],[52,56,59,64]].forEach((c,ci)=>c.forEach(m=>_horn(_mf(m),t+ci*bar,bar*0.9,0.072,out)));
-  const ost=[57,59,60,62,64,62,60,59,57,59,60,62,64,65,64,62,57,59,60,62,64,62,60,59,57,59,60,62,64,65,64,62];
-  ost.forEach((m,i)=>_strings(_mf(m),t+i*(bar*8/ost.length),bar*8/ost.length,0.060,out));
-  [[45,52],[33,40],[38,45]].forEach(([m1,m2],li)=>{_distantPad(_mf(m1),t+li*4,dur-li*4,0.042,out);_distantPad(_mf(m2),t+li*4+2,dur-li*4-2,0.028,out);});
-  const ctx=_mc();const sub=ctx.createOscillator();sub.type='sine';sub.frequency.value=_mf(33);const sg=ctx.createGain();sg.gain.setValueAtTime(0.12,t);sg.gain.exponentialRampToValueAtTime(0.0001,t+dur);sub.connect(sg);sg.connect(out);sub.start(t);sub.stop(t+dur);_n(sub);
-  const beatStart=t+bar*8,beatBars=bars-8;
-  for(let b=0;b<beatBars*4;b++){const bt=beatStart+b*beat;if(b%4===0)_kickDeep(bt,0.50,out);if(b%8===6)_kickDeep(bt+beat*0.75,0.30,out);}
-  for(let b=0;b<beatBars*4;b++){if(b%4===2)_snareCrack(beatStart+b*beat,0.14,out);if(b%8===7)_snareCrack(beatStart+b*beat+beat*0.5,0.08,out);}
-  for(let b=0;b<beatBars*8;b++){if(b%3===0||b%3===2)_hat(beatStart+b*beat*0.5,0.032,0.04,out);}
-  [[57,60,64,67],[53,57,60,65],[48,52,55,60],[52,56,59,64],[57,60,64,67],[53,57,60,65],[48,52,55,60],[52,56,59,64]].forEach((c,ci)=>c.forEach(m=>_horn(_mf(m),beatStart+ci*bar,bar*0.88,0.080,out)));
-  const ost2=[57,59,60,62,64,62,60,59,57,59,60,62,64,65,64,62,57,59,60,62,64,62,60,59,57,59,60,62,64,65,64,62];
-  ost2.forEach((m,i)=>_strings(_mf(m),beatStart+i*(bar*8/ost2.length),bar*8/ost2.length,0.065,out));
-  return dur;
-},
-
-// 3 — The Riviera (Luxury Funk)
-function(_c,out,t){
-  const bpm=115,beat=60/bpm,bar=beat*4,bars=16,dur=bar*bars;
-  for(let b=0;b<bars*4;b++){if(b%4===0)_kickDeep(t+b*beat,0.42,out);if(b%8===6)_kickDeep(t+b*beat+beat*0.75,0.24,out);}
-  for(let b=0;b<bars*4;b++){if(b%4===2)_snare(t+b*beat,0.13,out);if(b%4===1)_snare(t+b*beat+beat*0.5,0.04,out);if(b%4===3)_snare(t+b*beat+beat*0.25,0.03,out);}
-  for(let b=0;b<bars*8;b++){_hat(t+b*beat*0.5,b%2===0?0.046:0.024,0.035,out);}
-  for(let b=0;b<bars*4;b++){if(b%4===2)_openHat(t+b*beat+beat*0.5,0.036,out);}
-  const bm=[45,45,48,45,50,48,45,45,43,45,48,45,50,48,45,43,45,48,50,48,45,43,45,48,50,52,50,48,45,45,43,45];
-  for(let rep=0;rep<Math.ceil(bars/8);rep++){bm.forEach((m,i)=>{const bt=t+rep*bar*8+i*beat*0.5;if(bt<t+dur)_slapBass(_mf(m),bt,beat*0.38,0.24,out);});}
-  const chords=[[57,60,64,67],[50,54,57,62],[55,59,62,67],[52,55,59,64]];
-  for(let b=0;b<bars;b++){const c=chords[b%4];[1,2.5,3.5].forEach(bp=>{const bt=t+b*bar+bp*beat;c.forEach(m=>_rhodes(_mf(m),bt,beat*0.28,0.038,out));});}
-  const brassChords=[[60,64,67],[55,59,62],[57,60,64],[53,57,60]];
-  for(let b=0;b<bars;b++){const c=brassChords[b%4];[0.5,2].forEach(bp=>{const bt=t+b*bar+bp*beat;c.forEach(m=>_horn(_mf(m),bt,beat*0.22,0.048,out));});}
-  const melDat=[[0,0.5],[72,0.4],[72,0.4],[69,0.6],[0,0.5],[71,0.4],[72,0.4],[0,0.3],[76,0.9],[0,0.4],[74,0.4],[72,0.4],[69,0.5],[67,0.4],[0,0.5],[69,0.4],[0,0.3],[72,0.4],[71,1.2],[0,0.7],[0,0.5],[72,0.4],[72,0.4],[69,0.6],[0,0.5],[71,0.4],[72,0.4],[0,0.3],[76,0.9],[0,0.4],[77,0.4],[76,0.4],[74,0.4],[72,0.4],[0,0.4],[74,0.5],[72,0.5],[71,0.4],[69,1.4],[0,0.4],[64,0.4],[65,0.4],[67,0.9],[0,0.4],[69,0.4],[67,0.4],[65,0.4],[64,0.9],[0,0.4],[65,0.4],[67,0.4],[69,0.4],[71,0.4],[72,0.9],[0,0.4],[74,0.5],[0,0.3],[72,0.5],[0,0.3],[69,1.4],[0,0.4],[0,0.5],[72,0.4],[72,0.4],[69,0.6],[0,0.5],[71,0.4],[72,0.4],[0,0.3],[76,0.9],[79,0.5],[77,0.4],[76,0.4],[74,0.4],[72,0.4],[71,0.4],[69,0.4],[0,0.4],[67,0.4],[69,1.8],[0,0.6]];
-  let mt=t;melDat.forEach(([m,d])=>{if(m&&mt<t+dur)_rhodes(_mf(m),mt,Math.min(d*beat*0.92,beat*1.8),0.060,out);mt+=d*beat;});
-  return dur;
-},
-
-// 4 — High Limit Room (Minimal Techno, 48 bars)
-function(_c,out,t){
-  const bpm=115,beat=60/bpm,bar=beat*4,bars=48,dur=bar*bars;
-  for(let b=0;b<bars*4;b++){const bt=t+b*beat;_kickMuffled(bt,0.54,out);if(b%8===6)_kickMuffled(bt+beat*0.75,0.28,out);}
-  for(let b=32;b<bars*4;b++){const bt=t+b*beat;if(b%4===2)_snareT5(bt,0.14,out);if(b%4===0&&b>32)_snareT5(bt,0.10,out);if(b%8===5)_snareT5(bt+beat*0.5,0.05,out);}
-  for(let b=32;b<bars*4;b++){const bt=t+b*beat;if(b%4===1||b%4===3)_rimClick(bt,0.048,out);if(b%8===5)_rimClick(bt+beat*0.5,0.030,out);}
-  for(let b=64;b<bars*4;b++){const bt=t+b*beat;if(b%4===2)_openHat(bt+beat*0.5,0.038,out);if(b%8===3)_openHat(bt,0.025,out);}
-  for(let b=64;b<bars*8;b++){if(Math.random()>0.3)_hat(t+b*beat*0.5,0.028+Math.random()*0.012,0.03,out);}
-  for(let b=96;b<bars*8;b++){_shaker(t+b*beat*0.5,0.020,out);}
-  for(let b=0;b<bars*4;b+=2){_bass(_mf(45),t+b*beat,beat*0.55,0.30,out);if(b%4===2)_bass(_mf(48),t+b*beat+beat,beat*0.40,0.18,out);if(b%8===4)_bass(_mf(43),t+b*beat+beat*1.5,beat*0.35,0.14,out);}
-  _pad(_mf(57),t,dur,0.032,out);_pad(_mf(60),t,dur,0.024,out);
-  _pad(_mf(55),t+bar*24,dur-bar*24,0.020,out);_pad(_mf(58),t+bar*24,dur-bar*24,0.016,out);
-  function _t5note(m,bt,d,vol){if(bt>=t+dur*1.01)return;const ctx=_mc();const o=ctx.createOscillator();o.type='sine';o.frequency.value=_mf(m);const g=ctx.createGain();g.gain.setValueAtTime(0,bt);g.gain.linearRampToValueAtTime(vol,bt+0.015);g.gain.exponentialRampToValueAtTime(0.0001,bt+d);o.connect(g);g.connect(out);o.start(bt);o.stop(bt+d+0.02);_n(o);}
-  const repStart=t+bar*4,repLen=bar*8;
-  {const r=repStart;_t5note(69,r+beat*0,0.22,0.052);_t5note(72,r+beat*1,0.18,0.042);_t5note(76,r+beat*2,0.28,0.058);}
-  {const r=repStart+repLen;_t5note(69,r,0.22,0.055);_t5note(72,r+beat,0.18,0.045);_t5note(76,r+beat*2,0.28,0.060);_t5note(74,r+beat*3.5,0.18,0.038);_t5note(72,r+beat*4,0.18,0.035);_t5note(69,r+beat*5,0.30,0.050);}
-  {const r=repStart+repLen*2;_t5note(81,r,0.18,0.040);_t5note(79,r+beat*0.5,0.15,0.032);_t5note(76,r+beat,0.22,0.052);_t5note(72,r+beat*2,0.18,0.045);_t5note(69,r+beat*3,0.35,0.062);_t5note(67,r+beat*4.5,0.18,0.038);_t5note(69,r+beat*5.5,0.28,0.050);}
-  {const r=repStart+repLen*3;[0,0.25,1,1.25,2,3,3.5,4,5,5.25,6].forEach((off,i)=>{const notes=[69,69,72,72,76,74,74,72,69,69,67];const vols=[0.06,0.03,0.055,0.028,0.065,0.040,0.025,0.045,0.058,0.028,0.035];_t5note(notes[i]||69,r+beat*off,0.12,vols[i]||0.04);});}
-  {const r=repStart+repLen*4;_t5note(81,r,0.25,0.038);_t5note(84,r+beat,0.20,0.030);_t5note(88,r+beat*2,0.30,0.042);_t5note(84,r+beat*3.5,0.18,0.025);_t5note(81,r+beat*4.5,0.35,0.038);_t5note(69,r,0.25,0.028);_t5note(72,r+beat,0.20,0.022);_t5note(76,r+beat*2,0.30,0.030);}
-  {const r=repStart+repLen*5;_t5note(69,r,0.22,0.060);_t5note(72,r+beat,0.18,0.050);_t5note(76,r+beat*2,0.28,0.065);_t5note(74,r+beat*3.5,0.18,0.042);_t5note(72,r+beat*4,0.18,0.038);_t5note(69,r+beat*5,0.18,0.055);_t5note(67,r+beat*6,0.18,0.038);_t5note(69,r+beat*7,0.40,0.068);}
-  return dur;
 }
 
 ]; // end MUSIC_TRACKS
 
-const TRACK_NAMES=['Monte Carlo Bossa Nova','Velvet Underground','The Long Game','The Riviera','High Limit Room'];
+const TRACK_NAMES=['Velvet Underground'];
 
 // ── Seamless loop engine ──────────────────────────────────
 // Instead of setTimeout drift, we schedule the next loop iteration
@@ -3091,7 +2993,7 @@ const TRACK_NAMES=['Monte Carlo Bossa Nova','Velvet Underground','The Long Game'
 
 function _playTrack(idx){
   _stopMusic();
-  if(idx<0||idx>4) return;
+  if(idx!==0) return;
   const ctx=_musicCtx();
 
   function _scheduleIteration(startAt){
@@ -3118,20 +3020,10 @@ function _playTrack(idx){
   _scheduleIteration(ctx.currentTime+0.05);
 }
 
-function selectTrack(idx){
-  document.querySelectorAll('.music-track-btn').forEach((el,i)=>{
-    el.classList.toggle('active', i===idx);
-  });
-  if(idx===5){
-    _stopMusic(); MUSIC.currentTrack=-1;
-    const np=document.getElementById('music-now-playing'); if(np) np.textContent='';
-    const btn=document.getElementById('btn-music'); if(btn) btn.style.color='';
-    return;
-  }
-  MUSIC.currentTrack=idx;
-  _playTrack(idx);
-  const np=document.getElementById('music-now-playing');
-  if(np) np.textContent='▶ '+TRACK_NAMES[idx];
+function startMusic(){
+  if(MUSIC.currentTrack===0) return; // already playing
+  MUSIC.currentTrack=0;
+  _playTrack(0);
   const btn=document.getElementById('btn-music');
   if(btn) btn.style.color=MUSIC.muted?'var(--muted)':'var(--gold-hi)';
 }
@@ -3141,14 +3033,13 @@ function toggleMusicPanel(){
   if(!panel) return;
   const visible=panel.style.display!=='none';
   panel.style.display=visible?'none':'block';
-  if(!visible && MUSIC.currentTrack===-1) selectTrack(0);
 }
 
 function toggleMusicMute(){
   MUSIC.muted=!MUSIC.muted;
   if(MUSIC.gainNode) MUSIC.gainNode.gain.linearRampToValueAtTime(MUSIC.muted?0:MUSIC.volume, MUSIC.ctx.currentTime+0.05);
   const btn=document.getElementById('music-mute-btn'); if(btn) btn.textContent=MUSIC.muted?'🔇':'🔊';
-  const mbtn=document.getElementById('btn-music'); if(mbtn) mbtn.style.color=MUSIC.muted?'var(--muted)':(MUSIC.currentTrack>=0?'var(--gold-hi)':'');
+  const mbtn=document.getElementById('btn-music'); if(mbtn) mbtn.style.color=MUSIC.muted?'var(--muted)':'var(--gold-hi)';
 }
 
 function setMusicVolume(val){
@@ -3164,19 +3055,6 @@ document.addEventListener('click',(e)=>{
     if(!panel.contains(e.target)&&!btn.contains(e.target)) panel.style.display='none';
   }
 });
-
-function _musicCtx(){
-  if(!MUSIC.ctx){ MUSIC.ctx=new(window.AudioContext||window.webkitAudioContext)(); }
-  if(MUSIC.ctx.state==='suspended') MUSIC.ctx.resume();
-  if(!MUSIC.gainNode){
-    MUSIC.gainNode=MUSIC.ctx.createGain();
-    MUSIC.gainNode.gain.value=MUSIC.muted?0:MUSIC.volume;
-    MUSIC.gainNode.connect(MUSIC.ctx.destination);
-  }
-  return MUSIC.ctx;
-}
-
-
 
 let _pendingLogin = null;
 
@@ -4158,12 +4036,13 @@ function openApp(displayName, balance){
   if(!G.deck||G.deck.length===0) G.deck=buildShoe();
   msg('PLACE YOUR BET');
   setTimeout(()=>playWelcomeSound(), 300); // slight delay so audio context is ready
+  setTimeout(()=>startMusic(), 800); // start Velvet Underground after welcome sound
   // On session restore (page reload), AudioContext may still be suspended before a user gesture.
   // Schedule a one-shot retry the moment the user first interacts with the page.
   (function scheduleWelcomeSoundRetry(){
     const ctx2=window._kfcCtx;
     if(ctx2&&ctx2.state==='suspended'){
-      const once=()=>{ playWelcomeSound(); document.removeEventListener('pointerdown',once); document.removeEventListener('keydown',once); };
+      const once=()=>{ playWelcomeSound(); startMusic(); document.removeEventListener('pointerdown',once); document.removeEventListener('keydown',once); };
       document.addEventListener('pointerdown',once,{once:true});
       document.addEventListener('keydown',once,{once:true});
     }
@@ -6872,13 +6751,37 @@ function resetHand2State(){
   document.body.classList.remove('hand2-active');
 }
 
-// ── IN-GAME BACKGROUND: Vanishing Point Center (perspective warp) ──────────
+// ── IN-GAME BACKGROUND: Particle Vortex ────────────────────────────────────
 (function initGridBg(){
   const canvas=document.getElementById('grid-bg');
   if(!canvas) return;
   canvas.style.display='block';
   const ctx=canvas.getContext('2d');
   let W=0,H=0,animId=null,t=0;
+
+  // Particle pool
+  const N=180;
+  const particles=[];
+
+  function mkParticle(i){
+    // Distribute particles across spiral arms with varied depths
+    const arm=i%3;
+    const armOffset=(arm/3)*Math.PI*2;
+    const angle=armOffset + (i/N)*Math.PI*12 + Math.random()*0.4;
+    const depth=Math.random(); // 0=far, 1=near
+    const radius=0.05 + Math.random()*0.7;
+    return {
+      angle,          // current angle in vortex
+      radius,         // normalised distance from centre (0-1)
+      depth,          // z-layer
+      baseOp: 0.06 + Math.random()*0.22,
+      speed: 0.003 + Math.random()*0.007,   // angular speed
+      drift: -0.0008 - Math.random()*0.0012, // inward drift
+      size: 0.6 + Math.random()*1.6,
+    };
+  }
+
+  for(let i=0;i<N;i++) particles.push(mkParticle(i));
 
   function resize(){
     W=canvas.offsetWidth; H=canvas.offsetHeight;
@@ -6888,44 +6791,50 @@ function resetHand2State(){
 
   function frame(){
     ctx.clearRect(0,0,W,H);
-    t+=0.010;
-    // Vanishing point aligned to radial-gradient center (50% / 40%)
+    t+=0.016;
     const cx=W*0.50, cy=H*0.40;
-    const lines=16, rings=7;
+    const maxR=Math.min(W,H)*0.55;
 
-    // Radial lines from vanishing point
-    for(let i=0;i<lines;i++){
-      const angle=(i/lines)*Math.PI*2;
-      const wave=Math.sin(t*0.7+i*0.4);
-      const op=Math.max(0,0.04+wave*0.06);
+    for(let i=0;i<N;i++){
+      const p=particles[i];
+
+      // Advance
+      p.angle += p.speed * (1 + p.radius*1.2); // outer particles faster
+      p.radius += p.drift;
+
+      // Respawn at edge when fully collapsed to centre
+      if(p.radius<0.01){
+        p.radius=0.55+Math.random()*0.45;
+        p.angle=Math.random()*Math.PI*2;
+        p.depth=Math.random();
+        p.speed=0.003+Math.random()*0.007;
+        p.drift=-0.0008-Math.random()*0.0012;
+      }
+
+      // 3D perspective: depth scales size & brightness
+      const perspective=0.35 + p.depth*0.65;
+      const r=p.radius*maxR;
+      const x=cx + Math.cos(p.angle)*r;
+      const y=cy + Math.sin(p.angle)*r*0.52; // flatten Y for depth feel
+
+      // Pulse opacity with t and depth
+      const pulse=Math.sin(t*1.4 + p.angle*2.1 + p.depth*3.0)*0.5+0.5;
+      const op=Math.max(0, p.baseOp * perspective * (0.55 + pulse*0.45));
+      const sz=p.size * perspective * (0.7 + pulse*0.5);
+
       ctx.beginPath();
-      ctx.moveTo(cx,cy);
-      ctx.lineTo(cx+Math.cos(angle)*Math.max(W,H)*1.5, cy+Math.sin(angle)*Math.max(W,H)*1.5);
-      ctx.strokeStyle=`rgba(201,168,76,${op})`;
-      ctx.lineWidth=0.5; ctx.stroke();
-    }
+      ctx.arc(x, y, sz, 0, Math.PI*2);
+      ctx.fillStyle=`rgba(201,168,76,${op.toFixed(3)})`;
+      ctx.fill();
 
-    // Elliptical rings — flattened (ry = rx * 0.55) for perspective feel
-    for(let ri=1;ri<=rings;ri++){
-      const rx=ri*(Math.min(W,H)*0.70/rings);
-      const ry=rx*0.55;
-      const wave=Math.sin(t*1.2-ri*0.7);
-      const op=Math.max(0,0.04+wave*0.07);
-      ctx.beginPath();
-      ctx.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
-      ctx.strokeStyle=`rgba(201,168,76,${op})`;
-      ctx.lineWidth=0.5; ctx.stroke();
-
-      // Dots at ring/line intersections
-      for(let i=0;i<lines;i++){
-        const angle=(i/lines)*Math.PI*2;
-        const dx=cx+Math.cos(angle)*rx;
-        const dy=cy+Math.sin(angle)*ry;
-        const dotR=Math.max(0.1,0.6+wave*0.6);
+      // Trail: draw a short line back along the spiral for faster particles
+      if(p.speed>0.007){
+        const tx=cx + Math.cos(p.angle-0.18)*r*0.96;
+        const ty=cy + Math.sin(p.angle-0.18)*r*0.96*0.52;
         ctx.beginPath();
-        ctx.arc(dx,dy,dotR,0,Math.PI*2);
-        ctx.fillStyle=`rgba(201,168,76,${Math.max(0,op*1.5)})`;
-        ctx.fill();
+        ctx.moveTo(x,y); ctx.lineTo(tx,ty);
+        ctx.strokeStyle=`rgba(201,168,76,${(op*0.35).toFixed(3)})`;
+        ctx.lineWidth=sz*0.5; ctx.stroke();
       }
     }
 
