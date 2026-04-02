@@ -176,7 +176,7 @@ body:not(.betting) #betting-spacer { flex: 0; }
 /* betting-zone and playing-zone need to NOT both expand simultaneously */
 #betting-zone, #playing-zone { width: 100%; }
 #table-area .felt-logo {
-  position: absolute; top: 39%; left: 50%; transform: translate(-50%, -50%);
+  position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
   width: min(360px, 90vw); height: min(360px, 90vw);
   background-image: url("KFC_LOGO.png");
   background-size: contain; background-repeat: no-repeat; background-position: center;
@@ -2326,8 +2326,20 @@ const BONUS_CARDS = [
 ];
 
 // ── STATE ──────────────────────────────────────────────
+// ── SHOE LIMITS ──────────────────────────────────────────────────────────────
+// Change these two values at any time to adjust the daily shoe allowances.
+const SHOES_PER_DAY_STANDARD = 5;   // regular players
+const SHOES_PER_DAY_PASS     = 15;  // 21 Club pass holders
+// localStorage key pattern: kfc_shoes_YYYY-MM-DD_username
+function _shoeKey(username){ return 'kfc_shoes_'+new Date().toISOString().slice(0,10)+'_'+(username||'').toLowerCase(); }
+function _shoesPlayedToday(username){ return parseInt(localStorage.getItem(_shoeKey(username))||'0',10); }
+function _incrementShoesPlayed(username){ localStorage.setItem(_shoeKey(username), _shoesPlayedToday(username)+1); }
+function _shoeLimit(){ return G._clubPass ? SHOES_PER_DAY_PASS : SHOES_PER_DAY_STANDARD; }
+function _shoesRemaining(){ return Math.max(0, _shoeLimit() - _shoesPlayedToday(G.username||G.player)); }
+
 const G = {
   player:'', username:'', balance:0, sessionStart:0, _totalBalance:0,
+  _clubPass: false, // true if player holds the 21 Club pass (set from sheet on login)
   stake:'low', s: STAKES.low,
   deck:[], shoe:4,
   hands:[[]], cur:0, splits:0,
@@ -3813,6 +3825,7 @@ function saveSession(){
       balance:safeBalance, sessionStart:G.sessionStart, totalBalance:G._totalBalance||G.balance, cashedOut:G.cashedOut, sessionActive:G._sessionActive,
       stake:G.stake,
       cachedPin:G._cachedPin||'',
+      clubPass:G._clubPass||false,
       lastMainBet:G.lastMainBet, lastSideBets:G.lastSideBets,
       mainBet:G.mainBet, sideBets:{...G.sideBets},
       leverage:G.leverage,
@@ -3853,6 +3866,7 @@ function restoreSession(){
     // Restore state
     G.player=snap.player; G.username=snap.username||snap.player;
     G._cachedPin=snap.cachedPin||'';
+    G._clubPass=snap.clubPass||false;
     G.balance=snap.balance; G.sessionStart=snap.sessionStart||snap.balance; G._totalBalance=snap.totalBalance||snap.balance; G._sessionActive=snap.sessionActive||false;
     G.stake=snap.stake||'low'; G.s=STAKES[G.stake]||STAKES.low;
     G.lastMainBet=snap.lastMainBet||0; G.lastSideBets=snap.lastSideBets||{};
@@ -4047,6 +4061,7 @@ async function doLogin(){
         err.textContent='';
         G.username=username;
         G._cachedPin=pin;
+        G._clubPass = !!d.clubPass; // read 21 Club pass status from sheet
         // Check localStorage for a live session belonging to this player
         // This handles reloads and multi-device: if they have a saved session, restore it
         try{
@@ -4834,6 +4849,17 @@ function deal(){
   // Init audio on first deal if not already ready, but don't re-trigger welcome sound
   if(!G._audioReady){ initAudio(); if(!G._welcomePlayed){ G._welcomePlayed=true; setTimeout(()=>startMusic(),300); } }
   if(G.phase!=='bet')return;
+  // Daily shoe limit check — block deal if limit reached
+  if(_shoesRemaining()<=0){
+    notif('Daily shoe limit reached ('+_shoeLimit()+' shoes). Come back tomorrow'+(G._clubPass?' 🏆':'')+'!');
+    return;
+  }
+  // Count the first shoe the very first time a hand is dealt in a session
+  if(!G._sessionActive){
+    _incrementShoesPlayed(G.username||G.player);
+    const rem=_shoesRemaining();
+    if(rem>0) notif('Shoe 1 started — '+rem+' shoe'+(rem===1?'':'s')+' remaining today');
+  }
   if(G.balance>=BALANCE_CAP){notif('50B balance cap reached — cash out first');showCashout();return;}
   if(G.mainBet<=0){notif('Place a bet first');return;}
   if(G.mainBet<G.s.min){notif('Minimum bet is '+fmtKFC(G.s.min));return;}
@@ -6091,12 +6117,22 @@ function closeResult(){
   msg('PLACE YOUR BET');
   if(G.cutCardTriggered){
     G.cutCardTriggered=false;
+    // Check daily shoe limit before starting the new shoe
+    if(_shoesRemaining()<=0){
+      notif('Daily shoe limit reached ('+_shoeLimit()+' shoes). Come back tomorrow!');
+      G.phase='bet'; msg('DAILY LIMIT REACHED');
+      const db=document.getElementById('btn-deal'); if(db) db.disabled=true;
+      const dbt=document.getElementById('btn-deal-top'); if(dbt) dbt.disabled=true;
+      return;
+    }
+    _incrementShoesPlayed(G.username||G.player);
     G.deck=buildShoe();
     G.puOwned.clear();
     G.puPending.clear();
     G.levCards=[]; G._levCardsPending=[];
     buildPuPanel(); buildLevPanel();
-    notif('New shoe — power-ups and jester cards reset');
+    const rem=_shoesRemaining();
+    notif('New shoe — '+rem+' shoe'+(rem===1?'':'s')+' remaining today');
   } else if(G.deck.length<40){
     G.puOwned.clear();
     G.puPending.clear();
@@ -6899,14 +6935,20 @@ function resetHand2State(){
   const ctx=canvas.getContext('2d');
   let W=0,H=0,animId=null,t=0;
 
-  // Wave layers — each is a sine wave sweeping across the screen
+  // Wave layers — spread across the full screen height via yOff (0=top, 1=bottom)
+  // amp   : vertical height of wave as fraction of H
+  // freq  : number of wave crests across screen width
+  // speed : horizontal scroll speed
+  // yOff  : vertical centre of this wave (fraction of H)
+  // op    : opacity
+  // width : stroke thickness in px
   const LAYERS=[
-    { amp:0.16, freq:1.1, speed:0.18, phase:0.0,  op:0.07, width:1.5 },
-    { amp:0.09, freq:0.7, speed:0.12, phase:1.2,  op:0.05, width:2.0 },
-    { amp:0.14, freq:1.8, speed:0.25, phase:2.5,  op:0.06, width:1.2 },
-    { amp:0.12, freq:0.5, speed:0.09, phase:0.7,  op:0.04, width:2.5 },
-    { amp:0.04, freq:2.4, speed:0.32, phase:3.8,  op:0.05, width:1.0 },
-    { amp:0.08, freq:1.3, speed:0.15, phase:5.1,  op:0.06, width:1.8 },
+    { amp:0.05, freq:1.1, speed:0.18, phase:0.0,  yOff:0.15, op:0.06, width:1.2 },
+    { amp:0.07, freq:0.7, speed:0.10, phase:1.2,  yOff:0.30, op:0.05, width:1.8 },
+    { amp:0.06, freq:1.6, speed:0.22, phase:2.5,  yOff:0.45, op:0.06, width:1.3 },
+    { amp:0.08, freq:0.5, speed:0.08, phase:0.7,  yOff:0.60, op:0.05, width:2.0 },
+    { amp:0.05, freq:2.1, speed:0.28, phase:3.8,  yOff:0.72, op:0.05, width:1.0 },
+    { amp:0.07, freq:1.3, speed:0.14, phase:5.1,  yOff:0.85, op:0.06, width:1.5 },
   ];
 
   function resize(){
@@ -6917,7 +6959,7 @@ function resetHand2State(){
   }
 
   function drawWave(layer){
-    const midY = H * 0.42;
+    const midY = H * layer.yOff;  // ← each wave has its own vertical position
     ctx.beginPath();
     ctx.moveTo(0, midY);
     for(let x=0; x<=W; x+=3){
@@ -6934,7 +6976,6 @@ function resetHand2State(){
   function frame(){
     ctx.clearRect(0,0,W,H);
     t += 0.016;
-    // Global slow pulse to make the whole field breathe
     const breathe = Math.sin(t * 0.4) * 0.5 + 0.5;
     ctx.globalAlpha = 0.6 + breathe * 0.4;
     for(const layer of LAYERS) drawWave(layer);
