@@ -2322,7 +2322,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <div style="font-size:11px;letter-spacing:4px;color:var(--muted);text-transform:uppercase;margin-bottom:24px">Settings</div>
     <div class="field-row">
       <label>Apps Script URL</label>
-      <input type="text" id="cfg-url" placeholder="https://script.google.com/macros/s/AKfycby7WoY0bNN1QnikWM2HR6iNO5pzbQ8kWfQhcvq4k1ig7yEjWXeb3I-WHJpQgBlrA5_c/exec">
+      <input type="text" id="cfg-url" placeholder="https://script.google.com/macros/s/AKfycbwoMHqEcwF_rNIsCIY-9yt65XSIRcldfPVOTuWw5VZmr0fcT7FSXCnC-lA4aZBBdmw/exec">
     </div>
     <div class="section-div"></div>
     <div style="font-size:10px;letter-spacing:3px;color:var(--muted);text-transform:uppercase;margin-bottom:14px">Player PINs</div>
@@ -4063,8 +4063,8 @@ window.onload=()=>{
   // Clear old test data from localStorage
   Object.keys(localStorage).filter(k=>k.startsWith('kfc_bal_')).forEach(k=>localStorage.removeItem(k));
   // Auto-upgrade: if stored URL is the old deployment, replace with new one
-  const NEW_URL = 'https://script.google.com/macros/s/AKfycby7WoY0bNN1QnikWM2HR6iNO5pzbQ8kWfQhcvq4k1ig7yEjWXeb3I-WHJpQgBlrA5_c/exec';
-  const OLD_URL = 'https://script.google.com/macros/s/AKfycbyWiTYHSuQXYxf8Ja3N_7IceeIJ6A83-35lNKtEYv4C9a4dxCILpNRhSLvdPHp2QEPd/exec';
+  const NEW_URL = 'https://script.google.com/macros/s/AKfycbwoMHqEcwF_rNIsCIY-9yt65XSIRcldfPVOTuWw5VZmr0fcT7FSXCnC-lA4aZBBdmw/exec';
+  const OLD_URL = 'https://script.google.com/macros/s/AKfycby7WoY0bNN1QnikWM2HR6iNO5pzbQ8kWfQhcvq4k1ig7yEjWXeb3I-WHJpQgBlrA5_c/exec';
   const storedUrl = localStorage.getItem('kfc_url');
   if(!storedUrl || storedUrl === OLD_URL){ localStorage.setItem('kfc_url', NEW_URL); }
   G.url = localStorage.getItem('kfc_url') || NEW_URL;
