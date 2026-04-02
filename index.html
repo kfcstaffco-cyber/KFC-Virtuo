@@ -193,7 +193,7 @@ body:not(.betting) #betting-spacer { flex: 0; }
   pointer-events: none;
 }
 #table-area .felt-logo {
-  position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%);
+  position: absolute; top: 35%; left: 50%; transform: translate(-50%, -50%);
   width: min(360px, 90vw); height: min(360px, 90vw);
   background-image: url("KFC_LOGO.png");
   background-size: contain; background-repeat: no-repeat; background-position: center;
@@ -3131,6 +3131,13 @@ function startMusic(){
   if(MUSIC.mode === 'synth' && MUSIC.currentTrack === 0 && MUSIC.nodes.length > 0) return;
   // An MP3 is playing — don't override the user's choice
   if(MUSIC.mode === 'mp3' && _mp3El && !_mp3El.paused) return;
+  // Ensure music AudioContext is running before scheduling notes
+  try{
+    if(MUSIC.ctx && MUSIC.ctx.state === 'suspended'){
+      MUSIC.ctx.resume().catch(()=>{});
+      if(MUSIC.ctx.state !== 'running') return; // still suspended — will retry via poll
+    }
+  }catch(e){}
   MUSIC.mode = 'synth';
   MUSIC.currentTrack = 0;
   _playTrack(0);
@@ -4156,34 +4163,43 @@ function openApp(displayName, balance){
   if(!G.deck||G.deck.length===0) G.deck=buildShoe();
   msg('PLACE YOUR BET');
   // ── Audio: welcome sound + Velvet Underground ─────────────────────────────
-  // Welcome sound plays as soon as AudioContext is running (immediately on fresh
-  // login after a click; deferred to first gesture on page-load session restore).
-  // Music starts ~800ms after the welcome sound to avoid clashing.
-  (function _scheduleAudio(){
-    function _playAll(){
-      playWelcomeSound();
-      setTimeout(()=>startMusic(), 800);
+  // G._welcomePlayed prevents the welcome sound firing more than once
+  // (guards against the pointerdown listener AND deal()'s initAudio both triggering it).
+  G._welcomePlayed = false;
+
+  function _doWelcome(){
+    if(G._welcomePlayed) return;
+    G._welcomePlayed = true;
+    playWelcomeSound();
+    setTimeout(()=>startMusic(), 800);
+  }
+
+  try{
+    if(!G._audioReady) initAudio();
+    const ctx2 = window._kfcCtx;
+    if(ctx2 && ctx2.state === 'running'){
+      // Fresh login — context already live, play immediately
+      setTimeout(_doWelcome, 300);
+    } else if(ctx2){
+      // Page-load restore — context suspended. Try resuming silently;
+      // some browsers allow it without a gesture after a brief delay.
+      ctx2.resume().then(()=>{
+        if(ctx2.state === 'running') setTimeout(_doWelcome, 300);
+      }).catch(()=>{});
+      // Independently retry starting the music engine (uses its own AudioContext).
+      (function _tryMusic(n){
+        setTimeout(()=>{
+          try{ if(!MUSIC.nodes||MUSIC.nodes.length===0) startMusic(); }catch(e){}
+          if(n > 1) _tryMusic(n - 1);
+        }, 600);
+      })(5);
     }
-    // Try immediately — works if user just clicked the login button
-    try{
-      if(!G._audioReady) initAudio();
-      const ctx2=window._kfcCtx;
-      if(ctx2 && ctx2.state==='running'){
-        setTimeout(_playAll, 300);
-        return;
-      }
-      // Context suspended (page-load restore) — defer to first user gesture
-      const once=()=>{
-        _playAll();
-        document.removeEventListener('pointerdown', once);
-        document.removeEventListener('keydown', once);
-      };
-      document.addEventListener('pointerdown', once, {once:true});
-      document.addEventListener('keydown', once, {once:true});
-      // Also try resuming immediately — some browsers allow it after a short delay
-      if(ctx2) ctx2.resume().then(()=>{ if(ctx2.state==='running'){ setTimeout(_playAll,300); document.removeEventListener('pointerdown',once); document.removeEventListener('keydown',once); } }).catch(()=>{});
-    }catch(e){}
-  })();
+  }catch(e){}
+
+  // One-shot gesture listener for welcome sound. The {once:true} option and the
+  // G._welcomePlayed flag together guarantee it fires exactly once.
+  document.addEventListener('pointerdown', _doWelcome, {once:true});
+  document.addEventListener('keydown',     _doWelcome, {once:true});
   const db2=document.getElementById('btn-deal'); if(db2) db2.disabled=true;
   // Retry any previously failed sync in background
   if(G.url){ const q=getSyncQueue(); if(q){ setTimeout(async()=>{ try{ await attemptSync(q); clearSyncQueue(); setSyncBadge('live','LIVE'); notif('Pending sync completed'); }catch(e){} },2000); } }
@@ -4832,7 +4848,8 @@ function showBJ(){
   setTimeout(()=>el.classList.remove('show'), 1900);
 }
 function deal(){
-  if(!G._audioReady)initAudio();
+  // Init audio on first deal if not already ready, but don't re-trigger welcome sound
+  if(!G._audioReady){ initAudio(); if(!G._welcomePlayed){ G._welcomePlayed=true; setTimeout(()=>startMusic(),300); } }
   if(G.phase!=='bet')return;
   if(G.balance>=BALANCE_CAP){notif('50B balance cap reached — cash out first');showCashout();return;}
   if(G.mainBet<=0){notif('Place a bet first');return;}
