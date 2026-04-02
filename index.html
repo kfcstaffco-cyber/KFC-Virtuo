@@ -6727,6 +6727,7 @@ function notif(txt){
 
 // ── SESSION P&L CHART ──────────────────────────────────────────
 const _chartPts = [0]; // running P&L points, starts at 0
+let _chartAnimId = null; // active animation frame for chart transition
 
 function updateSessionChart(newPL) {
   _chartPts.push(newPL);
@@ -6745,23 +6746,44 @@ function updateSessionChart(newPL) {
   const changed = total !== prev;
   label.textContent = (total >= 0 ? '+' : '') + fmtKFC(total);
   const colorClass = total > 0 ? 'pos' : total < 0 ? 'neg' : 'zero';
-  // Trigger flash by removing and re-adding animation class
   label.className = colorClass;
   if (changed && colorClass !== 'zero') {
-    void label.offsetWidth; // force reflow
+    void label.offsetWidth;
     label.classList.add(total > prev ? 'flash-pos' : 'flash-neg');
     label.addEventListener('animationend', () => label.classList.remove('flash-pos','flash-neg'), {once:true});
   }
 
-  // Brief fade-out then redraw for the sparkline
-  if (canvas) {
-    canvas.style.opacity = '0';
-    setTimeout(() => { canvas.style.opacity = '1'; _drawChart(canvas); }, 80);
+  // Cancel any in-progress animation
+  if (_chartAnimId) { cancelAnimationFrame(_chartAnimId); _chartAnimId = null; }
+
+  // Animate the new segment growing from prev point to new point
+  // Duration: 900ms, eased so it starts fast then settles
+  const ANIM_MS = 900;
+  const startTime = performance.now();
+  const fromVal = prev;
+  const toVal = total;
+
+  function _animStep(now) {
+    const elapsed = now - startTime;
+    const raw = Math.min(elapsed / ANIM_MS, 1);
+    // Ease out cubic: fast start, slow finish — gives a "settling" feel
+    const progress = 1 - Math.pow(1 - raw, 3);
+    // Interpolate the last point between fromVal and toVal
+    const animPts = [..._chartPts];
+    animPts[animPts.length - 1] = fromVal + (toVal - fromVal) * progress;
+    _drawChart(canvas, animPts);
+    if (raw < 1) {
+      _chartAnimId = requestAnimationFrame(_animStep);
+    } else {
+      _chartAnimId = null;
+      _drawChart(canvas, _chartPts); // final exact draw
+    }
   }
+  _chartAnimId = requestAnimationFrame(_animStep);
 }
 
-function _drawChart(canvas) {
-  const pts = _chartPts;
+function _drawChart(canvas, pts) {
+  pts = pts || _chartPts;
   const wrap = document.getElementById('chart-canvas-wrap');
   if (!wrap) return;
 
@@ -6840,6 +6862,7 @@ function _drawChart(canvas) {
 }
 
 function resetSessionChart() {
+  if (_chartAnimId) { cancelAnimationFrame(_chartAnimId); _chartAnimId = null; }
   _chartPts.length = 0;
   _chartPts.push(0);
   const bar = document.getElementById('session-chart-bar');
