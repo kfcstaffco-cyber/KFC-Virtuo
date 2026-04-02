@@ -12,10 +12,10 @@
    DESIGN SYSTEM
 ───────────────────────────────────────────── */
 :root {
-  --bg:        #0A0B0D;
-  --bg1:       #111214;
-  --bg2:       #18191C;
-  --bg3:       #1E2024;
+  --bg:        #040506;
+  --bg1:       #0A0B0D;
+  --bg2:       #111214;
+  --bg3:       #18191C;
   --line:      #232529;
   --line2:     #35373D;
   --gold:      #C9A84C;
@@ -168,7 +168,7 @@ select option { background: var(--bg2); }
 ───────────────────────────────────────────── */
 #table-area {
   display: flex; flex-direction: column; gap: 0;
-  background: radial-gradient(ellipse at 50% 40%, #1C1E22 0%, #131417 55%, #0C0D10 100%);
+  background: transparent;
   border-right: 1px solid var(--line);
   padding: 8px 24px 8px;
   position: sticky; top: 16px;
@@ -1652,6 +1652,8 @@ body.hand2-active #chip-strip .chip { position: relative; }
 
 <!-- ══════════════ APP ══════════════ -->
 <div id="app">
+  <!-- FULL-SCREEN PARTICLE VORTEX BACKGROUND -->
+  <canvas id="grid-bg" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;"></canvas>
   <!-- TOP BAR -->
   <div id="topbar">
     <div class="tb-logo" style="display:flex;align-items:center;gap:8px">
@@ -1693,7 +1695,6 @@ body.hand2-active #chip-strip .chip { position: relative; }
   <div id="main">
     <!-- TABLE AREA -->
     <div id="table-area">
-      <canvas id="grid-bg" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:0;display:none"></canvas>
       <div class="felt-logo"></div>
       <!-- SHOE VISUAL -->
       <div id="shoe-area">
@@ -3030,8 +3031,7 @@ function _playTrack(idx){
 
 // ── MP3 TRACK LIST — add filenames here when you upload to /music/ ──────────
 const MP3_TRACKS = [
-  { name: 'Crazy Rap', file: 'music/Crazy Rap (Colt 45 & 2 Zig Zags).mp3' },
-  { name: 'KFC Royale', file: 'music/KFC Anthem.mp3' },
+  // { name: 'My Track Name', file: 'music/my-track.mp3' },
 ];
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -6893,16 +6893,17 @@ function resetHand2State(){
   for(let i=0;i<N;i++) particles.push(mkParticle(i));
 
   function resize(){
-    W=canvas.offsetWidth; H=canvas.offsetHeight;
+    W=window.innerWidth; H=window.innerHeight;
     canvas.width=W*devicePixelRatio; canvas.height=H*devicePixelRatio;
+    canvas.style.width=W+'px'; canvas.style.height=H+'px';
     ctx.scale(devicePixelRatio,devicePixelRatio);
   }
 
   function frame(){
     ctx.clearRect(0,0,W,H);
     t+=0.016;
-    const cx=W*0.50, cy=H*0.40;
-    const maxR=Math.min(W,H)*0.55;
+    const cx=W*0.50, cy=H*0.50;
+    const maxR=Math.min(W,H)*0.50;
 
     for(let i=0;i<N;i++){
       const p=particles[i];
@@ -6951,14 +6952,13 @@ function resetHand2State(){
   }
 
   function start(){
-    if(canvas.offsetWidth===0){setTimeout(start,200);return;}
     resize();
     if(animId)cancelAnimationFrame(animId);
     frame();
   }
   window.addEventListener('resize',()=>{if(animId)cancelAnimationFrame(animId);resize();frame();updateAnnounceCx();});
-  document.addEventListener('DOMContentLoaded',()=>setTimeout(start,300));
-  setTimeout(start,500);
+  document.addEventListener('DOMContentLoaded',()=>setTimeout(start,100));
+  setTimeout(start,200);
 })();
 
 // ── Login page background: Vortex Spiral ──────────────────────
