@@ -1645,6 +1645,8 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
 /* Sidebar collapse */
 #sidebar { transition: opacity .25s ease; }
 #sidebar.collapsed { width:0 !important; min-width:0 !important; padding:0 !important; overflow:hidden !important; opacity:0; pointer-events:none; }
+#sidebar.collapsed ~ * #table-area,
+#main:has(#sidebar.collapsed) #table-area { border-right: none; }
 
 /* ── DISCARD TRAY ── */
 #discard-tray {
@@ -2710,7 +2712,8 @@ function _updatePointsBadge(pts, bump){
   const el=document.getElementById('tb-points');
   if(!el) return;
   if(pts===undefined) pts=_getPoints(G.username||G.player);
-  el.style.display=(G._sessionActive||pts>0)?'inline-block':'none';
+  // Always show when logged in — hide only when no player is set
+  el.style.display = G.player ? 'inline-block' : 'none';
   el.textContent='⭐ '+pts;
   if(bump){ el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); el.addEventListener('animationend',()=>el.classList.remove('bump'),{once:true}); }
 }
@@ -4112,6 +4115,9 @@ function toggleSidebar(){
   const col=sb.classList.toggle('collapsed');
   mn.style.gridTemplateColumns=col?'1fr 0':'';
   if(btn) btn.textContent=col?'⊟':'⊞';
+  // Hide the right border when sidebar is collapsed — it becomes a stray line
+  const ta=document.getElementById('table-area');
+  if(ta) ta.style.borderRight=col?'none':'1px solid var(--line)';
   localStorage.setItem('kfc_sb_col',col?'1':'0');
   // Recalculate announce center and redraw chart after CSS transition completes (~350ms)
   setTimeout(()=>{
@@ -4419,7 +4425,7 @@ window.onload=()=>{
   const storedUrl = localStorage.getItem('kfc_url');
   if(!storedUrl || storedUrl === OLD_URL){ localStorage.setItem('kfc_url', NEW_URL); }
   G.url = localStorage.getItem('kfc_url') || NEW_URL;
-  if(localStorage.getItem('kfc_sb_col')==='1'){const _sb=document.getElementById('sidebar');const _mn=document.getElementById('main');const _bt=document.getElementById('sidebar-toggle');if(_sb)_sb.classList.add('collapsed');if(_mn)_mn.style.gridTemplateColumns='1fr 0';if(_bt)_bt.textContent='⊟';}
+  if(localStorage.getItem('kfc_sb_col')==='1'){const _sb=document.getElementById('sidebar');const _mn=document.getElementById('main');const _bt=document.getElementById('sidebar-toggle');const _ta=document.getElementById('table-area');if(_sb)_sb.classList.add('collapsed');if(_mn)_mn.style.gridTemplateColumns='1fr 0';if(_bt)_bt.textContent='⊟';if(_ta)_ta.style.borderRight='none';}
   // Load strategy hint preference
   _strategyOn=localStorage.getItem('kfc_strategy')==='1';
   const stEl=document.getElementById('strategy-toggle'); if(stEl) stEl.checked=_strategyOn;
@@ -4737,6 +4743,8 @@ function doLogout(skipToStake){
   _stopSessionTimer();
   _clearIdleFloat();
   if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer=null; }
+  const ptsBadge=document.getElementById('tb-points');
+  if(ptsBadge) ptsBadge.style.display='none';
   if(G.phase!=='bet'){notif('Finish the current hand first');return;}
   if(!G.cashedOut){
     notif('Please cash out before leaving the table');
