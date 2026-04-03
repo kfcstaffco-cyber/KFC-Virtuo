@@ -7650,7 +7650,7 @@ function _renderLeaderboard(players, errMsg){
     const balCls = p.balance > 0 ? 'pos' : '';
     return `<div class="lb-row">
       <span class="lb-rank ${rankClass(i)}">${rankSymbol(i)}</span>
-      <span class="lb-name${isYou?' is-you':''}">${p.name||p.username}${crown}</span>
+      <span class="lb-name${isYou?' is-you':''}">${p.username||p.name}${crown}</span>
       <span class="lb-bal ${balCls}">${fmtKFC(p.balance)}</span>
     </div>`;
   }).join('');
