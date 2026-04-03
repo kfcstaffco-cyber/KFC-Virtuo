@@ -2703,12 +2703,15 @@ function _updatePointsBadge(pts, bump){
   el.textContent='⭐ '+pts;
   if(bump){ el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); el.addEventListener('animationend',()=>el.classList.remove('bump'),{once:true}); }
 }
-function _calcShoePoints(){
+function _calcShoePoints(partial){
   const hands=_shoeHandCount;
   const wins=_shoeLog.filter(e=>e.pl>0).length;
   const bjs=_shoeLog.filter(e=>e.bj).length;
-  const base=PTS_BASE_PER_SHOE + hands*PTS_PER_HAND + wins*PTS_PER_WIN + bjs*PTS_PER_BJ;
-  return Math.ceil(base*(G._clubPass?PTS_PASS_MULTIPLIER:1));
+  // Full shoe: base + per-hand + per-win + per-BJ
+  // Partial shoe (cashout mid-shoe): no base — only per-hand/win/BJ earned
+  const base = partial ? 0 : PTS_BASE_PER_SHOE;
+  const raw = base + hands*PTS_PER_HAND + wins*PTS_PER_WIN + bjs*PTS_PER_BJ;
+  return Math.ceil(raw*(G._clubPass?PTS_PASS_MULTIPLIER:1));
 }
 
 // ── POWER-UP LIMITS ──────────────────────────────────────────────────────────
@@ -4340,7 +4343,8 @@ async function _expireStaleSession(snap){
     const u = (snap.username||snap.player||'').toLowerCase();
     const wins = (snap.shoeLog||[]).filter(e=>e.pl>0).length;
     const bjs  = (snap.shoeLog||[]).filter(e=>e.bj).length;
-    const base = PTS_BASE_PER_SHOE + snap.shoeHandCount*PTS_PER_HAND + wins*PTS_PER_WIN + bjs*PTS_PER_BJ;
+    // Partial shoe on expire — no base bonus, only per-hand/win/BJ
+    const base = snap.shoeHandCount*PTS_PER_HAND + wins*PTS_PER_WIN + bjs*PTS_PER_BJ;
     const pts  = Math.ceil(base * (snap.clubPass ? PTS_PASS_MULTIPLIER : 1));
     if(pts > 0){
       const cur = parseInt(localStorage.getItem('kfc_pts_'+u)||'0',10);
@@ -6901,11 +6905,12 @@ function showCashout(){
   const rm=document.getElementById('result-modal');
   if(G.phase!=='bet'&&!(rm&&rm.classList.contains('open'))){notif('Finish the current hand first');return;}
   if(rm&&rm.classList.contains('open')) closeResult();
-  // Award loyalty points for any partial shoe played before cashing out
-  if(_shoeHandCount > 0){
-    const partialPts = _calcShoePoints();
+  // Award loyalty points for partial shoe — only once per cashout attempt
+  // _shoeHandCount is cleared after awarding so re-opening cashout doesn't double-award
+  if(_shoeHandCount > 0 && !G._atCashout){
+    const partialPts = _calcShoePoints(true); // no base bonus for partial shoe
     _addPoints(partialPts);
-    _shoeHandCount = 0; _shoeLog = []; // clear so points aren't double-awarded
+    _shoeHandCount = 0; _shoeLog = [];
   }
   G._atCashout=true;  // block beforeunload from re-saving mid-cashout
   // DON'T clearSession() here — keep it alive so reload can restore stats
