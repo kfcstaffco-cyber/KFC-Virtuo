@@ -274,13 +274,13 @@ body.pass-player #topbar {
   opacity: 0;
   transition: opacity .4s ease, background .4s ease;
 }
-body.felt-green    #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(6,26,13,0.82) 0%, rgba(4,15,8,0.88) 55%, rgba(2,7,5,0.92) 100%); }
+body.felt-green    #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(6,26,13,0.45) 0%, rgba(4,15,8,0.52) 55%, rgba(2,7,5,0.58) 100%); }
 body.felt-green    .felt-logo  { filter: hue-rotate(60deg) saturate(0.5); }
-body.felt-burgundy #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(26,6,8,0.82) 0%, rgba(15,4,5,0.88) 55%, rgba(7,2,3,0.92) 100%); }
+body.felt-burgundy #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(26,6,8,0.45) 0%, rgba(15,4,5,0.52) 55%, rgba(7,2,3,0.58) 100%); }
 body.felt-burgundy .felt-logo  { filter: hue-rotate(320deg) saturate(0.5); }
-body.felt-purple   #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(18,7,26,0.82) 0%, rgba(11,4,15,0.88) 55%, rgba(6,2,7,0.92) 100%); }
+body.felt-purple   #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(18,7,26,0.45) 0%, rgba(11,4,15,0.52) 55%, rgba(6,2,7,0.58) 100%); }
 body.felt-purple   .felt-logo  { filter: hue-rotate(250deg) saturate(0.5); }
-body.felt-blue     #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(6,16,26,0.82) 0%, rgba(4,11,15,0.88) 55%, rgba(2,5,7,0.92) 100%); }
+body.felt-blue     #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(6,16,26,0.45) 0%, rgba(4,11,15,0.52) 55%, rgba(2,5,7,0.58) 100%); }
 body.felt-blue     .felt-logo  { filter: hue-rotate(180deg) saturate(0.5); }
 
 /* ── CARD BACK GEOMETRIC PATTERN ── */
@@ -7553,12 +7553,12 @@ function resetHand2State(){
   // op    : opacity
   // width : stroke thickness in px
   const LAYERS=[
-    { amp:0.05, freq:1.1, speed:0.18, phase:0.0,  yOff:0.15, op:0.06, width:1.2 },
-    { amp:0.07, freq:0.7, speed:0.10, phase:1.2,  yOff:0.30, op:0.05, width:1.8 },
-    { amp:0.06, freq:1.6, speed:0.22, phase:2.5,  yOff:0.45, op:0.06, width:1.3 },
-    { amp:0.08, freq:0.5, speed:0.08, phase:0.7,  yOff:0.60, op:0.05, width:2.0 },
-    { amp:0.05, freq:2.1, speed:0.28, phase:3.8,  yOff:0.72, op:0.05, width:1.0 },
-    { amp:0.07, freq:1.3, speed:0.14, phase:5.1,  yOff:0.85, op:0.06, width:1.5 },
+    { amp:0.05, freq:1.1, speed:0.18, phase:0.0,  yOff:0.15, op:0.10, width:1.2 },
+    { amp:0.07, freq:0.7, speed:0.10, phase:1.2,  yOff:0.30, op:0.09, width:1.8 },
+    { amp:0.06, freq:1.6, speed:0.22, phase:2.5,  yOff:0.45, op:0.10, width:1.3 },
+    { amp:0.08, freq:0.5, speed:0.08, phase:0.7,  yOff:0.60, op:0.09, width:2.0 },
+    { amp:0.05, freq:2.1, speed:0.28, phase:3.8,  yOff:0.72, op:0.09, width:1.0 },
+    { amp:0.07, freq:1.3, speed:0.14, phase:5.1,  yOff:0.85, op:0.10, width:1.5 },
   ];
 
   function resize(){
@@ -7587,7 +7587,7 @@ function resetHand2State(){
     ctx.clearRect(0,0,W,H);
     t += 0.016;
     const breathe = Math.sin(t * 0.4) * 0.5 + 0.5;
-    ctx.globalAlpha = 0.6 + breathe * 0.4;
+    ctx.globalAlpha = 0.75 + breathe * 0.25;
     for(const layer of LAYERS) drawWave(layer);
     ctx.globalAlpha = 1;
     animId = requestAnimationFrame(frame);
