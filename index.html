@@ -182,7 +182,36 @@ body:not(.betting) #betting-spacer { flex: 0; }
   background-size: contain; background-repeat: no-repeat; background-position: center;
   opacity: 0.04; mix-blend-mode: screen; pointer-events: none; z-index: 0;
 }
-/* ── LEADERBOARD PANEL ── */
+/* ── LOYALTY POINTS BADGE ── */
+#tb-points {
+  display: none;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 1px;
+  color: var(--gold-lo);
+  padding: 2px 6px;
+  border: 1px solid rgba(201,168,76,0.25);
+  border-radius: 2px;
+  white-space: nowrap;
+  cursor: default;
+}
+#tb-points.bump {
+  animation: ptsBump .4s ease;
+}
+@keyframes ptsBump {
+  0%   { transform:scale(1);   color:var(--gold-lo); }
+  40%  { transform:scale(1.2); color:var(--gold-hi); }
+  100% { transform:scale(1);   color:var(--gold-lo); }
+}
+/* ── POINTS REDEMPTION in PU panel ── */
+.pu-pts-btn {
+  font-family: var(--mono); font-size: 8px; letter-spacing: 1px;
+  background: rgba(201,168,76,0.08); border: 1px solid rgba(201,168,76,0.25);
+  color: var(--gold-lo); border-radius: 2px; padding: 2px 6px;
+  cursor: pointer; white-space: nowrap; transition: all .15s; flex-shrink:0;
+}
+.pu-pts-btn:hover { background:rgba(201,168,76,0.15); border-color:var(--gold-lo); color:var(--gold-hi); }
+.pu-pts-btn:disabled { opacity:.3; cursor:not-allowed; }
 .lb-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--line); font-family:var(--mono); font-size:10px; }
 .lb-row:last-child { border-bottom:none; }
 .lb-rank { width:16px; text-align:center; color:var(--muted); font-size:9px; flex-shrink:0; }
@@ -247,11 +276,45 @@ body:not(.betting) #betting-spacer { flex: 0; }
   line-height: 1;
   filter: drop-shadow(0 0 6px rgba(201,168,76,0.7));
   animation: passGlow 2.5s ease-in-out infinite;
+  cursor: pointer;
+  position: relative;
 }
 @keyframes passGlow {
   0%,100% { filter: drop-shadow(0 0 4px rgba(201,168,76,0.5)); }
   50%      { filter: drop-shadow(0 0 10px rgba(201,168,76,1)); }
 }
+/* ── PASS PERKS TOOLTIP ── */
+#pass-tooltip {
+  display: none;
+  position: fixed;
+  z-index: 800;
+  background: var(--bg2);
+  border: 1px solid rgba(201,168,76,0.4);
+  border-radius: 6px;
+  padding: 14px 16px;
+  min-width: 220px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 0 20px rgba(201,168,76,0.1);
+  pointer-events: none;
+  animation: tooltipIn .15s ease;
+}
+@keyframes tooltipIn {
+  from { opacity:0; transform:translateY(-4px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+#pass-tooltip .pt-title {
+  font-family: var(--mono); font-size: 9px; letter-spacing: 3px;
+  color: var(--gold); margin-bottom: 10px; text-transform: uppercase;
+}
+#pass-tooltip .pt-row {
+  display: flex; align-items: baseline; gap: 8px;
+  font-family: var(--mono); font-size: 9px; color: var(--muted2);
+  padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
+  line-height: 1.5;
+}
+#pass-tooltip .pt-row:last-child { border-bottom: none; }
+#pass-tooltip .pt-row span:first-child { font-size: 11px; flex-shrink:0; }
+#pass-tooltip .pt-val { color: var(--white); }
+#pass-tooltip .pt-sub { color: var(--muted); font-size: 8px; margin-left: auto; }
 body.pass-player .chip { box-shadow: 0 3px 8px rgba(0,0,0,.5), 0 0 12px rgba(201,168,76,0.25); }
 body.pass-player .chip:hover { box-shadow: 0 3px 8px rgba(0,0,0,.5), 0 0 20px rgba(201,168,76,0.5); }
 
@@ -1844,6 +1907,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
       <span id="tb-pass-badge" title="21 Club Pass">👑</span>
       <div class="tb-balance" id="tb-bal">0</div>
       <div class="badge" id="tb-stake">LOW</div>
+      <span id="tb-points" title="Loyalty points">⭐ 0</span>
       <span id="streak-badge"></span>
     </div>
     <div class="tb-right">
@@ -2166,22 +2230,6 @@ body.hand2-active #chip-strip .chip { position: relative; }
         </div>
         <div id="session-stats-wrap">
           <div id="session-stats-content" style="padding:6px 0"></div>
-        </div>
-      </div>
-
-      <!-- 21 CLUB PASS INFO (pass players only) -->
-      <div class="panel" id="pass-perks-panel" style="display:none">
-        <div class="panel-title" style="display:flex;align-items:center;gap:8px">
-          <span>👑</span> 21 Club Pass
-        </div>
-        <div style="font-family:var(--mono);font-size:9px;color:var(--muted);line-height:1.9;padding:4px 0">
-          <div style="color:var(--gold);margin-bottom:4px;letter-spacing:1px">YOUR PERKS</div>
-          <div>🃏 <span style="color:var(--white)">15 shoes/day</span> <span style="opacity:.5">(standard: 5)</span></div>
-          <div>🤜 <span style="color:var(--white)">2nd hand</span> <span style="opacity:.5">unlocked</span></div>
-          <div>⚡ <span style="color:var(--white)">2 power-ups/shoe</span> <span style="opacity:.5">(standard: 1)</span></div>
-          <div>🎁 <span style="color:var(--white)">1 free power-up/day</span></div>
-          <div>🌡️ <span style="color:var(--white)">Hot/cold shoe indicator</span></div>
-          <div>🎨 <span style="color:var(--white)">Table colour</span> <span style="opacity:.5">dark / green / burgundy / purple / blue</span></div>
         </div>
       </div>
 
@@ -2581,6 +2629,46 @@ function _setPersonalBest(u,v){ localStorage.setItem(_pbKey(u),String(v)); }
 const SHOES_PER_DAY_STANDARD = 5;   // regular players
 const SHOES_PER_DAY_PASS     = 15;  // 21 Club pass holders
 
+// ── LOYALTY POINTS ───────────────────────────────────────────────────────────
+const PTS_BASE_PER_SHOE   = 10;  // flat base per shoe completed
+const PTS_PER_HAND        = 1;   // per hand dealt that shoe
+const PTS_PER_WIN         = 1;   // per winning hand that shoe
+const PTS_PER_BJ          = 3;   // per blackjack that shoe
+const PTS_PASS_MULTIPLIER = 1.5; // pass players earn 1.5×
+const PTS_COST = { sally:75, net:60, seeker:60, guard:45, novak:45 };
+
+function _ptsKey(u){ return 'kfc_pts_'+(u||'').toLowerCase(); }
+function _getPoints(u){ return parseInt(localStorage.getItem(_ptsKey(u||(G.username||G.player)))||'0',10); }
+function _setPoints(u,v){ localStorage.setItem(_ptsKey(u||(G.username||G.player)), Math.max(0,Math.round(v))); }
+function _addPoints(amt){
+  const u=G.username||G.player;
+  _setPoints(u, _getPoints(u)+Math.max(0,Math.round(amt)));
+  _updatePointsBadge(_getPoints(u), true);
+}
+function _spendPoints(amt){
+  const u=G.username||G.player;
+  const cur=_getPoints(u);
+  if(cur<amt) return false;
+  _setPoints(u, cur-amt);
+  _updatePointsBadge(cur-amt, false);
+  return true;
+}
+function _updatePointsBadge(pts, bump){
+  const el=document.getElementById('tb-points');
+  if(!el) return;
+  if(pts===undefined) pts=_getPoints(G.username||G.player);
+  el.style.display=(G._sessionActive||pts>0)?'inline-block':'none';
+  el.textContent='⭐ '+pts;
+  if(bump){ el.classList.remove('bump'); void el.offsetWidth; el.classList.add('bump'); el.addEventListener('animationend',()=>el.classList.remove('bump'),{once:true}); }
+}
+function _calcShoePoints(){
+  const hands=_shoeHandCount;
+  const wins=_shoeLog.filter(e=>e.pl>0).length;
+  const bjs=_shoeLog.filter(e=>e.bj).length;
+  const base=PTS_BASE_PER_SHOE + hands*PTS_PER_HAND + wins*PTS_PER_WIN + bjs*PTS_PER_BJ;
+  return Math.ceil(base*(G._clubPass?PTS_PASS_MULTIPLIER:1));
+}
+
 // ── POWER-UP LIMITS ──────────────────────────────────────────────────────────
 // Max power-ups a player can hold at once per shoe.
 const PU_LIMIT_STANDARD = 1;   // regular players
@@ -2815,27 +2903,6 @@ function initAudio(){
     src.connect(f); f.connect(g); g.connect(ctx.destination);
     src.start(t); src.stop(t+0.1);
   }catch(e){}});};
-  // ── CHIP: ceramic poker chip click (double-hit, no body) ──
-  SFX.chip = ()=>{ ctx.resume().then(()=>{ try{
-    const t=ctx.currentTime, sr=ctx.sampleRate;
-    // Double-hit transient — sharp, dry, ceramic
-    for(let hit=0;hit<2;hit++){
-      const dt=hit*0.009;
-      const buf=ctx.createBuffer(1,Math.floor(sr*0.014),sr);
-      const bd=buf.getChannelData(0);
-      for(let i=0;i<bd.length;i++) bd[i]=(Math.random()*2-1)*Math.pow(1-(i/bd.length),5);
-      const src=ctx.createBufferSource(); src.buffer=buf;
-      const hp=ctx.createBiquadFilter(); hp.type='highpass'; hp.frequency.value=3800;
-      const g=ctx.createGain(); g.gain.setValueAtTime(hit===0?0.44:0.28,t+dt);
-      g.gain.exponentialRampToValueAtTime(0.001,t+dt+0.012);
-      src.connect(hp); hp.connect(g); g.connect(ctx.destination); src.start(t+dt); src.stop(t+dt+0.016);
-    }
-    // Ceramic ring only — no low end
-    const o=ctx.createOscillator(); o.type='sine'; o.frequency.value=3800;
-    const og=ctx.createGain(); og.gain.setValueAtTime(0,t); og.gain.linearRampToValueAtTime(0.065,t+0.001);
-    og.gain.exponentialRampToValueAtTime(0.001,t+0.032);
-    o.connect(og); og.connect(ctx.destination); o.start(t); o.stop(t+0.036);
-  }catch(e){}});}; 
   SFX.deal    = ()=>{};
   SFX.win     = multi(tone(523,0.12,'sine',0.2), ()=>setTimeout(()=>tone(659,0.12,'sine',0.2)(),120), ()=>setTimeout(()=>tone(784,0.18,'sine',0.2)(),240));
   SFX.lose    = ()=>{}; // silent
@@ -2935,7 +3002,22 @@ function initAudio(){
   SFX.buy     = multi(tone(660,0.06,'sine',0.15), ()=>setTimeout(()=>tone(880,0.1,'sine',0.15)(),70));
   SFX.button  = tone(480,0.05,'sine',0.1);
   SFX.notif   = tone(700,0.07,'sine',0.12);
-  SFX.shuffle = ()=>{ for(let i=0;i<8;i++) setTimeout(()=>noise(0.03,0.06)(),i*60); };
+  // ── CHIP CLICK: short high transient (ceramic/plastic clink) ──
+  SFX.chip = ()=>{ ctx.resume().then(()=>{ try{
+    // Sharp attack noise burst — mimics chip hitting felt
+    const buf=ctx.createBuffer(1,Math.floor(ctx.sampleRate*0.018),ctx.sampleRate);
+    const d=buf.getChannelData(0);
+    for(let i=0;i<d.length;i++) d[i]=(Math.random()*2-1)*Math.pow(1-i/d.length,3);
+    const src=ctx.createBufferSource(); src.buffer=buf;
+    // Band-pass centred around 2.4kHz — ceramic-ish click
+    const bp=ctx.createBiquadFilter(); bp.type='bandpass'; bp.frequency.value=2400; bp.Q.value=1.8;
+    const g=ctx.createGain(); g.gain.setValueAtTime(0.22,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.018);
+    src.connect(bp); bp.connect(g); g.connect(ctx.destination); src.start();
+    // Tiny resonant follow-through — the "ring" of the chip
+    const osc=ctx.createOscillator(); osc.type='sine'; osc.frequency.value=1100+Math.random()*200;
+    const og=ctx.createGain(); og.gain.setValueAtTime(0.06,ctx.currentTime+0.004); og.gain.exponentialRampToValueAtTime(0.001,ctx.currentTime+0.06);
+    osc.connect(og); og.connect(ctx.destination); osc.start(ctx.currentTime+0.004); osc.stop(ctx.currentTime+0.06);
+  }catch(e){}});};
   // ── DEALER BLACKJACK: ominous descending tones + low drone ──
   SFX.dealer_bj = ()=>{ ctx.resume().then(()=>{ try{
     const t=ctx.currentTime;
@@ -4486,6 +4568,7 @@ function openApp(displayName, balance){
   // Reset streak and shoe log on fresh session (not restore)
   if(!G._sessionActive){ _streak=0; _shoeLog=[]; _shoeHandCount=0; }
   _updatePassUI(); // crown badge, chip glow, hot/cold, PU panel
+  _updatePointsBadge(undefined, false); // show current points in topbar
   _initLeaderboard(); // fetch league table from sheet
   _startSessionTimer();
   // Wire idle listeners — reset on any interaction
@@ -5139,11 +5222,17 @@ function buildPuPanel(){
   const c=document.getElementById('panel-pu');
   if(!c)return;
   c.innerHTML='';
+  const myPts = _getPoints(G.username||G.player);
+  // Points balance line
+  const ptsBadge=document.createElement('div');
+  ptsBadge.style.cssText='font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:4px 8px 6px;color:var(--gold-lo);display:flex;justify-content:space-between;align-items:center';
+  ptsBadge.innerHTML='<span>⭐ POINTS</span><span style="color:var(--white);font-weight:700">'+myPts+'</span>';
+  c.appendChild(ptsBadge);
   // Show free PU availability for pass players
   if(G._clubPass){
     const freeBadge=document.createElement('div');
     const avail=_freePuAvailable();
-    freeBadge.style.cssText='font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:4px 8px 6px;color:'+(avail?'var(--gold)':'var(--muted)')+';text-align:center';
+    freeBadge.style.cssText='font-family:var(--mono);font-size:9px;letter-spacing:1px;padding:0 8px 6px;color:'+(avail?'var(--gold)':'var(--muted)');
     freeBadge.textContent=avail?'🏆 FREE POWER-UP AVAILABLE TODAY':'🏆 Free power-up used today';
     c.appendChild(freeBadge);
   }
@@ -5153,10 +5242,27 @@ function buildPuPanel(){
     const available=stakeIdx>=minIdx;
     const owned=G.puOwned.has(pu.id);
     const kfcCost=G.s.min*(pu.ratio||5);
+    const ptsCost=PTS_COST[pu.id]||60;
     const isFreeNext=_freePuAvailable()&&!owned;
     const costLabel=isFreeNext?'FREE (pass perk)':fmtKFC(kfcCost);
     const subText=owned?'Active — expires end of shoe':pu.sub+' · '+costLabel;
-    addItemBtn(c,pu.label,subText,'pu-'+pu.id,owned,(!available&&!owned)?'locked':null,()=>buyPu(pu,kfcCost));
+    const wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;align-items:center;gap:6px';
+    const itemDiv=document.createElement('div');
+    itemDiv.style.cssText='flex:1;min-width:0';
+    addItemBtn(itemDiv,pu.label,subText,'pu-'+pu.id,owned,(!available&&!owned)?'locked':null,()=>buyPu(pu,kfcCost));
+    wrap.appendChild(itemDiv);
+    // Points redemption button (when not owned, not free, have enough pts)
+    if(!owned && available && !isFreeNext){
+      const pBtn=document.createElement('button');
+      pBtn.className='pu-pts-btn';
+      pBtn.textContent='⭐'+ptsCost;
+      pBtn.title='Redeem for '+ptsCost+' points';
+      pBtn.disabled=myPts<ptsCost||G.puOwned.size>=_puLimit();
+      pBtn.onclick=()=>buyPuWithPoints(pu,ptsCost);
+      wrap.appendChild(pBtn);
+    }
+    c.appendChild(wrap);
   });
 }
 
@@ -5186,6 +5292,17 @@ function buyPu(pu,cost){
   if(G.balance<cost){notif('Not enough balance');return;}
   G.balance-=cost; G.puOwned.add(pu.id); updateUI(); buildPuPanel();
   sfx('buy'); notif(pu.label+' activated — good for this shoe');
+}
+
+function buyPuWithPoints(pu, ptsCost){
+  if(G.puOwned.has(pu.id)){notif(pu.label+' is already active');return;}
+  if(G.puOwned.size>=_puLimit()){notif('Max '+_puLimit()+' power-ups active at a time');return;}
+  const stakeIdx=STAKE_ORDER.indexOf(G.stake); const minIdx=STAKE_ORDER.indexOf(pu.minStake);
+  if(stakeIdx<minIdx){notif('Unlocks at '+pu.minStake.charAt(0).toUpperCase()+pu.minStake.slice(1)+' stakes');return;}
+  if(G.phase==='play'||G.phase==='dealer'){notif('Power-ups must be bought before dealing');return;}
+  if(!_spendPoints(ptsCost)){notif('Not enough loyalty points (need ⭐'+ptsCost+')');return;}
+  G.puOwned.add(pu.id); updateUI(); buildPuPanel();
+  sfx('buy'); notif('⭐ '+pu.label+' activated with points — good for this shoe');
 }
 
 const PU_IMAGES={
@@ -6034,7 +6151,7 @@ function settle(reason){
     ? `H1: ${_h1Res.detail} / H2: ${_h2Res.detail}`
     : detail;
   G.log.push({detail:_logDetail,pl:totalPLForDisplay,bal:G.balance,breakdown});
-  _shoeLog.push({pl:totalPLForDisplay}); // track for shoe summary
+  _shoeLog.push({pl:totalPLForDisplay, bj:reason==='player_bj'}); // track for shoe summary + points
   _shoeHandCount++;
   renderLog();
   // Update session P&L chart
@@ -6564,6 +6681,8 @@ function closeResult(){
     }
     _incrementShoesPlayed(G.username||G.player);
     _showShoeSummary(); // show summary before clearing shoe log
+    const _shoeEarned = _calcShoePoints();
+    _addPoints(_shoeEarned); // award loyalty points for completing the shoe
     _shoeLog = []; _shoeHandCount = 0;
     G.deck=buildShoe();
     G.puOwned.clear();
@@ -6575,6 +6694,8 @@ function closeResult(){
     setTimeout(()=>_earlyShoePreview(), 800); // pass players see hot/cold before first bet
   } else if(G.deck.length<40){
     _showShoeSummary();
+    const _shoeEarned2 = _calcShoePoints();
+    _addPoints(_shoeEarned2);
     _shoeLog = []; _shoeHandCount = 0;
     G.puOwned.clear();
     G.puPending.clear();
@@ -7329,11 +7450,18 @@ function _showShoeSummary(){
   const plEl = document.getElementById('shoe-summary-pl');
   const handsEl = document.getElementById('shoe-summary-hands');
   const bestEl = document.getElementById('shoe-summary-best');
+  const ptsEl = document.getElementById('shoe-summary-pts');
   if(plEl){
     plEl.textContent = (shoePL>=0?'+':'') + fmtKFC(shoePL);
     plEl.style.color = shoePL>0 ? 'var(--green)' : shoePL<0 ? 'var(--red)' : 'var(--muted2)';
   }
   if(handsEl) handsEl.textContent = _shoeHandCount;
+  // Points earned this shoe
+  const earned = _calcShoePoints();
+  if(ptsEl){
+    ptsEl.style.display = 'block';
+    ptsEl.textContent = '⭐ +' + earned + ' loyalty points' + (G._clubPass ? ' (1.5× pass)' : '');
+  }
   // Best hand this shoe
   if(bestEl){
     const best = _shoeLog.reduce((max,e)=>e.pl>max?e.pl:max, 0);
@@ -7491,9 +7619,43 @@ function toggleSessionStats(){
 }
 
 // ── PASS PERKS PANEL VISIBILITY ───────────────────────────────────────────────
+// ── PASS PERKS TOOLTIP (hover on crown badge) ─────────────────────────────────
+function _initPassTooltip(){
+  const badge = document.getElementById('tb-pass-badge');
+  const tip   = document.getElementById('pass-tooltip');
+  if(!badge || !tip) return;
+  let _hideTimer = null;
+
+  badge.addEventListener('mouseenter', ()=>{
+    clearTimeout(_hideTimer);
+    const r = badge.getBoundingClientRect();
+    // Position below the badge, aligned left
+    tip.style.left = Math.min(r.left, window.innerWidth - 240) + 'px';
+    tip.style.top  = (r.bottom + 6) + 'px';
+    tip.style.display = 'block';
+  });
+  badge.addEventListener('mouseleave', ()=>{
+    _hideTimer = setTimeout(()=>{ tip.style.display='none'; }, 120);
+  });
+  // Touch support — tap crown to toggle
+  badge.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    if(tip.style.display === 'block'){
+      tip.style.display = 'none';
+    } else {
+      const r = badge.getBoundingClientRect();
+      tip.style.left = Math.min(r.left, window.innerWidth - 240) + 'px';
+      tip.style.top  = (r.bottom + 6) + 'px';
+      tip.style.display = 'block';
+    }
+  });
+  // Close on outside click
+  document.addEventListener('click', ()=>{ tip.style.display='none'; });
+}
+
 function _updatePassPerksPanel(){
-  const p = document.getElementById('pass-perks-panel');
-  if(p) p.style.display = G._clubPass ? 'block' : 'none';
+  // Tooltip is always in DOM — visibility controlled by hover, not pass status
+  // (only the badge itself is shown/hidden via _updatePassUI)
 }
 
 // ── BUST ANIMATION ───────────────────────────────────────────────────────────
@@ -7945,7 +8107,10 @@ function resetHand2State(){
     frame();
   }
   window.addEventListener('resize',()=>{if(animId)cancelAnimationFrame(animId);resize();frame();updateAnnounceCx();});
-  document.addEventListener('DOMContentLoaded',()=>setTimeout(start,100));
+  document.addEventListener('DOMContentLoaded',()=>{
+    setTimeout(start,100);
+    _initPassTooltip();
+  });
   setTimeout(start,200);
 })();
 
@@ -8029,6 +8194,16 @@ function resetHand2State(){
   <div id="bj-text">Blackjack!</div>
   <div id="bj-sub">Natural 21</div>
 </div>
+<!-- PASS PERKS TOOLTIP -->
+<div id="pass-tooltip">
+  <div class="pt-title">👑 21 Club Pass</div>
+  <div class="pt-row"><span>🃏</span><span class="pt-val">15 shoes/day</span><span class="pt-sub">standard: 5</span></div>
+  <div class="pt-row"><span>🤜</span><span class="pt-val">2nd hand</span><span class="pt-sub">unlocked</span></div>
+  <div class="pt-row"><span>⚡</span><span class="pt-val">2 power-ups/shoe</span><span class="pt-sub">standard: 1</span></div>
+  <div class="pt-row"><span>🎁</span><span class="pt-val">1 free power-up/day</span></div>
+  <div class="pt-row"><span>🌡️</span><span class="pt-val">Hot/cold shoe preview</span></div>
+  <div class="pt-row"><span>🎨</span><span class="pt-val">Table colour toggle</span><span class="pt-sub">5 colours</span></div>
+</div>
 <!-- PERSONAL BEST FLASH -->
 <div id="pb-flash">🏆 NEW PERSONAL BEST</div>
 <!-- CONFETTI CANVAS -->
@@ -8040,7 +8215,8 @@ function resetHand2State(){
     <div class="shoe-summary-sub">SESSION P&L THIS SHOE</div>
     <div class="shoe-summary-pl" id="shoe-summary-pl">—</div>
     <div class="shoe-summary-sub" style="margin-bottom:16px"><span id="shoe-summary-hands">—</span> HANDS PLAYED</div>
-    <div id="shoe-summary-best" style="display:none;font-family:var(--mono);font-size:9px;color:var(--gold);letter-spacing:1px;margin-bottom:12px"></div>
+    <div id="shoe-summary-best" style="display:none;font-family:var(--mono);font-size:9px;color:var(--gold);letter-spacing:1px;margin-bottom:6px"></div>
+    <div id="shoe-summary-pts" style="display:none;font-family:var(--mono);font-size:9px;color:var(--gold-lo);letter-spacing:1px;margin-bottom:12px"></div>
     <button class="btn-primary" style="width:100%" onclick="closeModal('shoe-summary-modal')">New Shoe →</button>
   </div>
 </div>
