@@ -182,7 +182,50 @@ body:not(.betting) #betting-spacer { flex: 0; }
   background-size: contain; background-repeat: no-repeat; background-position: center;
   opacity: 0.04; mix-blend-mode: screen; pointer-events: none; z-index: 0;
 }
-/* ── PASS PLAYER BADGE ── */
+/* ── BUST SHAKE ── */
+@keyframes bustShake {
+  0%,100% { transform: translateX(0) rotate(0deg); }
+  15%     { transform: translateX(-6px) rotate(-1.5deg); }
+  30%     { transform: translateX(6px)  rotate(1.5deg); }
+  45%     { transform: translateX(-5px) rotate(-1deg); }
+  60%     { transform: translateX(5px)  rotate(1deg); }
+  75%     { transform: translateX(-3px) rotate(0deg); }
+  90%     { transform: translateX(3px)  rotate(0deg); }
+}
+@keyframes bustFlash {
+  0%,100% { box-shadow: none; }
+  25%,75% { box-shadow: 0 0 0 2px rgba(248,81,73,0.7), 0 0 28px rgba(248,81,73,0.4); }
+}
+.hand-slot.busted { animation: bustShake .55s ease, bustFlash .55s ease; }
+
+/* ── SESSION TIMER ── */
+#session-timer {
+  display: none;
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 2px;
+  color: var(--muted);
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  white-space: nowrap;
+  transition: color .3s;
+}
+#session-timer.warn { color: var(--gold-lo); border-color: rgba(201,168,76,0.3); }
+
+/* ── SHARE BUTTON ── */
+#btn-share { display: none; }
+
+/* ── IDLE CARD FLOAT ── */
+@keyframes idleFloat {
+  0%,100% { transform: translateY(0px) rotate(0deg); }
+  33%     { transform: translateY(-5px) rotate(0.8deg); }
+  66%     { transform: translateY(-3px) rotate(-0.5deg); }
+}
+.card.idle-float { animation: idleFloat 3.5s ease-in-out infinite; }
+.card.idle-float:nth-child(2) { animation-delay: 0.4s; }
+.card.idle-float:nth-child(3) { animation-delay: 0.8s; }
+.card.idle-float:nth-child(4) { animation-delay: 1.2s; }
 #tb-pass-badge {
   display: none;
   font-size: 14px;
@@ -1789,6 +1832,8 @@ body.hand2-active #chip-strip .chip { position: relative; }
       <span id="streak-badge"></span>
     </div>
     <div class="tb-right">
+      <span id="session-timer" title="Session duration">00:00</span>
+      <button class="btn-ghost" id="btn-share" onclick="shareLastHand()" style="font-size:11px;padding:6px 10px;letter-spacing:1px" title="Share last hand">↗</button>
       <button class="btn-ghost" id="btn-music" onclick="toggleMusicPanel()" style="font-size:13px;padding:6px 10px;letter-spacing:1px;position:relative" title="Music">♪</button>
       <button class="btn-ghost" id="sidebar-toggle" onclick="toggleSidebar()" style="font-size:11px;padding:6px 10px;letter-spacing:1px" title="Toggle sidebar">⊞</button>
       <button class="btn-ghost" id="felt-toggle-btn" onclick="toggleFelt()" style="font-size:11px;padding:6px 10px;letter-spacing:1px" title="Toggle table colour">🎨</button>
@@ -4408,6 +4453,13 @@ function openApp(displayName, balance){
   // Reset streak and shoe log on fresh session (not restore)
   if(!G._sessionActive){ _streak=0; _shoeLog=[]; _shoeHandCount=0; }
   _updatePassUI(); // crown badge, chip glow, hot/cold, PU panel
+  _startSessionTimer();
+  // Wire idle listeners — reset on any interaction
+  ['pointerdown','keydown'].forEach(ev=>{
+    document.removeEventListener(ev, _resetIdleTimer);
+    document.addEventListener(ev, _resetIdleTimer, {passive:true});
+  });
+  _resetIdleTimer();
   // ── Audio: welcome sound + Velvet Underground ─────────────────────────────
   // G._welcomePlayed prevents the welcome sound firing more than once
   // (guards against the pointerdown listener AND deal()'s initAudio both triggering it).
@@ -4496,6 +4548,9 @@ function openApp(displayName, balance){
 
 function doLogout(skipToStake){
   resetSessionChart();
+  _stopSessionTimer();
+  _clearIdleFloat();
+  if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer=null; }
   if(G.phase!=='bet'){notif('Finish the current hand first');return;}
   if(!G.cashedOut){
     notif('Please cash out before leaving the table');
@@ -5146,6 +5201,8 @@ function deal(){
   // Init audio on first deal if not already ready, but don't re-trigger welcome sound
   if(!G._audioReady){ initAudio(); if(!G._welcomePlayed){ G._welcomePlayed=true; setTimeout(()=>startMusic(),300); } }
   if(G.phase!=='bet')return;
+  _clearIdleFloat(); // cancel any idle animation
+  if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer=null; }
   // Daily shoe limit check — block deal if limit reached
   if(_shoesRemaining()<=0){
     notif('Daily shoe limit reached ('+_shoeLimit()+' shoes). Come back tomorrow'+(G._clubPass?' 🏆':'')+'!');
@@ -5485,6 +5542,7 @@ function hit(){
   if(v===22&&G.puOwned.has('net')){ G.safetyTrigger=true; notif('SAFETY NET — PUSH'); advOrEnd('safety');return; }
   if(isBust(h)){
     sfx('bust');
+    _playBustAnimation(G.cur); // red shake on busted hand slot
     if(G.kruegerOn[G.cur]){const _kBet=(G.cur===1&&G._hand2Active)?(G.mainBet2||0):G.mainBet;const ins=Math.floor(_kBet/2);G.preDealBal+=ins;G.balance+=ins;updateUI();G._bonusPayouts.push({label:'Krueger'+(G.cur===1?' (H2)':'')+' — bust insurance',pl:ins,type:'gain'});notif('Krueger — bust insurance paid '+fmtKFC(ins));G.kruegerOn[G.cur]=false;}
     if(G.desertOn[G.cur]){G.desertOn[G.cur]=false;advOrEnd('desert_push');return;}
     advOrEnd('bust');
@@ -6451,6 +6509,7 @@ function closeResult(){
   const ms=document.getElementById('msg-strip');
   if(ms){ms.className='';ms.textContent='Place your bet';}
   msg('PLACE YOUR BET');
+  _resetIdleTimer(); // restart idle countdown now we're back in betting phase
   if(G.cutCardTriggered){
     G.cutCardTriggered=false;
     // Check daily shoe limit before starting the new shoe
@@ -6526,6 +6585,9 @@ function toggleLog(){
 function renderLog(){
   const c=document.getElementById('log');
   const rows=[...G.log].reverse();
+  // Show share button once there's a hand to share
+  const shareBtn = document.getElementById('btn-share');
+  if(shareBtn) shareBtn.style.display = rows.filter(e=>!e.topup).length > 0 ? 'inline-flex' : 'none';
   // Keep session stats live
   const statsWrap = document.getElementById('session-stats-wrap');
   if(statsWrap && statsWrap.style.maxHeight !== '0px') _updateSessionStats();
@@ -7388,6 +7450,116 @@ function _updatePassPerksPanel(){
   if(p) p.style.display = G._clubPass ? 'block' : 'none';
 }
 
+// ── BUST ANIMATION ───────────────────────────────────────────────────────────
+function _playBustAnimation(handIdx){
+  const slotId = 'slot-' + (handIdx||0);
+  const slot = document.getElementById(slotId);
+  if(!slot) return;
+  slot.classList.remove('busted');
+  void slot.offsetWidth; // force reflow to re-trigger
+  slot.classList.add('busted');
+  slot.addEventListener('animationend', ()=>slot.classList.remove('busted'), {once:true});
+}
+
+// ── SESSION TIMER ─────────────────────────────────────────────────────────────
+let _sessionTimerInterval = null;
+let _sessionOpenTs = 0; // wall-clock time when this session was opened
+
+function _startSessionTimer(){
+  _sessionOpenTs = Date.now();
+  const el = document.getElementById('session-timer');
+  if(el){ el.style.display='inline-block'; }
+  if(_sessionTimerInterval) clearInterval(_sessionTimerInterval);
+  _sessionTimerInterval = setInterval(_tickSessionTimer, 1000);
+  _tickSessionTimer();
+}
+
+function _stopSessionTimer(){
+  if(_sessionTimerInterval){ clearInterval(_sessionTimerInterval); _sessionTimerInterval=null; }
+  const el = document.getElementById('session-timer');
+  if(el) el.style.display='none';
+}
+
+function _tickSessionTimer(){
+  const el = document.getElementById('session-timer');
+  if(!el) return;
+  const elapsed = Math.floor((Date.now() - _sessionOpenTs) / 1000);
+  const h = Math.floor(elapsed / 3600);
+  const m = Math.floor((elapsed % 3600) / 60);
+  const s = elapsed % 60;
+  el.textContent = h > 0
+    ? `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`
+    : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+  // Warn gold after 2 hours
+  el.classList.toggle('warn', elapsed >= 7200);
+}
+
+// ── SHARE LAST HAND ───────────────────────────────────────────────────────────
+function shareLastHand(){
+  const hands = G.log.filter(e=>!e.topup);
+  if(hands.length === 0){ notif('No hands to share yet'); return; }
+  const last = hands[hands.length - 1];
+  const pl = last.pl;
+  const bal = last.bal;
+  const plStr = (pl >= 0 ? '+' : '') + fmtKFC(pl);
+  const sessionPL = G.log.reduce((a,e)=>a+e.pl, 0);
+  const sessionStr = (sessionPL >= 0 ? '+' : '') + fmtKFC(sessionPL);
+  const stake = G.s ? G.s.label : '';
+  const lines = [
+    `🃏 KFC — ${G.player}`,
+    `Hand: ${last.detail}  ${plStr}`,
+    `Balance: ${fmtKFC(bal)}  |  Session: ${sessionStr}`,
+    `Stake: ${stake}  |  ${new Date().toLocaleTimeString()}`,
+    `kfcstaffco-cyber.github.io/KFC-Virtuo/`
+  ];
+  const text = lines.join('\n');
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>notif('📋 Hand copied to clipboard')).catch(()=>_shareFallback(text));
+  } else {
+    _shareFallback(text);
+  }
+}
+
+function _shareFallback(text){
+  // Share API on mobile
+  if(navigator.share){
+    navigator.share({ text }).catch(()=>{});
+  } else {
+    // Last resort: prompt
+    prompt('Copy this hand summary:', text);
+  }
+}
+
+// ── IDLE CARD FLOAT ───────────────────────────────────────────────────────────
+let _idleTimer = null;
+const IDLE_TIMEOUT = 30000; // 30 seconds
+
+function _resetIdleTimer(){
+  if(_idleTimer) clearTimeout(_idleTimer);
+  _clearIdleFloat();
+  if(G.phase === 'bet' && G._sessionActive){
+    _idleTimer = setTimeout(_triggerIdleFloat, IDLE_TIMEOUT);
+  }
+}
+
+function _triggerIdleFloat(){
+  if(G.phase !== 'bet') return;
+  // Add float animation to shoe stack cards as an idle pulse
+  const shoeCards = document.querySelectorAll('.shoe-card');
+  shoeCards.forEach((c,i)=>{ c.style.animation = `idleFloat ${3+i*0.3}s ease-in-out infinite`; c.style.animationDelay = (i*0.25)+'s'; });
+  // Also gently pulse the bet circle
+  const bc = document.getElementById('bet-circle');
+  if(bc && !bc.classList.contains('visible')){
+    bc.style.animation = 'idleFloat 3s ease-in-out infinite';
+  }
+}
+
+function _clearIdleFloat(){
+  document.querySelectorAll('.shoe-card').forEach(c=>{ c.style.animation=''; c.style.animationDelay=''; });
+  const bc = document.getElementById('bet-circle');
+  if(bc) bc.style.animation='';
+}
+
 function resetSessionChart() {
   if (_chartAnimId) { cancelAnimationFrame(_chartAnimId); _chartAnimId = null; }
   _chartPts.length = 0;
@@ -7553,12 +7725,12 @@ function resetHand2State(){
   // op    : opacity
   // width : stroke thickness in px
   const LAYERS=[
-    { amp:0.05, freq:1.1, speed:0.18, phase:0.0,  yOff:0.15, op:0.12, width:1.2 },
-    { amp:0.07, freq:0.7, speed:0.10, phase:1.2,  yOff:0.30, op:0.11, width:1.8 },
-    { amp:0.06, freq:1.6, speed:0.22, phase:2.5,  yOff:0.45, op:0.12, width:1.3 },
-    { amp:0.08, freq:0.5, speed:0.08, phase:0.7,  yOff:0.60, op:0.11, width:2.0 },
-    { amp:0.05, freq:2.1, speed:0.28, phase:3.8,  yOff:0.72, op:0.11, width:1.0 },
-    { amp:0.07, freq:1.3, speed:0.14, phase:5.1,  yOff:0.85, op:0.12, width:1.5 },
+    { amp:0.05, freq:1.1, speed:0.18, phase:0.0,  yOff:0.15, op:0.10, width:1.2 },
+    { amp:0.07, freq:0.7, speed:0.10, phase:1.2,  yOff:0.30, op:0.09, width:1.8 },
+    { amp:0.06, freq:1.6, speed:0.22, phase:2.5,  yOff:0.45, op:0.10, width:1.3 },
+    { amp:0.08, freq:0.5, speed:0.08, phase:0.7,  yOff:0.60, op:0.09, width:2.0 },
+    { amp:0.05, freq:2.1, speed:0.28, phase:3.8,  yOff:0.72, op:0.09, width:1.0 },
+    { amp:0.07, freq:1.3, speed:0.14, phase:5.1,  yOff:0.85, op:0.10, width:1.5 },
   ];
 
   function resize(){
