@@ -4070,10 +4070,13 @@ const SESSION_KEY='kfc_session_v1';
 
 function saveSession(){
   // Saves current state. Always restores to bet phase.
-  // If navigated away mid-hand, balance is restored to pre-deal amount (bet refunded).
+  // If navigated away MID-HAND (play/dealer phase), balance is restored to pre-deal
+  // amount so the in-flight bet is refunded cleanly.
+  // If the hand has FINISHED (done phase — result modal open), G.balance is already
+  // correct and must be used as-is, so the hand result is preserved on reload.
   if(!G.player) return;
-  // Use preDealBal if mid-hand (refunds the in-flight bet on restore)
-  const safeBalance = (G.phase !== 'bet' && G.preDealBal > 0) ? G.preDealBal : G.balance;
+  const midHand = (G.phase === 'play' || G.phase === 'dealer');
+  const safeBalance = (midHand && G.preDealBal > 0) ? G.preDealBal : G.balance;
   try{
     const snap={
       player:G.player, username:G.username,
