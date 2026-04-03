@@ -4075,8 +4075,10 @@ function saveSession(){
   // If the hand has FINISHED (done phase — result modal open), G.balance is already
   // correct and must be used as-is, so the hand result is preserved on reload.
   if(!G.player) return;
+  // mid-hand refund only applies if the bet hasn't been committed yet
+  // Once _handCommitted=true the balance is already deducted — use it as-is
   const midHand = (G.phase === 'play' || G.phase === 'dealer');
-  const safeBalance = (midHand && G.preDealBal > 0) ? G.preDealBal : G.balance;
+  const safeBalance = (midHand && !G._handCommitted && G.preDealBal > 0) ? G.preDealBal : G.balance;
   try{
     const snap={
       player:G.player, username:G.username,
@@ -5211,6 +5213,7 @@ function deal(){
   if(G.phase!=='bet')return;
   _clearIdleFloat(); // cancel any idle animation
   if(_idleTimer){ clearTimeout(_idleTimer); _idleTimer=null; }
+  G._handCommitted=false; // will be set true once balance is deducted
   // Daily shoe limit check — block deal if limit reached
   if(_shoesRemaining()<=0){
     notif('Daily shoe limit reached ('+_shoeLimit()+' shoes). Come back tomorrow'+(G._clubPass?' 🏆':'')+'!');
@@ -5242,6 +5245,7 @@ function deal(){
   G.balance-=totalDeducted+puCost; updateUI();
   if(G.balance===0) setTimeout(showAllIn, 200); // all-in!
   G._handStartBal=G.balance; // snapshot AFTER deductions — so P&L display is net of all costs
+  G._handCommitted=true; // bet is locked — reload must not refund it
   // Second hand setup: only activate if mainBet2 meets minimum
   const _deal2 = G._hand2Active && (G.mainBet2||0) >= G.s.min;
   G.hands=_deal2 ? [[], []] : [[]]; G.cur=0; G.splits=0; G.dealer=[];
@@ -5278,6 +5282,8 @@ function deal(){
   G._dealStagger=false;
   // Staggered card sounds — one click per card dealt
   [0,300,600,900].forEach(t=>setTimeout(()=>sfx('card'),t));
+  // Save session immediately — bet is committed, reload must not refund it
+  saveSession();
 
   // Helper: fire bonuses for the initial two drawn cards (p1, p2 style),
   // then keep drawing replacements until the hand has 2 non-jester value cards.
@@ -6471,6 +6477,7 @@ function showResult(pl,detail,bal){
 
 function closeResult(){
   closeModal('result-modal');
+  G._handCommitted=false; // round complete — next saveSession can use preDealBal if needed
   _betHistory.length=0; // fresh undo stack for new round
   // Full reset for next hand
   G.phase='bet';
