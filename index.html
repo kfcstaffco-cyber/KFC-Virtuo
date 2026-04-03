@@ -459,19 +459,6 @@ body.felt-blue     .felt-logo  { filter: hue-rotate(180deg) saturate(0.5); }
 .score.flash-win  { animation: scoreWin  .7s ease forwards; }
 .score.flash-lose { animation: scoreLose .7s ease forwards; }
 
-/* ── CHIP STACK ON BET CIRCLE ── */
-#bet-circle-stack {
-  position: absolute; inset: 0;
-  pointer-events: none;
-}
-.bet-stack-chip {
-  position: absolute;
-  border-radius: 50%;
-  width: 18px; height: 18px;
-  border: 1.5px solid rgba(255,255,255,0.3);
-  left: 50%; transform: translateX(-50%);
-  transition: bottom .2s cubic-bezier(.34,1.56,.64,1);
-}
 /* Geometric diamond pattern overlay on card back */
 .card.down::after {
   content: '';
@@ -2151,7 +2138,6 @@ body.hand2-active #chip-strip .chip { position: relative; }
           <div id="bet-circle-row">
             <div id="bet-circle-wrap">
               <div id="bet-circle">
-                <div id="bet-circle-stack"></div>
                 <div id="bet-circle-inner"></div>
                 <span id="bet-circle-amt"></span>
               </div>
@@ -3862,20 +3848,6 @@ function flyChipToCircle(sourceBtn, colorClass, label){
   // Pulse the bet circle
   circle.style.transform='scale(1.08)';
   setTimeout(()=>{circle.style.transform='';}, 200);
-  // Add a chip to the visual stack
-  const stack = document.getElementById('bet-circle-stack');
-  if(stack){
-    const STACK_COLORS = {
-      'col-grey':'#888','col-red':'#e05','col-gold':'#c9a84c',
-      'col-teal':'#1db','col-green':'#3a3','col-white':'#ccc'
-    };
-    const sc = document.createElement('div');
-    sc.className = 'bet-stack-chip';
-    const count = stack.children.length;
-    sc.style.bottom = (4 + count * 3) + 'px';
-    sc.style.background = STACK_COLORS[colorClass] || 'rgba(201,168,76,0.6)';
-    stack.appendChild(sc);
-  }
 }
 
 function flySBChip(srcEl, targetEl){
@@ -5147,8 +5119,6 @@ function clearBets(){
   // Reset bet circle display
   const bc=document.getElementById('bet-circle');
   if(bc) bc.classList.remove('visible');
-  const stack=document.getElementById('bet-circle-stack');
-  if(stack) stack.innerHTML='';
   sfx('button');
 }
 function sameBet(){
@@ -5210,11 +5180,11 @@ function buildSideBets(){
 function cycleSB(name){
   if(G.phase!=='bet'){notif('Finish the current hand first'); return;}
   if(G.mainBet<=0){notif('Place your main bet first'); return;}
-  const steps=[0,G.s.sMin,G.s.sMin*2,G.s.sMin*5,G.s.min];
   const cur=G.sideBets[name]||0;
-  const ni=steps.findIndex(v=>v>cur);
+  // Increment by sMin each click; wrap back to 0 when max is reached
+  const next = cur >= G.s.max ? 0 : cur + G.s.sMin;
   _snapBet();
-  G.sideBets[name]=ni===-1?0:steps[ni];
+  G.sideBets[name]=next;
   sfx('chip');
   updateBetPanel();
   updateSBCircles();
@@ -5225,7 +5195,7 @@ function cycleSB(name){
     const chipStrip=document.getElementById('chip-strip');
     if(targetCircle&&chipStrip){
       const chips=chipStrip.querySelectorAll('.chip');
-      const srcChip=chips[0]; // animate from first chip
+      const srcChip=chips[0];
       if(srcChip) flySBChip(srcChip, targetCircle);
     }
   }
@@ -5508,7 +5478,6 @@ function deal(){
   const _ms=document.getElementById('msg-strip');if(_ms){_ms.className='';_ms.textContent='';}
   resetCards();
   const _bc=document.getElementById('bet-circle');if(_bc){_bc.classList.remove('visible');}
-  const _bcs=document.getElementById('bet-circle-stack');if(_bcs) _bcs.innerHTML='';
   // Draw all 4 cards, then reveal one at a time with stagger
   const p1=draw(),p2=draw(),d1=draw(),d2=draw();
   G.hands[0].push(p1,p2); G.dealer.push(d1,d2);
@@ -6730,9 +6699,8 @@ function showResult(pl,detail,bal){
 
 function closeResult(){
   closeModal('result-modal');
-  G._handCommitted=false; // round complete — next saveSession can use preDealBal if needed
+  G._handCommitted=false;
   _betHistory.length=0; // fresh undo stack for new round
-  const _bcs2=document.getElementById('bet-circle-stack');if(_bcs2) _bcs2.innerHTML='';
   // Full reset for next hand
   G.phase='bet';
   G.hands=[[]]; G.cur=0; G.splits=0; G.dealer=[];
