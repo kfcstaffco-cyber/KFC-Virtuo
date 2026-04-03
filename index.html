@@ -4281,7 +4281,10 @@ function saveSession(){
       mainBet2:G.mainBet2||0,
       sideBets2:{...G.sideBets2||{}},
       chartPts:[..._chartPts],
-      needsSync: false, // sheet writes only happen on explicit cashout
+      needsSync: false,
+      // Partial shoe tracking — used to award points on auto-expire or cashout
+      shoeHandCount: _shoeHandCount||0,
+      shoeLog: _shoeLog.map(e=>({pl:e.pl,bj:!!e.bj})),
       ts:Date.now()
     };
     localStorage.setItem(SESSION_KEY, JSON.stringify(snap));
@@ -4360,6 +4363,18 @@ function clearSession(){
 // Fires silently in the background — player never sees this UI-side.
 async function _expireStaleSession(snap){
   if(!snap||!snap.player||!snap.balance) return;
+  // Award loyalty points for the partial shoe before expiring
+  if(snap.shoeHandCount > 0){
+    const u = (snap.username||snap.player||'').toLowerCase();
+    const wins = (snap.shoeLog||[]).filter(e=>e.pl>0).length;
+    const bjs  = (snap.shoeLog||[]).filter(e=>e.bj).length;
+    const base = PTS_BASE_PER_SHOE + snap.shoeHandCount*PTS_PER_HAND + wins*PTS_PER_WIN + bjs*PTS_PER_BJ;
+    const pts  = Math.ceil(base * (snap.clubPass ? PTS_PASS_MULTIPLIER : 1));
+    if(pts > 0){
+      const cur = parseInt(localStorage.getItem('kfc_pts_'+u)||'0',10);
+      localStorage.setItem('kfc_pts_'+u, Math.max(0, cur+pts));
+    }
+  }
   const url=localStorage.getItem('kfc_url')||G.url;
   if(!url||!snap.cachedPin) return; // no sheet configured, nothing to do
   try{
@@ -6918,6 +6933,12 @@ function showCashout(){
   const rm=document.getElementById('result-modal');
   if(G.phase!=='bet'&&!(rm&&rm.classList.contains('open'))){notif('Finish the current hand first');return;}
   if(rm&&rm.classList.contains('open')) closeResult();
+  // Award loyalty points for any partial shoe played before cashing out
+  if(_shoeHandCount > 0){
+    const partialPts = _calcShoePoints();
+    _addPoints(partialPts);
+    _shoeHandCount = 0; _shoeLog = []; // clear so points aren't double-awarded
+  }
   G._atCashout=true;  // block beforeunload from re-saving mid-cashout
   // DON'T clearSession() here — keep it alive so reload can restore stats
   // Save a cashout snapshot so reload during cashout restores the modal correctly
