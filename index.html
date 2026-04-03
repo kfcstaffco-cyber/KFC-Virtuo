@@ -182,7 +182,22 @@ body:not(.betting) #betting-spacer { flex: 0; }
   background-size: contain; background-repeat: no-repeat; background-position: center;
   opacity: 0.04; mix-blend-mode: screen; pointer-events: none; z-index: 0;
 }
-/* ── BUST SHAKE ── */
+/* ── LEADERBOARD PANEL ── */
+.lb-row { display:flex; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--line); font-family:var(--mono); font-size:10px; }
+.lb-row:last-child { border-bottom:none; }
+.lb-rank { width:16px; text-align:center; color:var(--muted); font-size:9px; flex-shrink:0; }
+.lb-rank.gold   { color:#F5D76E; font-weight:700; }
+.lb-rank.silver { color:#c0c0c0; font-weight:700; }
+.lb-rank.bronze { color:#cd7f32; font-weight:700; }
+.lb-name { flex:1; color:var(--white); font-size:10px; letter-spacing:.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lb-name.is-you { color:var(--gold-hi); }
+.lb-bal  { color:var(--muted2); font-size:9px; white-space:nowrap; }
+.lb-bal.pos { color:var(--green); }
+#lb-refresh { font-size:9px; padding:2px 7px; letter-spacing:1px; margin-left:auto; }
+#lb-updated { font-family:var(--mono); font-size:8px; color:var(--muted); letter-spacing:1px; margin-top:4px; }
+
+/* ── TAX PREVIEW (cashout modal) ── */
+#co-tax-preview { font-family:var(--mono); font-size:9px; color:var(--muted); letter-spacing:1px; padding:8px 0 4px; border-top:1px solid var(--line); margin-top:8px; }
 @keyframes bustShake {
   0%,100% { transform: translateX(0) rotate(0deg); }
   15%     { transform: translateX(-6px) rotate(-1.5deg); }
@@ -2133,6 +2148,16 @@ body.hand2-active #chip-strip .chip { position: relative; }
         <div id="panel-pu" style="display:none"></div>
       </div>
 
+      <!-- LEADERBOARD -->
+      <div class="panel">
+        <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between">
+          League Table
+          <button class="btn-ghost" id="lb-refresh" onclick="_fetchLeaderboard()" title="Refresh">↺</button>
+        </div>
+        <div id="lb-content" style="font-family:var(--mono);font-size:9px;color:var(--muted);padding:4px 0">Loading...</div>
+        <div id="lb-updated"></div>
+      </div>
+
       <!-- SESSION STATS -->
       <div class="panel">
         <div class="panel-title" style="cursor:pointer;user-select:none;display:flex;align-items:center;justify-content:space-between" onclick="toggleSessionStats()">
@@ -2411,6 +2436,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
     <div style="font-size:11px;letter-spacing:4px;color:var(--muted);text-transform:uppercase;margin-bottom:20px">Cash Out</div>
     <div id="co-pl" style="font-family:var(--mono);font-size:36px;font-weight:500;margin-bottom:4px"></div>
     <div id="co-bal" style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:8px"></div>
+    <div id="co-tax-preview"></div>
     <div id="co-sync" style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:12px"></div>
     <!-- Session Stats -->
     <div id="co-stats" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px"></div>
@@ -4460,6 +4486,7 @@ function openApp(displayName, balance){
   // Reset streak and shoe log on fresh session (not restore)
   if(!G._sessionActive){ _streak=0; _shoeLog=[]; _shoeHandCount=0; }
   _updatePassUI(); // crown badge, chip glow, hot/cold, PU panel
+  _initLeaderboard(); // fetch league table from sheet
   _startSessionTimer();
   // Wire idle listeners — reset on any interaction
   ['pointerdown','keydown'].forEach(ev=>{
@@ -6545,6 +6572,7 @@ function closeResult(){
     buildPuPanel(); buildLevPanel();
     const rem=_shoesRemaining();
     notif('New shoe — '+rem+' shoe'+(rem===1?'':'s')+' remaining today');
+    setTimeout(()=>_earlyShoePreview(), 800); // pass players see hot/cold before first bet
   } else if(G.deck.length<40){
     _showShoeSummary();
     _shoeLog = []; _shoeHandCount = 0;
@@ -6553,6 +6581,7 @@ function closeResult(){
     G.levCards=[]; G._levCardsPending=[]; // Jester cards expire at end of shoe
     buildPuPanel();
     notif('New shoe — power-ups and jester cards reset');
+    setTimeout(()=>_earlyShoePreview(), 800);
   }
   // Balance checks after hand
   if(G.balance>=BALANCE_CAP){
@@ -6690,6 +6719,7 @@ function showCashout(){
   el.textContent=(pl>=0?'+':'')+fmtKFC(pl);
   el.style.color=pl>=0?'var(--green)':'var(--red)';
   document.getElementById('co-bal').textContent='Final balance: '+fmtKFC(G.balance);
+  _renderTaxPreview(); // show estimated dealer tax on total wallet balance
   const atCap=G.balance>=BALANCE_CAP;
   const syncEl=document.getElementById('co-sync');
   if(atCap){
@@ -6838,9 +6868,10 @@ async function confirmCashout(){
       badge.style.color='var(--green)';
       if(leaveBtn){ leaveBtn.disabled=false; leaveBtn.textContent='Leave Table'; }
       if(stayBtn) stayBtn.style.display='block';
-      // Reset balance to 0 — chips have been cashed back into wallet
       G.balance=0; updateUI();
       notif('Session saved — balance returned to wallet');
+      // Refresh leaderboard now that this player's balance has updated on the sheet
+      setTimeout(()=>_fetchLeaderboard(true), 1500);
     }catch(e){
       // Failed — store in queue, lock leave, show retry
       storeSyncQueue(payload);
@@ -7573,6 +7604,134 @@ function _clearIdleFloat(){
   document.querySelectorAll('.shoe-card').forEach(c=>{ c.style.animation=''; c.style.animationDelay=''; });
   const bc = document.getElementById('bet-circle');
   if(bc) bc.style.animation='';
+}
+
+// ── LEADERBOARD ───────────────────────────────────────────────────────────────
+let _lbLastFetch = 0;
+const LB_CACHE_MS = 60000; // re-fetch at most once per minute
+
+async function _fetchLeaderboard(force){
+  if(!G.url){ _renderLeaderboard(null,'No sheet connected'); return; }
+  const now = Date.now();
+  if(!force && (now - _lbLastFetch) < LB_CACHE_MS) return; // use cache
+  const btn = document.getElementById('lb-refresh');
+  if(btn){ btn.textContent='…'; btn.disabled=true; }
+  try{
+    const d = await sheetGet(G.url+'?action=getleaderboard');
+    if(d.players) {
+      _lbLastFetch = Date.now();
+      _renderLeaderboard(d.players);
+    } else {
+      _renderLeaderboard(null, d.error||'Unavailable');
+    }
+  }catch(e){
+    _renderLeaderboard(null,'Fetch failed');
+  } finally {
+    if(btn){ btn.textContent='↺'; btn.disabled=false; }
+  }
+}
+
+function _renderLeaderboard(players, errMsg){
+  const el = document.getElementById('lb-content');
+  const upd = document.getElementById('lb-updated');
+  if(!el) return;
+  if(!players){
+    el.innerHTML = `<div style="color:var(--muted);padding:4px 0">${errMsg||'—'}</div>`;
+    return;
+  }
+  // Sort by total balance descending
+  const sorted = [...players].sort((a,b)=>b.balance - a.balance);
+  const me = (G.username||G.player||'').toLowerCase();
+  const rankSymbol = (i) => i===0?'🥇':i===1?'🥈':i===2?'🥉':(i+1)+'.';
+  const rankClass  = (i) => i===0?'gold':i===1?'silver':i===2?'bronze':'';
+  el.innerHTML = sorted.map((p,i)=>{
+    const isYou = (p.username||p.name||'').toLowerCase() === me;
+    const crown = p.clubPass ? ' 👑' : '';
+    const balCls = p.balance > 0 ? 'pos' : '';
+    return `<div class="lb-row">
+      <span class="lb-rank ${rankClass(i)}">${rankSymbol(i)}</span>
+      <span class="lb-name${isYou?' is-you':''}">${p.name||p.username}${crown}</span>
+      <span class="lb-bal ${balCls}">${fmtKFC(p.balance)}</span>
+    </div>`;
+  }).join('');
+  if(upd) upd.textContent = 'Updated '+new Date().toLocaleTimeString();
+}
+
+// Auto-fetch leaderboard when app opens, and refresh after each cashout
+function _initLeaderboard(){
+  _renderLeaderboard(null,'Fetching…');
+  _fetchLeaderboard(true);
+}
+
+// ── DEALER TAX PREVIEW ────────────────────────────────────────────────────────
+// Shows estimated tax on the 25th based on TOTAL wallet balance (not just session)
+function _renderTaxPreview(){
+  const el = document.getElementById('co-tax-preview');
+  if(!el) return;
+  const totalBal = G._totalBalance || G.balance;
+  if(!totalBal || totalBal <= 0){ el.innerHTML=''; return; }
+  const rate = G.s ? G.s.tax : 0.04;
+  const taxAmt = Math.floor(totalBal * rate);
+  const nextDate = _nextTaxDate();
+  el.innerHTML = `
+    <div style="color:var(--muted);margin-bottom:2px">DEALER TAX ESTIMATE (${nextDate})</div>
+    <div style="display:flex;justify-content:space-between;margin-top:3px">
+      <span style="color:var(--muted2)">Wallet balance</span>
+      <span style="color:var(--white)">${fmtKFC(totalBal)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between">
+      <span style="color:var(--muted2)">${Math.round(rate*100)}% tax (${G.s?G.s.label:''} stake)</span>
+      <span style="color:var(--red)">−${fmtKFC(taxAmt)}</span>
+    </div>
+    <div style="display:flex;justify-content:space-between;border-top:1px solid var(--line);margin-top:4px;padding-top:4px">
+      <span style="color:var(--muted2)">After tax</span>
+      <span style="color:var(--gold-lo)">${fmtKFC(totalBal - taxAmt)}</span>
+    </div>`;
+}
+
+function _nextTaxDate(){
+  const now = new Date();
+  const d = now.getDate();
+  const y = now.getFullYear();
+  const m = now.getMonth();
+  // If past the 25th this month, show next month
+  const taxMonth = d >= 25 ? (m === 11 ? 0 : m + 1) : m;
+  const taxYear  = d >= 25 && m === 11 ? y + 1 : (d >= 25 ? y : y);
+  return new Date(taxYear, taxMonth, 25).toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+}
+
+// ── EARLY SHOE PREVIEW (pass players only) ────────────────────────────────────
+// After a new shoe is built, pass players get a brief flash showing hot/cold
+// before they place their first bet.
+function _earlyShoePreview(){
+  if(!G._clubPass) return;
+  const deck = G.deck || [];
+  let low=0, high=0;
+  for(const c of deck){
+    if(!c||c.cutCard||c.bonus) continue;
+    if(['2','3','4','5','6'].includes(c.r)) low++;
+    else if(['10','J','Q','K','A'].includes(c.r)) high++;
+  }
+  const total = low + high;
+  if(total === 0) return;
+  const ratio = (low - high) / total;
+  let emoji, label, col;
+  if(ratio > 0.15){
+    emoji='🔥'; label='HOT SHOE — low cards rich'; col='#f97316';
+  } else if(ratio < -0.15){
+    emoji='🧊'; label='COLD SHOE — high cards rich'; col='#60a5fa';
+  } else {
+    emoji='〰️'; label='NEUTRAL SHOE'; col='var(--muted2)';
+  }
+  // Show as a brief notif — subtle, doesn't interrupt flow
+  const n = document.getElementById('notif');
+  if(n){
+    n.textContent = `${emoji} ${label} (Pass Preview)`;
+    n.style.color = col;
+    n.style.opacity='1'; n.style.transform='translateY(0)';
+    clearTimeout(n._tid);
+    n._tid=setTimeout(()=>{ n.style.opacity='0'; n.style.transform='translateY(-8px)'; }, 3500);
+  }
 }
 
 function resetSessionChart() {
