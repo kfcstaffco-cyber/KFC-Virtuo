@@ -263,13 +263,24 @@ body.pass-player #topbar {
 }
 
 /* ── GREEN FELT TABLE (pass players only) ── */
-body.felt-green    #table-area { background: radial-gradient(ellipse at 50% 40%, #061a0d 0%, #040f08 55%, #020705 100%) !important; }
+/* Felt colour tints — applied as a semi-transparent overlay on table-area
+   so the wave canvas animation always shows through behind it */
+#table-area::before {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity .4s ease, background .4s ease;
+}
+body.felt-green    #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(6,26,13,0.82) 0%, rgba(4,15,8,0.88) 55%, rgba(2,7,5,0.92) 100%); }
 body.felt-green    .felt-logo  { filter: hue-rotate(60deg) saturate(0.5); }
-body.felt-burgundy #table-area { background: radial-gradient(ellipse at 50% 40%, #1a0608 0%, #0f0405 55%, #070203 100%) !important; }
+body.felt-burgundy #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(26,6,8,0.82) 0%, rgba(15,4,5,0.88) 55%, rgba(7,2,3,0.92) 100%); }
 body.felt-burgundy .felt-logo  { filter: hue-rotate(320deg) saturate(0.5); }
-body.felt-purple   #table-area { background: radial-gradient(ellipse at 50% 40%, #12071a 0%, #0b040f 55%, #060207 100%) !important; }
+body.felt-purple   #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(18,7,26,0.82) 0%, rgba(11,4,15,0.88) 55%, rgba(6,2,7,0.92) 100%); }
 body.felt-purple   .felt-logo  { filter: hue-rotate(250deg) saturate(0.5); }
-body.felt-blue     #table-area { background: radial-gradient(ellipse at 50% 40%, #06101a 0%, #040b0f 55%, #020507 100%) !important; }
+body.felt-blue     #table-area::before { opacity:1; background: radial-gradient(ellipse at 50% 40%, rgba(6,16,26,0.82) 0%, rgba(4,11,15,0.88) 55%, rgba(2,5,7,0.92) 100%); }
 body.felt-blue     .felt-logo  { filter: hue-rotate(180deg) saturate(0.5); }
 
 /* ── CARD BACK GEOMETRIC PATTERN ── */
@@ -3500,8 +3511,22 @@ function setBuyIn(amount){
 function finaliseLogin(stakeKey){
   if(!_pendingLogin)return;
   G.stake=stakeKey; G.s=STAKES[stakeKey];
-  G._totalBalance=_pendingLogin.totalBalance||_pendingLogin.balance; // full sheet balance
-  G._sessionActive=false; // fresh login — becomes true only after first deal
+  G._totalBalance=_pendingLogin.totalBalance||_pendingLogin.balance;
+  G._clubPass=!!(_pendingLogin.clubPass); // carry through from auth response
+  G._sessionActive=false;
+  // Record who just logged in — used to prevent auto-restoring a different player's session on reload
+  localStorage.setItem('kfc_last_user', (G.username||'').toLowerCase());
+  // Clear any previous player's session snap and cashout snap
+  const existingRaw = localStorage.getItem(SESSION_KEY);
+  if(existingRaw){
+    try{
+      const existingSnap = JSON.parse(existingRaw);
+      if((existingSnap.username||existingSnap.player||'').toLowerCase() !== (G.username||'').toLowerCase()){
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem('kfc_cashout_snap');
+      }
+    }catch(e){ localStorage.removeItem(SESSION_KEY); }
+  }
   document.getElementById('login').style.display='none';
   openApp(_pendingLogin.name, _pendingLogin.balance);
   _pendingLogin=null; _selectedStakeKey=null;
@@ -4032,14 +4057,19 @@ function saveSession(){
   }catch(e){}
 }
 
-function restoreSession(){
+function restoreSession(lastUser){
   try{
     const raw=localStorage.getItem(SESSION_KEY);
     if(!raw) return false;
     const snap=JSON.parse(raw);
     if(!snap||!snap.player) return false;
-    if(snap.cashedOut) { localStorage.removeItem(SESSION_KEY); return false; } // already done
-    if(!snap.sessionActive) { localStorage.removeItem(SESSION_KEY); return false; } // no hand played
+    if(snap.cashedOut) { localStorage.removeItem(SESSION_KEY); return false; }
+    if(!snap.sessionActive) { localStorage.removeItem(SESSION_KEY); return false; }
+
+    // If we know who last logged in on this browser, only restore their session
+    if(lastUser && (snap.username||snap.player||'').toLowerCase() !== lastUser){
+      return false; // belongs to a different player — don't auto-restore
+    }
 
     // STALE SESSION: >4 hours old — auto-sync balance to sheet so chips aren't lost, then discard
     if((Date.now()-snap.ts)>4*60*60*1000){
@@ -4176,12 +4206,16 @@ window.onload=()=>{
   G._shoeTotal=G.deck.length-1;
   SB_NAMES.forEach(n=>G.sideBets[n]=0); updateSBCircles&&updateSBCircles();
   buildStakeList();
+  // Try to restore a previous session — only if it belongs to the last user on this browser
+  const _lastUser = (localStorage.getItem('kfc_last_user')||'').toLowerCase();
   // Check for cashout-in-progress snap (reload during cashout screen)
   try{
     const coSnap=localStorage.getItem('kfc_cashout_snap');
     if(coSnap){
       const cs=JSON.parse(coSnap);
-      if(cs&&cs.player&&(Date.now()-cs.ts)<30*60*1000){ // within 30 min
+      const csUser=(cs.username||cs.player||'').toLowerCase();
+      // Only restore if it's the same user who last logged in on this browser
+      if(cs&&cs.player&&(Date.now()-cs.ts)<30*60*1000&&(!_lastUser||csUser===_lastUser)){
         G.player=cs.player; G.username=cs.username||cs.player;
         G.balance=cs.balance; G.sessionStart=cs.sessionStart;
         G._totalBalance=cs.totalBalance||cs.balance;
@@ -4204,8 +4238,8 @@ window.onload=()=>{
       }
     }
   }catch(e){}
-  // Try to restore a previous session
-  if(restoreSession()){
+  // Try to restore a previous session — only for the last user who logged in on this browser
+  if(restoreSession(_lastUser)){
     // Session found — skip login, go straight to table
     openApp(G.player, G.balance);
     notif('Session restored — welcome back, '+G.player);
@@ -4268,8 +4302,9 @@ async function doLogin(){
             if(snap&&samePlayer&&fresh&&!snap.cashedOut&&snap.sessionActive){
               // Restore the saved session directly — skip stake selection
               G._cachedPin=pin;
-              if(restoreSession()){
+              if(restoreSession(username.toLowerCase())){
                 G._clubPass = !!d.clubPass; // re-apply live value — snap may be stale
+                localStorage.setItem('kfc_last_user', username.toLowerCase());
                 openApp(G.player, G.balance);
                 notif('Session restored — welcome back, '+G.player);
                 _afterRestoreChart();
@@ -4278,7 +4313,20 @@ async function doLogin(){
             }
           }
         }catch(e){}
-        _pendingLogin={name:d.playerName||username,balance:d.balance};
+        _pendingLogin={name:d.playerName||username,balance:d.balance,clubPass:!!d.clubPass};
+        // Clear any session belonging to a different player on this device
+        try{
+          const _oldSnap=localStorage.getItem(SESSION_KEY);
+          if(_oldSnap){
+            const _old=JSON.parse(_oldSnap);
+            const _oldUser=(_old.username||_old.player||'').toLowerCase();
+            if(_oldUser && _oldUser!==username.toLowerCase()){
+              localStorage.removeItem(SESSION_KEY);
+              localStorage.removeItem('kfc_cashout_snap');
+            }
+          }
+        }catch(e){}
+        localStorage.setItem('kfc_last_user', username.toLowerCase());
         document.getElementById('login-step1').style.display='none';
         goLoginStep(2);
         return;
@@ -4305,7 +4353,8 @@ async function doLogin(){
       const samePlayer=(snap.username===username||snap.player===username);
       const fresh=(Date.now()-snap.ts)<4*60*60*1000;
       if(snap&&samePlayer&&fresh&&!snap.cashedOut&&snap.sessionActive){
-        if(restoreSession()){
+        if(restoreSession(username.toLowerCase())){
+          localStorage.setItem('kfc_last_user', username.toLowerCase());
           openApp(G.player, G.balance);
           notif('Session restored — welcome back, '+G.player);
           _afterRestoreChart();
@@ -4804,12 +4853,11 @@ function confirmTopUp(){
   updateUI(); renderLog();
   closeModal('topup-modal');
   // Reset session flags — treat as a fresh session start after sync+top-up
-  // so that if the player reloads, the session restores correctly
   G._atCashout=false;
   G.cashedOut=false;
-  // _sessionActive: keep as-is (false if no hand dealt yet, true if continuing)
-  // but for a post-cashout top-up, force a clean session start
   G._sessionActive=false; // will become true again on first deal
+  // Clear the cashout snap — it was for the previous session and must not restore on reload
+  localStorage.removeItem('kfc_cashout_snap');
   notif('✓ '+fmtKFC(amount)+' added to session');
   sfx('cash');
   saveSession();
