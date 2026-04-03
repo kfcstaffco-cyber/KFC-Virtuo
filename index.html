@@ -6764,7 +6764,9 @@ function closeResult(){
     _incrementShoesPlayed(G.username||G.player);
     _showShoeSummary(); // show summary before clearing shoe log
     const _shoeEarned = _calcShoePoints();
-    _addPoints(_shoeEarned); // award loyalty points for completing the shoe
+    _addPoints(_shoeEarned);
+    const _sw=_shoeLog.filter(e=>e.pl>0).length, _sb=_shoeLog.filter(e=>e.bj).length;
+    notif('⭐ +'+_shoeEarned+' points ('+_shoeHandCount+'h · '+_sw+'w · '+_sb+'bj)');
     _shoeLog = []; _shoeHandCount = 0;
     G.deck=buildShoe();
     G.puOwned.clear();
@@ -6905,13 +6907,6 @@ function showCashout(){
   const rm=document.getElementById('result-modal');
   if(G.phase!=='bet'&&!(rm&&rm.classList.contains('open'))){notif('Finish the current hand first');return;}
   if(rm&&rm.classList.contains('open')) closeResult();
-  // Award loyalty points for partial shoe — only once per cashout attempt
-  // _shoeHandCount is cleared after awarding so re-opening cashout doesn't double-award
-  if(_shoeHandCount > 0 && !G._atCashout){
-    const partialPts = _calcShoePoints(true); // no base bonus for partial shoe
-    _addPoints(partialPts);
-    _shoeHandCount = 0; _shoeLog = [];
-  }
   G._atCashout=true;  // block beforeunload from re-saving mid-cashout
   // DON'T clearSession() here — keep it alive so reload can restore stats
   // Save a cashout snapshot so reload during cashout restores the modal correctly
@@ -7019,6 +7014,16 @@ async function sheetGet(url){
 
 async function confirmCashout(){
   G.cashedOut=true;
+  // Award loyalty points for partial shoe played before cashing out — fires exactly once
+  if(_shoeHandCount > 0){
+    const partialPts = _calcShoePoints(true); // no base bonus for partial shoe
+    if(partialPts > 0){
+      const _cw=_shoeLog.filter(e=>e.pl>0).length, _cb=_shoeLog.filter(e=>e.bj).length;
+      _addPoints(partialPts);
+      notif('⭐ +'+partialPts+' points ('+_shoeHandCount+'h · '+_cw+'w · '+_cb+'bj)');
+    }
+    _shoeHandCount = 0; _shoeLog = [];
+  }
   // Session is cleared only after sync/save succeeds — not here
   document.getElementById('co-actions-pre').style.display='none';
   const post=document.getElementById('co-actions-post');
