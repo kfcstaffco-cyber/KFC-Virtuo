@@ -410,6 +410,7 @@ body.felt-blue     .felt-logo  { filter: hue-rotate(180deg) saturate(0.5); }
   border: 1px solid #1e3a5a;
   overflow: hidden;
 }
+/* ── CARD BACK SHIMMER ── */
 .card.down::before {
   content: '';
   position: absolute; inset: 0;
@@ -419,6 +420,57 @@ body.felt-blue     .felt-logo  { filter: hue-rotate(180deg) saturate(0.5); }
   background-position: center;
   mix-blend-mode: screen;
   opacity: 0.55;
+}
+.card.down .card-shimmer {
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  overflow: hidden;
+  pointer-events: none;
+}
+.card.down .card-shimmer::after {
+  content: '';
+  position: absolute;
+  top: -100%; left: -75%;
+  width: 50%; height: 300%;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255,255,255,0.06) 45%,
+    rgba(201,168,76,0.18) 50%,
+    rgba(255,255,255,0.06) 55%,
+    transparent 70%
+  );
+  animation: cardShimmer 3.5s ease-in-out infinite;
+}
+@keyframes cardShimmer {
+  0%   { transform: translateX(0);    opacity:0; }
+  10%  { opacity:1; }
+  40%  { transform: translateX(400%); opacity:1; }
+  50%,100% { transform: translateX(400%); opacity:0; }
+}
+/* Stagger shimmer per card position */
+.card.down:nth-child(2) .card-shimmer::after { animation-delay: 0.5s; }
+.card.down:nth-child(3) .card-shimmer::after { animation-delay: 1.0s; }
+.card.down:nth-child(4) .card-shimmer::after { animation-delay: 1.5s; }
+
+/* ── SCORE WIN/LOSE FLASH ── */
+@keyframes scoreWin  { 0%,100%{color:rgba(255,255,255,0.5)} 30%,60%{color:var(--green);text-shadow:0 0 12px rgba(63,185,80,0.7)} }
+@keyframes scoreLose { 0%,100%{color:rgba(255,255,255,0.5)} 30%,60%{color:var(--red);text-shadow:0 0 12px rgba(248,81,73,0.7)} }
+.score.flash-win  { animation: scoreWin  .7s ease forwards; }
+.score.flash-lose { animation: scoreLose .7s ease forwards; }
+
+/* ── CHIP STACK ON BET CIRCLE ── */
+#bet-circle-stack {
+  position: absolute; inset: 0;
+  pointer-events: none;
+}
+.bet-stack-chip {
+  position: absolute;
+  border-radius: 50%;
+  width: 18px; height: 18px;
+  border: 1.5px solid rgba(255,255,255,0.3);
+  left: 50%; transform: translateX(-50%);
+  transition: bottom .2s cubic-bezier(.34,1.56,.64,1);
 }
 /* Geometric diamond pattern overlay on card back */
 .card.down::after {
@@ -2097,6 +2149,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
           <div id="bet-circle-row">
             <div id="bet-circle-wrap">
               <div id="bet-circle">
+                <div id="bet-circle-stack"></div>
                 <div id="bet-circle-inner"></div>
                 <span id="bet-circle-amt"></span>
               </div>
@@ -3806,6 +3859,20 @@ function flyChipToCircle(sourceBtn, colorClass, label){
   // Pulse the bet circle
   circle.style.transform='scale(1.08)';
   setTimeout(()=>{circle.style.transform='';}, 200);
+  // Add a chip to the visual stack
+  const stack = document.getElementById('bet-circle-stack');
+  if(stack){
+    const STACK_COLORS = {
+      'col-grey':'#888','col-red':'#e05','col-gold':'#c9a84c',
+      'col-teal':'#1db','col-green':'#3a3','col-white':'#ccc'
+    };
+    const sc = document.createElement('div');
+    sc.className = 'bet-stack-chip';
+    const count = stack.children.length;
+    sc.style.bottom = (4 + count * 3) + 'px';
+    sc.style.background = STACK_COLORS[colorClass] || 'rgba(201,168,76,0.6)';
+    stack.appendChild(sc);
+  }
 }
 
 function flySBChip(srcEl, targetEl){
@@ -4239,7 +4306,9 @@ function restoreSession(lastUser){
     }
 
     // Restore state
-    G.player=snap.player; G.username=snap.username||snap.player;
+    G.player=snap.player; 
+    // Use snap.username if available — never fall back to snap.player (display name ≠ username)
+    G.username=snap.username||'';
     G._cachedPin=snap.cachedPin||'';
     G._clubPass=snap.clubPass||false;
     G.balance=snap.balance; G.sessionStart=snap.sessionStart||snap.balance; G._totalBalance=snap.totalBalance||snap.balance; G._sessionActive=snap.sessionActive||false;
@@ -4376,7 +4445,7 @@ window.onload=()=>{
       const csUser=(cs.username||cs.player||'').toLowerCase();
       // Only restore if it's the same user who last logged in on this browser
       if(cs&&cs.player&&(Date.now()-cs.ts)<30*60*1000&&(!_lastUser||csUser===_lastUser)){
-        G.player=cs.player; G.username=cs.username||cs.player;
+        G.player=cs.player; G.username=cs.username||'';
         G.balance=cs.balance; G.sessionStart=cs.sessionStart;
         G._totalBalance=cs.totalBalance||cs.balance;
         G.stake=cs.stake||'low'; G.s=STAKES[G.stake]||STAKES.low;
@@ -5055,6 +5124,8 @@ function clearBets(){
   // Reset bet circle display
   const bc=document.getElementById('bet-circle');
   if(bc) bc.classList.remove('visible');
+  const stack=document.getElementById('bet-circle-stack');
+  if(stack) stack.innerHTML='';
   sfx('button');
 }
 function sameBet(){
@@ -5414,6 +5485,7 @@ function deal(){
   const _ms=document.getElementById('msg-strip');if(_ms){_ms.className='';_ms.textContent='';}
   resetCards();
   const _bc=document.getElementById('bet-circle');if(_bc){_bc.classList.remove('visible');}
+  const _bcs=document.getElementById('bet-circle-stack');if(_bcs) _bcs.innerHTML='';
   // Draw all 4 cards, then reveal one at a time with stagger
   const p1=draw(),p2=draw(),d1=draw(),d2=draw();
   G.hands[0].push(p1,p2); G.dealer.push(d1,d2);
@@ -5924,6 +5996,7 @@ function revealHole(){
     // Phase 1: rotate the face-down card out (to 90°) over 180ms
     holeEl.style.transition='transform .18s ease-in';
     holeEl.style.transform='rotateY(90deg)';
+    sfx('card'); // flip sound as card turns
     setTimeout(()=>{
       // Phase 2: at 90° (invisible), swap to face-up content with no transition
       holeEl.style.transition='none';
@@ -6183,6 +6256,18 @@ function settle(reason){
   }
   // Reset early SB tracking after settle
   G._earlySBPL=0; G._earlySBResults=[];
+  // Flash score elements to show win/loss result
+  G.hands.forEach((h,hi)=>{
+    const scoreEl = document.getElementById('score-'+hi);
+    if(!scoreEl) return;
+    const _isH2 = hi===1 && G._hand2Active && G.hands.length>1 && G.splits===0;
+    const hpl = (_handResults[hi]||{}).w||0;
+    scoreEl.classList.remove('flash-win','flash-lose');
+    void scoreEl.offsetWidth;
+    if(hpl > 0) scoreEl.classList.add('flash-win');
+    else if(hpl < 0) scoreEl.classList.add('flash-lose');
+    setTimeout(()=>scoreEl.classList.remove('flash-win','flash-lose'), 750);
+  });
   showResult(totalPLForDisplay,detail,G.balance);
 }
 
@@ -6316,6 +6401,7 @@ function renderAll(){
       const down=i===holeIdx&&G.phase==='play'&&!G.holeRevealed;
       if(down){
         el.className='card down';
+        el.innerHTML='<div class="card-shimmer"></div>'; // shimmer overlay
       } else if(c.bonus){
         el.className='card bonus';
         el.dataset.bonusId=c.bonus.id;
@@ -6623,6 +6709,7 @@ function closeResult(){
   closeModal('result-modal');
   G._handCommitted=false; // round complete — next saveSession can use preDealBal if needed
   _betHistory.length=0; // fresh undo stack for new round
+  const _bcs2=document.getElementById('bet-circle-stack');if(_bcs2) _bcs2.innerHTML='';
   // Full reset for next hand
   G.phase='bet';
   G.hands=[[]]; G.cur=0; G.splits=0; G.dealer=[];
@@ -6949,14 +7036,20 @@ async function confirmCashout(){
   // Calculate what the new wallet total will be (for local _totalBalance tracking)
   const newTotalBalance = (G._totalBalance||G.sessionStart) - G.sessionStart + G.balance;
 
+  // Safety check — username must be set for sync to work
+  if(!(G.username||G.player)){
+    notif('Cannot sync — session identity lost. Please log out and back in.');
+    return;
+  }
   const payload={
     username: G.username||G.player, player: G.player,
-    balance:   G.balance,           // cashIn: chips returned to wallet
+    balance:   G.balance,
     sessionPL: sessionPL,
-    buyIn:     G.sessionStart,      // chips taken to table
+    buyIn:     G.sessionStart,
     date: new Date().toISOString(),
     stake: G.s.label, pin: G._cachedPin||''
   };
+  console.log('[KFC] Sync payload username:', payload.username, '| player:', payload.player);
 
   async function doSync(){
     badge.textContent='Syncing…';
