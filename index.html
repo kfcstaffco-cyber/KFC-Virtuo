@@ -4109,7 +4109,9 @@ function restoreSession(lastUser){
     const snap=JSON.parse(raw);
     if(!snap||!snap.player) return false;
     if(snap.cashedOut) { localStorage.removeItem(SESSION_KEY); return false; }
-    if(!snap.sessionActive) { localStorage.removeItem(SESSION_KEY); return false; }
+    // Restore if: session was active (hands played), OR balance > 0 and not cashed out (topped up, not yet dealt)
+    const _hasBalance = (snap.balance||0) > 0;
+    if(!snap.sessionActive && !_hasBalance) { localStorage.removeItem(SESSION_KEY); return false; }
 
     // If we know who last logged in on this browser, only restore their session
     if(lastUser && (snap.username||snap.player||'').toLowerCase() !== lastUser){
@@ -4217,7 +4219,7 @@ function _installBackTrap(){
   window.addEventListener('popstate', function _popHandler(evt){
     // Re-push so the next back press also fires popstate
     history.pushState({kfc:1}, '');
-    if(G.player && !G.cashedOut && G._sessionActive){
+    if(G.player && !G.cashedOut && !G._atCashout && G._sessionActive){
       // Show cashout modal instead of letting them leave
       notif('Cash out before leaving the table!');
       saveSession();
@@ -4907,10 +4909,13 @@ function confirmTopUp(){
   G.log.push({detail:'Top Up +'+fmtKFC(amount),pl:0,bal:G.balance,topup:true});
   updateUI(); renderLog();
   closeModal('topup-modal');
-  // Reset session flags — treat as a fresh session start after sync+top-up
+  // Reset cashout flags — the sync is done, this is now a fresh active session
   G._atCashout=false;
   G.cashedOut=false;
-  G._sessionActive=false; // will become true again on first deal
+  // Keep _sessionActive as-is: if they had an active session before, keep it active
+  // (ensures beforeunload leave guard still fires and restore works on reload)
+  // Only reset it if no hands have been dealt yet (truly fresh)
+  if(G.log.filter(e=>!e.topup).length === 0) G._sessionActive=false;
   // Clear the cashout snap — it was for the previous session and must not restore on reload
   localStorage.removeItem('kfc_cashout_snap');
   notif('✓ '+fmtKFC(amount)+' added to session');
