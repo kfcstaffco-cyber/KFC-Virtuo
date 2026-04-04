@@ -4933,6 +4933,11 @@ function updateInventoryBar(){
 }
 
 function updateUI(){
+  // Always hide boost button when not in play phase
+  if(G.phase==='bet'||G.phase==='done'){
+    const _sb=document.getElementById('stamped-boost');
+    if(_sb) _sb.style.display='none';
+  }
   const balEl=document.getElementById('tb-bal');
   const prev=G._prevBalance;
   const cur=G.balance;
@@ -6245,6 +6250,7 @@ function revealHole(){
 // ── SETTLE ──────────────────────────────────────────────
 function settle(reason){
   G.phase='done';
+  hideStampedBoost();
   closeModal('insurance-modal');
   const _iy=document.getElementById('btn-insurance-yes'); if(_iy)_iy.style.display='none'; const _in=document.getElementById('btn-insurance-no'); if(_in)_in.style.display='none';
   const dv=hv(G.dealer); const db=isBust(G.dealer);
@@ -6936,6 +6942,7 @@ function showResult(pl,detail,bal){
 
 function closeResult(){
   closeModal('result-modal');
+  hideStampedBoost();
   G._handCommitted=false;
   _betHistory.length=0; // fresh undo stack for new round
   // Full reset for next hand
