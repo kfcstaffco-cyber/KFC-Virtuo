@@ -1558,12 +1558,19 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
 }
 #msg-strip.dealer-drawing { animation: dealerPulse 1.1s ease-in-out infinite; border-color: var(--muted); color: var(--muted2); }
 
-/* ── BASIC STRATEGY HINT ── */
+/* On desktop with 2 hands, show bet rows side by side under their hands */
+@media (min-width: 900px) {
+  body.two-hands #play-bottom { flex-direction: row; align-items: flex-start; justify-content: center; gap: 24px; }
+  body.two-hands #play-hand2-row { border-top: none !important; margin-top: 0 !important; padding-top: 0 !important; width: auto !important; }
+  body.two-hands #play-bottom-inner { flex: 1; justify-content: center; }
+  body.two-hands #sb-hints { order: -1; flex-basis: 100%; }
+}
 #strategy-hint {
-  display: none; text-align: center; margin-top: 4px;
+  display: none; text-align: center; margin: 4px auto 2px;
   font-family: var(--mono); font-size: 9px; letter-spacing: 2px;
-  text-transform: uppercase; padding: 4px 8px;
-  border-radius: var(--radius);
+  text-transform: uppercase; padding: 4px 12px;
+  border-radius: var(--radius); width: fit-content;
+  position: relative; z-index: 10;
 }
 #strategy-hint.show { display: block; }
 #strategy-hint.hint-hit    { color: var(--green); border: 1px solid rgba(63,185,80,0.3); background: rgba(63,185,80,0.06); }
@@ -2124,8 +2131,9 @@ body.hand2-active #chip-strip .chip { position: relative; }
           <button class="act" id="btn-insurance-no"  onclick="declineInsurance()" style="display:none;font-size:10px">No Ins.</button>
           <button class="shortcut-btn" id="btn-surrender" onclick="surrender()" style="display:none">Surrender</button>
         </div>
-        <div id="strategy-hint"></div>
       </div><!-- end #playing-zone -->
+
+      <div id="strategy-hint"></div>
 
       <!-- PLAY-BOTTOM: bet circle + SB circles — always in flow, never hidden -->
       <!-- During betting phase: sits below the betting-zone chips/circle area -->
@@ -2847,6 +2855,7 @@ const G = {
   preDealBal:0, lastMainBet:0, lastSideBets:{}, lastMainBet2:0, lastSideBets2:{}, cashedOut:false, _atCashout:false, _sessionActive:false, insuranceBet:0, _freeDoubleBet:0, _freeLevBet:0,
   _insuranceToken:false, // loyalty: covers half bet on bust (stacks with Krueger for full)
   _allSBNextHand:false,  // loyalty: auto-place sMin on all 4 side bets next deal
+  _freeSBNames:[],       // SBs placed free by the all-SB token this hand
   _bonusPayouts:[], // [{label, pl}] — instant bonus card payouts to show in result
   cutCardTriggered:false, // set when cut card is drawn mid-shoe
 };
@@ -5547,8 +5556,33 @@ function _redeemAllSB(){
   if(G.phase!=='bet'){notif('Must redeem before dealing');return;}
   if(G._allSBNextHand){notif('All Side Bets token already active');return;}
   if(!_spendPoints(PTS_COST.allsb)){notif('Not enough points (need ⭐'+PTS_COST.allsb+')');return;}
-  G._allSBNextHand=true; buildPuPanel();
+  // If two hands active, ask which hand
+  if(G._hand2Active && (G.mainBet2||0) >= G.s.min){
+    // Show a quick choice modal
+    _showAllSBHandChoice();
+    return;
+  }
+  G._allSBNextHand='h1';
+  buildPuPanel();
   sfx('buy'); notif('⭐ All side bets will be covered at minimum next deal');
+}
+
+function _showAllSBHandChoice(){
+  // Simple notif-style overlay asking H1 / H2 / Both
+  const el=document.createElement('div');
+  el.id='allsb-choice';
+  el.style.cssText='position:fixed;inset:0;z-index:900;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7)';
+  el.innerHTML=`
+    <div style="background:var(--bg1);border:1px solid var(--line2);border-radius:8px;padding:24px 28px;text-align:center;max-width:280px">
+      <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:16px">ALL SIDE BETS — APPLY TO</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn-ghost" onclick="document.getElementById('allsb-choice').remove();G._allSBNextHand='h1';G._allSBHand=1;buildPuPanel();sfx('buy');notif('⭐ All SBs on Hand 1 next deal')">Hand 1</button>
+        <button class="btn-ghost" onclick="document.getElementById('allsb-choice').remove();G._allSBNextHand='h2';G._allSBHand=2;buildPuPanel();sfx('buy');notif('⭐ All SBs on Hand 2 next deal')">Hand 2</button>
+        <button class="btn-ghost" style="border-color:rgba(201,168,76,0.4);color:var(--gold)" onclick="document.getElementById('allsb-choice').remove();G._allSBNextHand='both';buildPuPanel();sfx('buy');notif('⭐ All SBs on both hands next deal')">Both Hands</button>
+        <button class="btn-ghost" style="font-size:10px;color:var(--muted)" onclick="document.getElementById('allsb-choice').remove();_addPoints(PTS_COST.allsb)">Cancel</button>
+      </div>
+    </div>`;
+  document.body.appendChild(el);
 }
 
 function _redeemExtraShoe(){
@@ -5633,14 +5667,27 @@ function deal(){
   if(G._hand2Active&&(G.mainBet2||0)>0&&G.mainBet<=0){
     notif('Fill Hand 1 before placing on Hand 2'); return;
   }
-  // All Side Bets token: auto-place sMin on each side bet for this hand
+  // All Side Bets token: auto-place sMin on targeted hand(s) (FREE — points already spent)
+  G._freeSBNames = [];
   if(G._allSBNextHand){
-    SB_NAMES.forEach(n=>{ if((G.sideBets[n]||0)===0) G.sideBets[n]=G.s.min; });
+    const target = G._allSBNextHand; // 'h1', 'h2', or 'both'
+    const applyH1 = target==='h1'||target==='both'||target===true;
+    const applyH2 = (target==='h2'||target==='both') && G._hand2Active;
+    if(applyH1){
+      SB_NAMES.forEach(n=>{
+        if((G.sideBets[n]||0)===0){ G.sideBets[n]=G.s.sMin; G._freeSBNames.push(n); }
+      });
+    }
+    if(applyH2){
+      if(!G.sideBets2) G.sideBets2={};
+      SB_NAMES.forEach(n=>{ if((G.sideBets2[n]||0)===0) G.sideBets2[n]=G.s.sMin; });
+    }
     G._allSBNextHand=false;
     updateSBCircles();
-    notif('⭐ All side bets covered at '+fmtKFC(G.s.min));
+    notif('⭐ Side bets covered ('+fmtKFC(G.s.sMin)+' each — free)');
   }
-  const totalDeducted=G.mainBet+Object.values(G.sideBets).reduce((a,b)=>a+b,0)+(G.leverage==='2x'?G.s.min*2:0)
+  const _freeSBTotal = G._freeSBNames.reduce((a,n)=>a+(G.sideBets[n]||0),0);
+  const totalDeducted=G.mainBet+Object.values(G.sideBets).reduce((a,b)=>a+b,0)-_freeSBTotal+(G.leverage==='2x'?G.s.min*2:0)
     +((G._hand2Active&&(G.mainBet2||0)>=G.s.min)?(G.mainBet2+Object.values(G.sideBets2||{}).reduce((a,b)=>a+b,0)):0);
   if(G.balance<totalDeducted){notif('Not enough balance');return;}
   let puCost=0;
@@ -6429,7 +6476,7 @@ function settle(reason){
   };
   // Early SBs (PP, 21+3, C7s)
   (G._earlySBResults||[]).forEach(r=>{
-    breakdown.sbs.push({name:r.name,bet:r.bet,pl:r.pl,won:r.won});
+    breakdown.sbs.push({name:r.name,bet:r.bet,pl:r.pl,won:r.won,free:(G._freeSBNames||[]).includes(r.name)});
   });
   // Dealer Bust breakdown
   SB_NAMES.forEach(n=>{
@@ -6438,7 +6485,7 @@ function settle(reason){
     const goldExtra=n==='Dealer Bust'?(G._goldCardBet||0):0;
     if(orig>0){
       const won=sbAnnouncements.find(a=>a.name===n);
-      breakdown.sbs.push({name:'Dealer Bust',bet:orig,pl:won?won.pl:-orig,won:!!won});
+      breakdown.sbs.push({name:'Dealer Bust',bet:orig,pl:won?won.pl:-orig,won:!!won,free:(G._freeSBNames||[]).includes('Dealer Bust')});
     }
     if(goldExtra>0){
       const gwon=sbAnnouncements.find(a=>a.name===n+'_gold');
@@ -6950,7 +6997,7 @@ function closeResult(){
   G.hands=[[]]; G.cur=0; G.splits=0; G.dealer=[];
   G.arrowCounts=[0,0]; G.kruegerOn=[false,false]; G.desertOn=[false,false]; G.steelOn=[false,false]; G.goldOn=false;
   G.stampedOn=false; G._pendingBJ=false; G._pendingStand=false; G.stampedInitialBet=0; G.stampedCardsViewed=0; G.stampedOn2=false; G.stampedInitialBet2=0; G.stampedCardsViewed2=0; G.plagueOn=false;
-  G.safetyTrigger=false; G.dealerJester=false; G._freeDoubleBet=0;
+  G.safetyTrigger=false; G.dealerJester=false; G._freeDoubleBet=0; G._freeSBNames=[];
   G._handStartBal=0;
   G.mainBet=0;
   SB_NAMES.forEach(n=>G.sideBets[n]=0);
@@ -8358,6 +8405,7 @@ function updateHand2Panel(){
   if(playH2Row){
     const showRow=G._hand2Active&&(G.mainBet2||0)>0&&G.phase!=='bet';
     playH2Row.style.display=showRow?'flex':'none';
+    document.body.classList.toggle('two-hands', !!showRow);
     if(showRow){
       const h2amt=document.getElementById('play-hand2-bet-amt');
       if(h2amt) h2amt.textContent=fmtKFC(G.mainBet2);
