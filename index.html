@@ -302,20 +302,26 @@ body:not(.betting) #betting-spacer { flex: 0; }
   from { opacity:0; transform:translateY(-4px); }
   to   { opacity:1; transform:translateY(0); }
 }
-#pass-tooltip .pt-title {
+#pass-tooltip .pt-title,
+#pts-tooltip .pt-title {
   font-family: var(--mono); font-size: 9px; letter-spacing: 3px;
   color: var(--gold); margin-bottom: 10px; text-transform: uppercase;
 }
-#pass-tooltip .pt-row {
-  display: flex; align-items: baseline; gap: 8px;
+#pass-tooltip .pt-row,
+#pts-tooltip .pt-row {
+  display: flex; align-items: center; gap: 8px;
   font-family: var(--mono); font-size: 9px; color: var(--muted2);
   padding: 3px 0; border-bottom: 1px solid rgba(255,255,255,0.04);
   line-height: 1.5;
 }
-#pass-tooltip .pt-row:last-child { border-bottom: none; }
-#pass-tooltip .pt-row span:first-child { font-size: 11px; flex-shrink:0; }
-#pass-tooltip .pt-val { color: var(--white); }
-#pass-tooltip .pt-sub { color: var(--muted); font-size: 8px; margin-left: auto; }
+#pass-tooltip .pt-row:last-child,
+#pts-tooltip .pt-row:last-child { border-bottom: none; }
+#pass-tooltip .pt-row span:first-child,
+#pts-tooltip .pt-row span:first-child { font-size: 11px; flex-shrink:0; width:16px; text-align:center; }
+#pass-tooltip .pt-val,
+#pts-tooltip .pt-val { color: var(--white); flex:1; }
+#pass-tooltip .pt-sub,
+#pts-tooltip .pt-sub { color: var(--gold-lo); font-size: 8px; white-space:nowrap; }
 body.pass-player .chip { box-shadow: 0 3px 8px rgba(0,0,0,.5), 0 0 12px rgba(201,168,76,0.25); }
 body.pass-player .chip:hover { box-shadow: 0 3px 8px rgba(0,0,0,.5), 0 0 20px rgba(201,168,76,0.5); }
 
@@ -3421,7 +3427,6 @@ const MP3_TRACKS = [
   { name: 'KFC Royale', file: 'music/KFC Anthem.mp3' },
   { name: 'Clair de Lune', file: 'music/Clair de Lune (Studio Version).mp3' },
   { name: 'Clean Chips', file: 'music/KingsCasino.mp3' },
-  { name: 'Cigar Smoke', file: 'music/Cigar Smoke.mp3' },
 ];
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -8350,18 +8355,19 @@ function resetHand2State(){
 <!-- LOYALTY POINTS TOOLTIP -->
 <div id="pts-tooltip">
   <div class="pt-title">⭐ Loyalty Points</div>
+  <div style="font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Earning</div>
   <div class="pt-row"><span>👟</span><span class="pt-val">Shoe complete</span><span class="pt-sub">+10 base</span></div>
   <div class="pt-row"><span>🃏</span><span class="pt-val">Per hand played</span><span class="pt-sub">+1</span></div>
   <div class="pt-row"><span>✅</span><span class="pt-val">Per hand won</span><span class="pt-sub">+1</span></div>
-  <div class="pt-row"><span>🃏</span><span class="pt-val">Per blackjack</span><span class="pt-sub">+3</span></div>
+  <div class="pt-row"><span>🎯</span><span class="pt-val">Per blackjack</span><span class="pt-sub">+3</span></div>
   <div class="pt-row"><span>👑</span><span class="pt-val">Pass multiplier</span><span class="pt-sub">×1.5</span></div>
-  <div style="border-top:1px solid rgba(255,255,255,0.06);margin-top:8px;padding-top:8px">
-    <div class="pt-row" style="border:none"><span>⚡</span><span class="pt-val">Surrender Sally</span><span class="pt-sub">75 pts</span></div>
-    <div class="pt-row" style="border:none"><span>🛡️</span><span class="pt-val">Safety Net</span><span class="pt-sub">60 pts</span></div>
-    <div class="pt-row" style="border:none"><span>7️⃣</span><span class="pt-val">Seven-Seeker</span><span class="pt-sub">60 pts</span></div>
-    <div class="pt-row" style="border:none"><span>🛡️</span><span class="pt-val">BJ Guard</span><span class="pt-sub">45 pts</span></div>
-    <div class="pt-row" style="border:none"><span>🎯</span><span class="pt-val">BJ Novak</span><span class="pt-sub">45 pts</span></div>
-  </div>
+  <div style="border-top:1px solid rgba(255,255,255,0.07);margin:10px 0 8px"></div>
+  <div style="font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Redemption</div>
+  <div class="pt-row"><span>⚡</span><span class="pt-val">Surrender Sally</span><span class="pt-sub">75 pts</span></div>
+  <div class="pt-row"><span>🛡️</span><span class="pt-val">Safety Net</span><span class="pt-sub">60 pts</span></div>
+  <div class="pt-row"><span>7️⃣</span><span class="pt-val">Seven-Seeker</span><span class="pt-sub">60 pts</span></div>
+  <div class="pt-row"><span>🔰</span><span class="pt-val">BJ Guard</span><span class="pt-sub">45 pts</span></div>
+  <div class="pt-row"><span>🎯</span><span class="pt-val">BJ Novak</span><span class="pt-sub">45 pts</span></div>
 </div>
 <!-- PERSONAL BEST FLASH -->
 <div id="pb-flash">🏆 NEW PERSONAL BEST</div>
