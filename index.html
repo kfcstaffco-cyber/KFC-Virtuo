@@ -271,6 +271,46 @@ body:not(.betting) #betting-spacer { flex: 0; }
 .card.idle-float:nth-child(2) { animation-delay: 0.4s; }
 .card.idle-float:nth-child(3) { animation-delay: 0.8s; }
 .card.idle-float:nth-child(4) { animation-delay: 1.2s; }
+
+/* ── LOGIN ANIMATIONS ── */
+@keyframes loginFadeUp {
+  from { opacity:0; transform:translateY(18px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+@keyframes logoGlow {
+  0%,100% { box-shadow:0 0 24px rgba(201,168,76,0.08); }
+  50%      { box-shadow:0 0 48px rgba(201,168,76,0.22), 0 0 80px rgba(201,168,76,0.08); }
+}
+@keyframes stepSlideIn {
+  from { opacity:0; transform:translateX(28px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+@keyframes stepSlideInBack {
+  from { opacity:0; transform:translateX(-28px); }
+  to   { opacity:1; transform:translateX(0); }
+}
+.login-wrap { animation: loginFadeUp .65s cubic-bezier(.16,1,.3,1) both; }
+.login-step-enter      { animation: stepSlideIn     .32s cubic-bezier(.16,1,.3,1) both; }
+.login-step-enter-back { animation: stepSlideInBack .32s cubic-bezier(.16,1,.3,1) both; }
+#login input:focus, #buyin-amount:focus {
+  border-color: rgba(201,168,76,0.55) !important;
+  box-shadow: 0 0 0 3px rgba(201,168,76,0.07) !important;
+  outline: none;
+  transition: border-color .2s, box-shadow .2s;
+}
+.login-stake-btn { transition: border-color .15s, background .15s, transform .15s !important; }
+.login-stake-btn:hover:not([disabled]) { transform: translateX(5px) !important; }
+.btn-primary { position:relative; overflow:hidden; }
+@keyframes btnRipple { to { transform:scale(4); opacity:0; } }
+.btn-ripple {
+  position:absolute; border-radius:50%;
+  background:rgba(255,255,255,0.2);
+  width:40px; height:40px;
+  margin-top:-20px; margin-left:-20px;
+  animation: btnRipple .5s ease-out forwards;
+  pointer-events:none;
+}
+
 #tb-pass-badge {
   display: none;
   font-size: 14px;
@@ -1904,7 +1944,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
   <canvas id="login-bg" style="position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0"></canvas>
   <div class="login-wrap">
     <div style="text-align:center;margin-bottom:24px">
-      <div style="display:inline-block;border:1.5px solid rgba(201,168,76,0.45);border-radius:12px;padding:4px;background:rgba(0,0,0,0);box-shadow:0 0 24px rgba(201,168,76,0.08)">
+      <div class="login-logo-wrap" style="animation:logoGlow 3s ease-in-out infinite;">
         <img src="KFC_LOGO.png" alt="KFC" style="width:180px;height:180px;object-fit:contain;display:block;mix-blend-mode:screen">
       </div>
     </div>
@@ -1922,14 +1962,14 @@ body.hand2-active #chip-strip .chip { position: relative; }
     </div>
     <!-- Step 2: Stake selection (shown first after credentials) -->
     <div id="login-step2" style="display:none">
-      <button class="btn-ghost" onclick="goLoginStep(1)" style="padding:6px 12px;margin-bottom:16px;font-size:11px">Back</button>
+      <button class="btn-ghost" onclick="goLoginStep(1,true)" style="padding:6px 12px;margin-bottom:16px;font-size:11px">← Back</button>
       <div style="font-family:var(--sans);font-weight:800;font-size:15px;color:var(--gold-hi);letter-spacing:3px;text-align:center;margin-bottom:4px;text-transform:uppercase">Select Stake</div>
       <div id="login-bal-display" style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-bottom:16px;letter-spacing:1px"></div>
       <div id="login-stake-list" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto"></div>
     </div>
     <!-- Step 3: Buy-in amount -->
     <div id="login-step-buyin" style="display:none">
-      <button class="btn-ghost" onclick="goLoginStep(2)" style="padding:6px 12px;margin-bottom:16px;font-size:11px">Back</button>
+      <button class="btn-ghost" onclick="goLoginStep(2,true)" style="padding:6px 12px;margin-bottom:16px;font-size:11px">← Back</button>
       <div class="field-label" style="text-align:center;letter-spacing:4px;margin-bottom:24px">BUY IN</div>
       <div class="field-label" style="margin-bottom:4px">Your Balance</div>
       <div id="buyin-current-bal" style="font-family:var(--mono);font-size:14px;color:var(--white);font-weight:500;margin-bottom:20px;padding:10px 12px;background:var(--bg2);border:1px solid var(--line);border-radius:var(--radius)"></div>
@@ -2683,7 +2723,14 @@ const PTS_PER_HAND        = 1;   // per hand dealt that shoe
 const PTS_PER_WIN         = 1;   // per winning hand that shoe
 const PTS_PER_BJ          = 3;   // per blackjack that shoe
 const PTS_PASS_MULTIPLIER = 1.5; // pass players earn 1.5×
-const PTS_COST = { sally:75, net:60, seeker:60, guard:45, novak:45 };
+const PTS_COST = {
+  sally:60, net:50, seeker:50, guard:35, novak:35, // power-ups
+  lev2x:35,           // 2× leverage token (high-roller+ only)
+  insurance:25,       // insurance token (all stakes)
+  allsb:40,           // all side bets min next hand
+  extrashoe_std:50,   // +1 shoe for standard players
+  extrashoe_pass:30,  // +1 shoe for pass players
+};
 
 function _ptsKey(u){ return 'kfc_pts_'+(u||'').toLowerCase(); }
 function _getPoints(u){ return parseInt(localStorage.getItem(_ptsKey(u||(G.username||G.player)))||'0',10); }
@@ -2714,10 +2761,9 @@ function _calcShoePoints(partial){
   const hands=_shoeHandCount;
   const wins=_shoeLog.filter(e=>e.pl>0).length;
   const bjs=_shoeLog.filter(e=>e.bj).length;
-  // Full shoe: base + per-hand + per-win + per-BJ
-  // Partial shoe (cashout mid-shoe): no base — only per-hand/win/BJ earned
+  const sbWins=_shoeLog.reduce((a,e)=>a+(e.sbWins||0),0);
   const base = partial ? 0 : PTS_BASE_PER_SHOE;
-  const raw = base + hands*PTS_PER_HAND + wins*PTS_PER_WIN + bjs*PTS_PER_BJ;
+  const raw = base + hands*PTS_PER_HAND + wins*PTS_PER_WIN + bjs*PTS_PER_BJ + sbWins*2;
   return Math.ceil(raw*(G._clubPass?PTS_PASS_MULTIPLIER:1));
 }
 
@@ -2759,6 +2805,8 @@ const G = {
   log:[],
   url:'', pins:{},
   preDealBal:0, lastMainBet:0, lastSideBets:{}, lastMainBet2:0, lastSideBets2:{}, cashedOut:false, _atCashout:false, _sessionActive:false, insuranceBet:0, _freeDoubleBet:0, _freeLevBet:0,
+  _insuranceToken:false, // loyalty: covers half bet on bust (stacks with Krueger for full)
+  _allSBNextHand:false,  // loyalty: auto-place sMin on all 4 side bets next deal
   _bonusPayouts:[], // [{label, pl}] — instant bonus card payouts to show in result
   cutCardTriggered:false, // set when cut card is drawn mid-shoe
 };
@@ -3577,23 +3625,23 @@ let _pendingLogin = null;
 // ── LOGIN FLOW NAVIGATION ────────────────────────────────────
 let _selectedStakeKey = null;
 
-function goLoginStep(step){
+function goLoginStep(step, back){
+  const stepIds=['login-step1','login-step2','login-step-buyin'];
+  const cls = back ? 'login-step-enter-back' : 'login-step-enter';
   // Hide all steps
-  ['login-step1','login-step2','login-step-buyin'].forEach(id=>{
-    const el=document.getElementById(id); if(el) el.style.display='none';
-  });
+  stepIds.forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display='none'; });
   if(step===1){
     const s1=document.getElementById('login-step1');
-    if(s1) s1.style.display='block';
-    setTimeout(()=>{const u=document.getElementById('lusername');if(u)u.focus();},50);
+    if(s1){ s1.style.display='block'; s1.classList.remove('login-step-enter','login-step-enter-back'); void s1.offsetWidth; s1.classList.add(cls); }
+    setTimeout(()=>{ const u=document.getElementById('lusername'); if(u) u.focus(); },50);
   } else if(step===2){
     buildLoginStakeList();
     const s2=document.getElementById('login-step2');
-    if(s2) s2.style.display='block';
+    if(s2){ s2.style.display='block'; s2.classList.remove('login-step-enter','login-step-enter-back'); void s2.offsetWidth; s2.classList.add(cls); }
   } else if(step===3){
     buildBuyInStep();
     const s3=document.getElementById('login-step-buyin');
-    if(s3) s3.style.display='block';
+    if(s3){ s3.style.display='block'; s3.classList.remove('login-step-enter','login-step-enter-back'); void s3.offsetWidth; s3.classList.add(cls); }
   }
 }
 
@@ -3618,6 +3666,7 @@ function buildLoginStakeList(){
     const canAfford=bal<=0||bal>=s.min;
     const btn=document.createElement('button');
     btn.style.cssText='width:100%;padding:11px 14px;background:var(--bg2);border:1px solid var(--line2);font-family:var(--sans);font-size:13px;font-weight:600;letter-spacing:1px;text-align:left;display:flex;justify-content:space-between;align-items:center;border-radius:var(--radius);transition:all .15s;cursor:pointer;color:var(--white);opacity:1';
+    btn.className='login-stake-btn';
     btn.innerHTML='<span>'+s.label+' Stakes</span><span style="font-family:var(--mono);font-size:10px;color:var(--muted)">min '+fmt(s.min)+'</span>';
     btn.onmouseover=()=>{btn.style.borderColor='rgba(201,168,76,0.5)';btn.style.background='rgba(201,168,76,0.06)';};
     btn.onmouseout=()=>{btn.style.borderColor='var(--line2)';btn.style.background='var(--bg2)';};
@@ -5339,6 +5388,53 @@ function buildPuPanel(){
     }
     c.appendChild(wrap);
   });
+
+  // ── Additional points redemptions ──────────────────────────────
+  const _addRedemption = (label, sub, id, cost, onRedeem, disabled) => {
+    const wrap=document.createElement('div');
+    wrap.style.cssText='display:flex;align-items:center;gap:6px';
+    const itemDiv=document.createElement('div');
+    itemDiv.style.cssText='flex:1;min-width:0';
+    addItemBtn(itemDiv,label,sub,id,false,null,null);
+    const pBtn=document.createElement('button');
+    pBtn.className='pu-pts-btn';
+    pBtn.textContent='⭐'+cost;
+    pBtn.title='Redeem for '+cost+' points';
+    pBtn.disabled=disabled||myPts<cost;
+    if(!pBtn.disabled) pBtn.onclick=onRedeem;
+    wrap.appendChild(itemDiv);
+    wrap.appendChild(pBtn);
+    c.appendChild(wrap);
+  };
+
+  // Divider
+  const div=document.createElement('div');
+  div.style.cssText='border-top:1px solid var(--line);margin:8px 0 6px';
+  c.appendChild(div);
+  const secLbl=document.createElement('div');
+  secLbl.style.cssText='font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--muted);padding:0 0 4px';
+  secLbl.textContent='MORE REDEMPTIONS';
+  c.appendChild(secLbl);
+
+  // 2× Leverage token (high-roller+ only)
+  const canLev = !['highroller','champion'].includes(G.stake) && G.leverage!=='2x';
+  _addRedemption('2× Leverage Token','Free double-down leverage','pts-lev2x',PTS_COST.lev2x,
+    ()=>_redeemLev2x(), !canLev || G.phase!=='bet');
+
+  // Insurance token (all stakes)
+  const insOwned = G._insuranceToken;
+  _addRedemption('Insurance Token', insOwned?'Active — next bust covered':'Half-bet on next bust','pts-insurance',PTS_COST.insurance,
+    ()=>_redeemInsurance(), insOwned);
+
+  // All Side Bets min
+  const allSBOwned = G._allSBNextHand;
+  _addRedemption('All Side Bets (Min)','Auto-places sMin on all 4 SBs','pts-allsb',PTS_COST.allsb,
+    ()=>_redeemAllSB(), allSBOwned || G.phase!=='bet');
+
+  // Extra shoe
+  const extraShoesCost = G._clubPass ? PTS_COST.extrashoe_pass : PTS_COST.extrashoe_std;
+  _addRedemption('+1 Extra Shoe Today','Adds one shoe to daily limit','pts-extrashoe',extraShoesCost,
+    ()=>_redeemExtraShoe(), false);
 }
 
 function buyPu(pu,cost){
@@ -5378,6 +5474,41 @@ function buyPuWithPoints(pu, ptsCost){
   if(!_spendPoints(ptsCost)){notif('Not enough loyalty points (need ⭐'+ptsCost+')');return;}
   G.puOwned.add(pu.id); updateUI(); buildPuPanel();
   sfx('buy'); notif('⭐ '+pu.label+' activated with points — good for this shoe');
+}
+
+function _redeemLev2x(){
+  if(['highroller','champion'].includes(G.stake)){notif('2× Token not available at this stake tier');return;}
+  if(G.leverage==='2x'){notif('2× Token already active');return;}
+  if(G.phase!=='bet'){notif('Must redeem before dealing');return;}
+  if(!_spendPoints(PTS_COST.lev2x)){notif('Not enough points (need ⭐'+PTS_COST.lev2x+')');return;}
+  G.leverage='2x'; buildLevPanel(); updateBetPanel(); updateInventoryBar();
+  sfx('buy'); notif('⭐ 2× Leverage Token activated');
+}
+
+function _redeemInsurance(){
+  if(G._insuranceToken){notif('Insurance Token already active');return;}
+  if(!_spendPoints(PTS_COST.insurance)){notif('Not enough points (need ⭐'+PTS_COST.insurance+')');return;}
+  G._insuranceToken=true; buildPuPanel();
+  sfx('buy'); notif('⭐ Insurance Token active — half-bet covered on next bust'+(G.kruegerOn[0]||G.kruegerOn[1]?' (+Krueger = full cover)':''));
+}
+
+function _redeemAllSB(){
+  if(G.phase!=='bet'){notif('Must redeem before dealing');return;}
+  if(G._allSBNextHand){notif('All Side Bets token already active');return;}
+  if(!_spendPoints(PTS_COST.allsb)){notif('Not enough points (need ⭐'+PTS_COST.allsb+')');return;}
+  G._allSBNextHand=true; buildPuPanel();
+  sfx('buy'); notif('⭐ All side bets will be covered at minimum next deal');
+}
+
+function _redeemExtraShoe(){
+  const cost=G._clubPass?PTS_COST.extrashoe_pass:PTS_COST.extrashoe_std;
+  if(!_spendPoints(cost)){notif('Not enough points (need ⭐'+cost+')');return;}
+  // Decrement today's shoe counter by 1 (adds one shoe back to allowance)
+  const u=G.username||G.player;
+  const cur=_shoesPlayedToday(u);
+  if(cur>0) localStorage.setItem(_shoeKey(u), String(cur-1));
+  buildPuPanel();
+  sfx('cash'); notif('⭐ +1 extra shoe added — '+_shoesRemaining()+' shoes remaining today');
 }
 
 const PU_IMAGES={
@@ -5450,6 +5581,13 @@ function deal(){
   // If hand 2 is active but hand 1 has no bet, prompt to fill hand 1 first
   if(G._hand2Active&&(G.mainBet2||0)>0&&G.mainBet<=0){
     notif('Fill Hand 1 before placing on Hand 2'); return;
+  }
+  // All Side Bets token: auto-place sMin on each side bet for this hand
+  if(G._allSBNextHand){
+    SB_NAMES.forEach(n=>{ if((G.sideBets[n]||0)===0) G.sideBets[n]=G.s.sMin; });
+    G._allSBNextHand=false;
+    updateSBCircles();
+    notif('⭐ All side bets covered (sMin)');
   }
   const totalDeducted=G.mainBet+Object.values(G.sideBets).reduce((a,b)=>a+b,0)+(G.leverage==='2x'?G.s.min*2:0)
     +((G._hand2Active&&(G.mainBet2||0)>=G.s.min)?(G.mainBet2+Object.values(G.sideBets2||{}).reduce((a,b)=>a+b,0)):0);
@@ -5776,7 +5914,19 @@ function hit(){
   if(isBust(h)){
     sfx('bust');
     _playBustAnimation(G.cur); // red shake on busted hand slot
-    if(G.kruegerOn[G.cur]){const _kBet=(G.cur===1&&G._hand2Active)?(G.mainBet2||0):G.mainBet;const ins=Math.floor(_kBet/2);G.preDealBal+=ins;G.balance+=ins;updateUI();G._bonusPayouts.push({label:'Krueger'+(G.cur===1?' (H2)':'')+' — bust insurance',pl:ins,type:'gain'});notif('Krueger — bust insurance paid '+fmtKFC(ins));G.kruegerOn[G.cur]=false;}
+    if(G.kruegerOn[G.cur]||G._insuranceToken){
+      const _kBet=(G.cur===1&&G._hand2Active)?(G.mainBet2||0):G.mainBet;
+      const hasKrueger=G.kruegerOn[G.cur];
+      const hasToken=G._insuranceToken;
+      // Krueger = half, Token = half, both = full
+      const coverPct = (hasKrueger && hasToken) ? 1 : 0.5;
+      const ins=Math.floor(_kBet*coverPct);
+      G.preDealBal+=ins; G.balance+=ins; updateUI();
+      const lbl = hasKrueger&&hasToken ? 'Full bust cover (Krueger+Token)' : hasKrueger ? 'Krueger — bust insurance' : 'Insurance Token';
+      G._bonusPayouts.push({label:lbl+(G.cur===1?' (H2)':''),pl:ins,type:'gain'});
+      notif(lbl+' — +'+fmtKFC(ins));
+      G.kruegerOn[G.cur]=false; G._insuranceToken=false;
+    }
     if(G.desertOn[G.cur]){G.desertOn[G.cur]=false;advOrEnd('desert_push');return;}
     advOrEnd('bust');
   } else if(v===21){
@@ -6248,7 +6398,10 @@ function settle(reason){
     ? `H1: ${_h1Res.detail} / H2: ${_h2Res.detail}`
     : detail;
   G.log.push({detail:_logDetail,pl:totalPLForDisplay,bal:G.balance,breakdown});
-  _shoeLog.push({pl:totalPLForDisplay, bj:reason==='player_bj'}); // track for shoe summary + points
+  // Count side bet wins for loyalty points (+2 per SB won)
+  const _sbWins = (G._earlySBResults||[]).filter(r=>r.won).length
+    + sbAnnouncements.filter(a=>a.pl>0&&!a.free).length;
+  _shoeLog.push({pl:totalPLForDisplay, bj:reason==='player_bj', sbWins:_sbWins});
   _shoeHandCount++;
   renderLog();
   // Update session P&L chart
@@ -8258,6 +8411,18 @@ function resetHand2State(){
   document.addEventListener('DOMContentLoaded',()=>{
     setTimeout(start,100);
     _initPassTooltip();
+    // Ripple effect on all .btn-primary buttons
+    document.addEventListener('click', e=>{
+      const btn = e.target.closest('.btn-primary');
+      if(!btn) return;
+      const r = btn.getBoundingClientRect();
+      const rip = document.createElement('span');
+      rip.className = 'btn-ripple';
+      rip.style.left = (e.clientX - r.left) + 'px';
+      rip.style.top  = (e.clientY - r.top)  + 'px';
+      btn.appendChild(rip);
+      setTimeout(()=>rip.remove(), 550);
+    });
   });
   setTimeout(start,200);
 })();
