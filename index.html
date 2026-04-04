@@ -5583,20 +5583,22 @@ function _redeemInsurance(){
 function _redeemAllSB(){
   if(G.phase!=='bet'){notif('Must redeem before dealing');return;}
   if(G._allSBNextHand){notif('All Side Bets token already active');return;}
-  if(!_spendPoints(PTS_COST.allsb)){notif('Not enough points (need ⭐'+PTS_COST.allsb+')');return;}
-  // If two hands active, ask which hand
+  // If two hands active, show choice first (points spent inside choice handler)
   if(G._hand2Active && (G.mainBet2||0) >= G.s.min){
-    // Show a quick choice modal
     _showAllSBHandChoice();
     return;
   }
+  // Single hand — spend and activate
+  if(!_spendPoints(PTS_COST.allsb)){notif('Not enough points (need ⭐'+PTS_COST.allsb+')');return;}
   G._allSBNextHand='h1';
   buildPuPanel();
   sfx('buy'); notif('⭐ All side bets will be covered at minimum next deal');
 }
 
 function _showAllSBHandChoice(){
-  // Simple notif-style overlay asking H1 / H2 / Both
+  const cost1 = PTS_COST.allsb;
+  const cost2 = PTS_COST.allsb * 2;
+  const myPts = _getPoints(G.username||G.player);
   const el=document.createElement('div');
   el.id='allsb-choice';
   el.style.cssText='position:fixed;inset:0;z-index:900;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.7)';
@@ -5604,10 +5606,10 @@ function _showAllSBHandChoice(){
     <div style="background:var(--bg1);border:1px solid var(--line2);border-radius:8px;padding:24px 28px;text-align:center;max-width:280px">
       <div style="font-family:var(--mono);font-size:9px;letter-spacing:2px;color:var(--muted);margin-bottom:16px">ALL SIDE BETS — APPLY TO</div>
       <div style="display:flex;flex-direction:column;gap:8px">
-        <button class="btn-ghost" onclick="document.getElementById('allsb-choice').remove();G._allSBNextHand='h1';G._allSBHand=1;buildPuPanel();sfx('buy');notif('⭐ All SBs on Hand 1 next deal')">Hand 1</button>
-        <button class="btn-ghost" onclick="document.getElementById('allsb-choice').remove();G._allSBNextHand='h2';G._allSBHand=2;buildPuPanel();sfx('buy');notif('⭐ All SBs on Hand 2 next deal')">Hand 2</button>
-        <button class="btn-ghost" style="border-color:rgba(201,168,76,0.4);color:var(--gold)" onclick="document.getElementById('allsb-choice').remove();G._allSBNextHand='both';buildPuPanel();sfx('buy');notif('⭐ All SBs on both hands next deal')">Both Hands</button>
-        <button class="btn-ghost" style="font-size:10px;color:var(--muted)" onclick="document.getElementById('allsb-choice').remove();_addPoints(PTS_COST.allsb)">Cancel</button>
+        <button class="btn-ghost" ${myPts<cost1?'disabled':''} onclick="document.getElementById('allsb-choice').remove();if(_spendPoints(${cost1})){G._allSBNextHand='h1';buildPuPanel();sfx('buy');notif('⭐ All SBs on Hand 1 (⭐${cost1})');}">Hand 1 — ⭐${cost1}</button>
+        <button class="btn-ghost" ${myPts<cost1?'disabled':''} onclick="document.getElementById('allsb-choice').remove();if(_spendPoints(${cost1})){G._allSBNextHand='h2';buildPuPanel();sfx('buy');notif('⭐ All SBs on Hand 2 (⭐${cost1})');}">Hand 2 — ⭐${cost1}</button>
+        <button class="btn-ghost" style="border-color:rgba(201,168,76,0.4);color:var(--gold)" ${myPts<cost2?'disabled style="opacity:.3"':''} onclick="document.getElementById('allsb-choice').remove();if(_spendPoints(${cost2})){G._allSBNextHand='both';buildPuPanel();sfx('buy');notif('⭐ All SBs on both hands (⭐${cost2})');}else{notif('Not enough points for both hands (need ⭐${cost2})');}">Both Hands — ⭐${cost2}</button>
+        <button class="btn-ghost" style="font-size:10px;color:var(--muted)" onclick="document.getElementById('allsb-choice').remove()">Cancel</button>
       </div>
     </div>`;
   document.body.appendChild(el);
