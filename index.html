@@ -5779,6 +5779,7 @@ function deal(){
       sfx('bj'); showBJ();
       msg('HAND 2: BLACKJACK!','bj');
       setActions(false);
+      revealHole(); renderAll();
       setTimeout(()=>settle('player_bj'), 600);
       return;
     }
@@ -6043,7 +6044,14 @@ function hit(){
   else { renderScores(); setActions(true); updateStrategyHint(); }
 }
 
-function stand(){ if(G.phase!=='play')return; sfx('button'); hideStampedBoost(); G.stampedOn=false; G.stampedOn2=false; advOrEnd(); }
+function stand(){
+  if(G.phase!=='play')return;
+  sfx('button');
+  hideStampedBoost();
+  // Only clear the current hand's stamped flag — other hand may still need it
+  if(G.cur===1){ G.stampedOn2=false; } else { G.stampedOn=false; }
+  advOrEnd();
+}
 
 function dbl(){
   if(G.phase!=='play')return;
@@ -6141,7 +6149,9 @@ function split(){
 }
 
 function advOrEnd(reason){
-  hideStampedBoost(); G.stampedOn=false; G.stampedOn2=false; // always clear boost button when advancing
+  hideStampedBoost();
+  // Clear stamped flag for current hand only — next hand may still need its flag
+  if(G.cur===1){ G.stampedOn2=false; } else { G.stampedOn=false; }
   if(reason==='safety'){
     // Safety net: immediate push, skip dealer
     renderScores();
@@ -6160,6 +6170,7 @@ function advOrEnd(reason){
         if(_isH2Seat){
           msg('HAND 2: BLACKJACK!','bj');
           setActions(false);
+          revealHole(); renderAll();
           setTimeout(()=>settle('player_bj'), 600);
         } else {
           notif('BLACKJACK on split hand!');
@@ -6174,14 +6185,18 @@ function advOrEnd(reason){
   }
   if(G.cur<G.hands.length-1){
     G.cur++; renderAll();
+    // Re-show stamped boost if the newly active hand has it
+    const _nextStamped = G.cur===1 ? G.stampedOn2 : G.stampedOn;
+    if(_nextStamped) showStampedBoost();
     if(isBJ(G.hands[G.cur])){
       // BJ on newly active hand — split hand OR second seat in two-hand mode
       const _isH2Seat=G._hand2Active&&G.cur===1&&G.splits===0;
       sfx('bj'); showBJ();
       if(_isH2Seat){
-        // Two-hand mode: hand 2 is a BJ — show animation then settle (both hands)
+        // Two-hand mode: hand 2 is a BJ — reveal hole then settle
         msg('HAND 2: BLACKJACK!','bj');
         setActions(false);
+        revealHole(); renderAll();
         setTimeout(()=>settle('player_bj'), 600);
       } else {
         notif('BLACKJACK on split hand!');
