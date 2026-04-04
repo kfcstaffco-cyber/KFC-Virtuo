@@ -1136,6 +1136,7 @@ body.pass-player #felt-toggle-btn { display:flex; }
   /* ── STAKE LIST ── */
   .stake-btn { padding: 9px 12px; }
   #login-stake-list { max-height: 55vh; }
+  #login-stake-list::-webkit-scrollbar { display: none; }
 
   /* ── LOG ── */
   #log { font-size: 10px; }
@@ -1985,7 +1986,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
       <button class="btn-ghost" onclick="goLoginStep(1,true)" style="padding:6px 12px;margin-bottom:16px;font-size:11px">← Back</button>
       <div style="font-family:var(--sans);font-weight:800;font-size:15px;color:var(--gold-hi);letter-spacing:3px;text-align:center;margin-bottom:4px;text-transform:uppercase">Select Stake</div>
       <div id="login-bal-display" style="font-family:var(--mono);font-size:11px;color:var(--muted);text-align:center;margin-bottom:16px;letter-spacing:1px"></div>
-      <div id="login-stake-list" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto"></div>
+      <div id="login-stake-list" style="display:flex;flex-direction:column;gap:6px;max-height:320px;overflow-y:auto;scrollbar-width:none;-ms-overflow-style:none"></div>
     </div>
     <!-- Step 3: Buy-in amount -->
     <div id="login-step-buyin" style="display:none">
@@ -2750,7 +2751,7 @@ const SHOES_PER_DAY_PASS     = 15;  // 21 Club pass holders
 // ── LOYALTY POINTS ───────────────────────────────────────────────────────────
 const PTS_BASE_PER_SHOE   = 10;  // flat base per shoe completed
 const PTS_PER_HAND        = 1;   // per hand dealt that shoe
-const PTS_PER_WIN         = 1;   // per winning hand that shoe
+const PTS_PER_WIN         = 2;   // per winning hand that shoe
 const PTS_PER_BJ          = 3;   // per blackjack that shoe
 const PTS_PASS_MULTIPLIER = 1.5; // pass players earn 1.5×
 const PTS_COST = {
@@ -3746,19 +3747,18 @@ function buildBuyInStep(){
   if(bd) bd.textContent='Available: '+fmtKFC(bal);
   // Set default = min bet of stake
   const inp=document.getElementById('buyin-amount');
-  if(inp){inp.min=s.min; inp.value=Math.min(bal, s.min*10);}
+  if(inp){ const defVal=Math.min(bal, s.min*10); inp._raw=defVal; inp.value=defVal.toLocaleString('de-CH'); }
   // Quick buttons using stake chip denominations
   const qb=document.getElementById('buyin-quick-btns');
   if(qb){
     qb.innerHTML='';
-    // Generate sensible quick amounts for this stake
     const amounts=[s.min,s.min*5,s.min*10,s.min*50,s.min*100].filter(v=>v<=bal);
     amounts.forEach(v=>{
       const b=document.createElement('button');
       b.className='btn-ghost';
       b.style.cssText='flex:1;font-size:10px;padding:5px 4px;min-width:0';
       b.textContent=fmt(v);
-      b.onclick=()=>{const i=document.getElementById('buyin-amount');if(i)i.value=v;};
+      b.onclick=()=>{const i=document.getElementById('buyin-amount');if(i){i._raw=v;i.value=v.toLocaleString('de-CH');}};
       qb.appendChild(b);
     });
   }
@@ -8566,7 +8566,7 @@ function resetHand2State(){
   <div style="font-family:var(--mono);font-size:8px;letter-spacing:2px;color:var(--muted);margin-bottom:6px;text-transform:uppercase">Earning</div>
   <div class="pt-row"><span>👟</span><span class="pt-val">Shoe complete</span><span class="pt-sub">+10 base</span></div>
   <div class="pt-row"><span>🃏</span><span class="pt-val">Per hand played</span><span class="pt-sub">+1</span></div>
-  <div class="pt-row"><span>✅</span><span class="pt-val">Per hand won</span><span class="pt-sub">+1</span></div>
+  <div class="pt-row"><span>✅</span><span class="pt-val">Per hand won</span><span class="pt-sub">+2</span></div>
   <div class="pt-row"><span>🎯</span><span class="pt-val">Per blackjack</span><span class="pt-sub">+3</span></div>
   <div class="pt-row"><span>👑</span><span class="pt-val">Pass multiplier</span><span class="pt-sub">×1.5</span></div>
   <div style="border-top:1px solid rgba(255,255,255,0.07);margin:10px 0 8px"></div>
