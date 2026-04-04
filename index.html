@@ -5428,19 +5428,28 @@ function buildPuPanel(){
   });
 
   // ── Additional points redemptions ──────────────────────────────
-  const _addRedemption = (label, sub, id, cost, onRedeem, disabled) => {
+  const _addRedemption = (label, sub, id, cost, onRedeem, disabled, active) => {
     const itemDiv=document.createElement('div');
     addItemBtn(itemDiv,label,sub,id,false,null,null);
     const ib=itemDiv.querySelector('.item-btn');
     if(ib){
       ib.classList.add('redemption-item');
-      const pBtn=document.createElement('button');
-      pBtn.className='pu-pts-btn';
-      pBtn.style.cssText='margin-left:auto;flex-shrink:0;align-self:center';
-      pBtn.textContent='\u2605'+cost;
-      pBtn.disabled=disabled||myPts<cost;
-      if(!pBtn.disabled) pBtn.onclick=(e)=>{e.stopPropagation();onRedeem();};
-      ib.appendChild(pBtn);
+      if(active){
+        // Show active badge instead of pts button
+        ib.style.borderColor='rgba(201,168,76,0.35)';
+        const badge=document.createElement('span');
+        badge.style.cssText='margin-left:auto;flex-shrink:0;font-family:var(--mono);font-size:8px;color:var(--gold);letter-spacing:1px;white-space:nowrap';
+        badge.textContent='✓ ACTIVE';
+        ib.appendChild(badge);
+      } else {
+        const pBtn=document.createElement('button');
+        pBtn.className='pu-pts-btn';
+        pBtn.style.cssText='margin-left:auto;flex-shrink:0;align-self:center';
+        pBtn.textContent='\u2605'+cost;
+        pBtn.disabled=disabled||myPts<cost;
+        if(!pBtn.disabled) pBtn.onclick=(e)=>{e.stopPropagation();onRedeem();};
+        ib.appendChild(pBtn);
+      }
     }
     c.appendChild(itemDiv);
   };
@@ -5455,22 +5464,22 @@ function buildPuPanel(){
   c.appendChild(secLbl);
 
   // 2× Leverage token (high-roller+ only)
-  const canLev = !['highroller','champion'].includes(G.stake) && G.leverage!=='2x';
-  _addRedemption('2× Leverage Token','Double leverage — next hand','pts-lev2x',PTS_COST.lev2x,
-    ()=>_redeemLev2x(), !canLev || G.phase!=='bet');
+  const levActive = G.leverage==='2x';
+  const canLev = !['highroller','champion'].includes(G.stake) && !levActive;
+  _addRedemption('2× Leverage Token', levActive?'Active — next hand':'Double leverage — next hand',
+    'pts-lev2x',PTS_COST.lev2x, ()=>_redeemLev2x(), !canLev || G.phase!=='bet', levActive);
 
   const insOwned = G._insuranceToken;
-  _addRedemption('Insurance Token', insOwned?'Active':'Half-bet covered on bust','pts-insurance',PTS_COST.insurance,
-    ()=>_redeemInsurance(), insOwned);
+  _addRedemption('Insurance Token', insOwned?'Active — bust protected':'Half-bet covered on bust',
+    'pts-insurance',PTS_COST.insurance, ()=>_redeemInsurance(), false, insOwned);
 
   const allSBOwned = G._allSBNextHand;
-  _addRedemption('All Side Bets (Min)','Min bet on all 4 SBs next deal','pts-allsb',PTS_COST.allsb,
-    ()=>_redeemAllSB(), allSBOwned || G.phase!=='bet');
+  _addRedemption('All Side Bets (Min)', allSBOwned?'Active — next deal covered':'Min bet on all 4 SBs next deal',
+    'pts-allsb',PTS_COST.allsb, ()=>_redeemAllSB(), G.phase!=='bet', allSBOwned);
 
-  // Extra shoe
   const extraShoesCost = G._clubPass ? PTS_COST.extrashoe_pass : PTS_COST.extrashoe_std;
-  _addRedemption('+1 Extra Shoe',_shoesRemaining()+' remaining today','pts-extrashoe',extraShoesCost,
-    ()=>_redeemExtraShoe(), false);
+  _addRedemption('+1 Extra Shoe',_shoesRemaining()+' remaining today',
+    'pts-extrashoe',extraShoesCost, ()=>_redeemExtraShoe(), false, false);
 }
 
 function buyPu(pu,cost){
