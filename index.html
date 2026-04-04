@@ -2324,7 +2324,7 @@ body.hand2-active #chip-strip .chip { position: relative; }
           <span style="display:flex;align-items:center;gap:8px">Enhancements <button class="info-btn" onclick="event.stopPropagation();openModal('pu-info-modal')" style="pointer-events:auto">ⓘ</button></span>
           <span id="enh-toggle-icon" style="font-size:11px;color:var(--muted);letter-spacing:1px;font-family:var(--mono);transition:transform .2s">▼</span>
         </div>
-        <div id="enh-wrap" style="overflow:hidden;transition:max-height .3s ease,opacity .3s ease;max-height:600px;opacity:1">
+        <div id="enh-wrap" style="overflow:hidden;transition:max-height .3s ease,opacity .3s ease;max-height:1000px;opacity:1">
           <div class="tab-row">
             <button class="tab on" id="tab-lev" onclick="switchTab('lev')">Leverage</button>
             <button class="tab"    id="tab-pu"  onclick="switchTab('pu')">Power-Ups</button>
@@ -7050,7 +7050,7 @@ function _togglePanel(wrapId, iconId, maxH){
   wrap.style.opacity   = collapsed ? '1' : '0';
   if(icon){ icon.textContent=collapsed?'▼':'▶'; icon.style.transform=collapsed?'':'rotate(-90deg)'; }
 }
-function toggleEnhancements(){ _togglePanel('enh-wrap','enh-toggle-icon','600px'); }
+function toggleEnhancements(){ _togglePanel('enh-wrap','enh-toggle-icon','1000px'); }
 function toggleLeaderboard(){ _togglePanel('lb-wrap','lb-toggle-icon','400px'); }
 
 // ── LOG ──────────────────────────────────────────────
