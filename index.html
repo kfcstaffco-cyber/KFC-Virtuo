@@ -769,6 +769,7 @@ body.pass-player #felt-toggle-btn { display:flex; }
 .item-btn.locked { opacity: .28; cursor: not-allowed; pointer-events: none; }
 /* Inside PU panel, item-btn must stay within panel — box-sizing ensures padding doesn't overflow */
 #panel-pu .item-btn { width: 100%; box-sizing: border-box; }
+#panel-pu { padding-bottom: 8px; }
 /* Redemption items (no medallion): truncate sub text so pts button stays visible */
 #panel-pu .redemption-item .item-text { min-width: 0; overflow: hidden; }
 #panel-pu .redemption-item .item-sub  { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -5474,7 +5475,7 @@ function buildPuPanel(){
     'pts-insurance',PTS_COST.insurance, ()=>_redeemInsurance(), false, insOwned);
 
   const allSBOwned = G._allSBNextHand;
-  _addRedemption('All Side Bets (Min)', allSBOwned?'Active — next deal covered':'Min bet on all 4 SBs next deal',
+  _addRedemption('All Side Bets (Min)', allSBOwned?'Active — next deal covered':'All 4 SBs at min bet',
     'pts-allsb',PTS_COST.allsb, ()=>_redeemAllSB(), G.phase!=='bet', allSBOwned);
 
   const extraShoesCost = G._clubPass ? PTS_COST.extrashoe_pass : PTS_COST.extrashoe_std;
