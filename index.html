@@ -697,6 +697,7 @@ body.pass-player #felt-toggle-btn { display:flex; }
 ───────────────────────────────────────────── */
 .panel {
   border: 1px solid var(--line); background: var(--bg1); padding: 16px;
+  width: 100%; box-sizing: border-box; overflow: hidden;
 }
 .panel-title {
   font-family: var(--sans); font-size: 11px; font-weight: 700; letter-spacing: 3px;
@@ -765,10 +766,9 @@ body.pass-player #felt-toggle-btn { display:flex; }
 .item-btn.active { border-color: var(--purple); color: var(--purple); background: rgba(188,140,255,.05); }
 .item-btn.owned { border-color: var(--green); color: var(--green); }
 .item-btn.locked { opacity: .28; cursor: not-allowed; pointer-events: none; }
-/* Inside PU panel rows that have a points button alongside, constrain width */
-#panel-pu .item-btn { width: auto; min-width: 0; box-sizing: border-box; }
+/* Inside PU panel, item-btn must stay within panel — box-sizing ensures padding doesn't overflow */
+#panel-pu .item-btn { width: 100%; box-sizing: border-box; }
 #panel-pu { overflow: hidden; }
-#panel-pu > div[style*="display:flex"] { box-sizing: border-box; width: 100%; }
 .item-sub { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 1px; }
 .item-medallion {
   width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
@@ -5405,47 +5405,42 @@ function buildPuPanel(){
     const isFreeNext=_freePuAvailable()&&!owned;
     const costLabel=isFreeNext?'FREE (pass perk)':fmtKFC(kfcCost);
     const subText=owned?'Active — expires end of shoe':pu.sub+' · '+costLabel;
-    const wrap=document.createElement('div');
-    wrap.style.cssText='display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;overflow:hidden';
     const itemDiv=document.createElement('div');
-    itemDiv.style.cssText='flex:1;min-width:0;overflow:hidden';
     addItemBtn(itemDiv,pu.label,subText,'pu-'+pu.id,owned,(!available&&!owned)?'locked':null,()=>buyPu(pu,kfcCost));
-    wrap.appendChild(itemDiv);
-    // Points redemption button (when not owned, not free, have enough pts)
+    // Inject points button INSIDE the item-btn (which is display:flex) — stays within panel width
     if(!owned && available && !isFreeNext){
-      const pBtn=document.createElement('button');
-      pBtn.className='pu-pts-btn';
-      pBtn.style.flexShrink='0';
-      pBtn.textContent='⭐'+ptsCost;
-      pBtn.title='Redeem for '+ptsCost+' points';
-      pBtn.disabled=myPts<ptsCost||G.puOwned.size>=_puLimit();
-      pBtn.onclick=()=>buyPuWithPoints(pu,ptsCost);
-      wrap.appendChild(pBtn);
+      const ib=itemDiv.querySelector('.item-btn');
+      if(ib){
+        const pBtn=document.createElement('button');
+        pBtn.className='pu-pts-btn';
+        pBtn.style.cssText='margin-left:auto;flex-shrink:0';
+        pBtn.textContent='★'+ptsCost;
+        pBtn.title='Redeem for '+ptsCost+' points';
+        pBtn.disabled=myPts<ptsCost||G.puOwned.size>=_puLimit();
+        pBtn.onclick=(e)=>{e.stopPropagation();buyPuWithPoints(pu,ptsCost);};
+        ib.appendChild(pBtn);
+      }
     }
-    c.appendChild(wrap);
+    c.appendChild(itemDiv);
   });
 
   // ── Additional points redemptions ──────────────────────────────
   const _addRedemption = (label, sub, id, cost, onRedeem, disabled) => {
-    const wrap=document.createElement('div');
-    wrap.style.cssText='display:flex;align-items:center;gap:6px;width:100%;box-sizing:border-box;overflow:hidden';
+    // Build item btn normally, then inject pts button INSIDE it (item-btn is display:flex)
     const itemDiv=document.createElement('div');
-    itemDiv.style.cssText='flex:1;min-width:0;overflow:hidden';
     addItemBtn(itemDiv,label,sub,id,false,null,null);
     const ib=itemDiv.querySelector('.item-btn');
-    if(ib){ ib.style.width='100%'; ib.style.boxSizing='border-box'; ib.style.marginBottom='0'; }
-    const pBtn=document.createElement('button');
-    pBtn.className='pu-pts-btn';
-    pBtn.style.cssText='flex-shrink:0;margin-bottom:0';
-    pBtn.textContent='⭐'+cost;
-    pBtn.title='Redeem for '+cost+' points';
-    pBtn.disabled=disabled||myPts<cost;
-    if(!pBtn.disabled) pBtn.onclick=onRedeem;
-    wrap.appendChild(itemDiv);
-    wrap.appendChild(pBtn);
-    c.appendChild(wrap);
-    // Add spacing after row
-    const gap=document.createElement('div'); gap.style.height='6px'; c.appendChild(gap);
+    if(ib){
+      if(!disabled && myPts>=cost) ib.onclick=null; // clear default null click
+      const pBtn=document.createElement('button');
+      pBtn.className='pu-pts-btn';
+      pBtn.style.cssText='margin-left:auto;flex-shrink:0';
+      pBtn.textContent='\u2605'+cost;
+      pBtn.disabled=disabled||myPts<cost;
+      if(!pBtn.disabled) pBtn.onclick=(e)=>{e.stopPropagation();onRedeem();};
+      ib.appendChild(pBtn);
+    }
+    c.appendChild(itemDiv);
   };
 
   // Divider
