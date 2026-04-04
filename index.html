@@ -768,6 +768,7 @@ body.pass-player #felt-toggle-btn { display:flex; }
 .item-btn.locked { opacity: .28; cursor: not-allowed; pointer-events: none; }
 /* Inside PU panel, item-btn must stay within panel — box-sizing ensures padding doesn't overflow */
 #panel-pu .item-btn { width: 100%; box-sizing: border-box; }
+#panel-pu .item-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .item-sub { font-family: var(--mono); font-size: 9px; color: var(--muted); letter-spacing: 1px; }
 .item-medallion {
   width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
@@ -5453,22 +5454,20 @@ function buildPuPanel(){
 
   // 2× Leverage token (high-roller+ only)
   const canLev = !['highroller','champion'].includes(G.stake) && G.leverage!=='2x';
-  _addRedemption('2× Leverage Token','Free double-down leverage','pts-lev2x',PTS_COST.lev2x,
+  _addRedemption('2× Leverage Token','Double leverage — next hand','pts-lev2x',PTS_COST.lev2x,
     ()=>_redeemLev2x(), !canLev || G.phase!=='bet');
 
-  // Insurance token (all stakes)
   const insOwned = G._insuranceToken;
-  _addRedemption('Insurance Token', insOwned?'Active — next bust covered':'Half-bet on next bust','pts-insurance',PTS_COST.insurance,
+  _addRedemption('Insurance Token', insOwned?'Active':'Half-bet covered on bust','pts-insurance',PTS_COST.insurance,
     ()=>_redeemInsurance(), insOwned);
 
-  // All Side Bets min
   const allSBOwned = G._allSBNextHand;
-  _addRedemption('All Side Bets (Min Bet)','Auto-places min bet on all 4 SBs','pts-allsb',PTS_COST.allsb,
+  _addRedemption('All Side Bets (Min)','Min bet on all 4 SBs next deal','pts-allsb',PTS_COST.allsb,
     ()=>_redeemAllSB(), allSBOwned || G.phase!=='bet');
 
   // Extra shoe
   const extraShoesCost = G._clubPass ? PTS_COST.extrashoe_pass : PTS_COST.extrashoe_std;
-  _addRedemption('+1 Extra Shoe Today','Adds one shoe to daily limit','pts-extrashoe',extraShoesCost,
+  _addRedemption('+1 Extra Shoe',_shoesRemaining()+' remaining today','pts-extrashoe',extraShoesCost,
     ()=>_redeemExtraShoe(), false);
 }
 
