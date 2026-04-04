@@ -1560,10 +1560,38 @@ body:not(.betting) #play-bottom { opacity: 1; pointer-events: auto; max-height: 
 
 /* On desktop with 2 hands, show bet rows side by side under their hands */
 @media (min-width: 900px) {
-  body.two-hands #play-bottom { flex-direction: row; align-items: flex-start; justify-content: center; gap: 24px; }
-  body.two-hands #play-hand2-row { border-top: none !important; margin-top: 0 !important; padding-top: 0 !important; width: auto !important; }
-  body.two-hands #play-bottom-inner { flex: 1; justify-content: center; }
-  body.two-hands #sb-hints { order: -1; flex-basis: 100%; }
+  body.two-hands #play-bottom {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: center;
+    gap: 8px;
+    padding-left: 0;
+    padding-right: 0;
+  }
+  body.two-hands #play-bottom-inner {
+    flex: 1;
+    justify-content: center;
+    max-width: 50%;
+  }
+  body.two-hands #play-hand2-row {
+    flex: 1;
+    border-top: none !important;
+    margin-top: 0 !important;
+    padding-top: 0 !important;
+    width: auto !important;
+    max-width: 50%;
+    justify-content: center !important;
+  }
+  /* SB hints span full width above the two columns */
+  body.two-hands #sb-hints {
+    order: -1;
+    width: 100%;
+    flex-basis: 100%;
+    text-align: center;
+    align-items: center;
+    justify-content: center;
+  }
 }
 #strategy-hint {
   display: none; text-align: center; margin: 4px auto 2px;
