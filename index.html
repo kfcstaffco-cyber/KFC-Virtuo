@@ -6202,7 +6202,8 @@ function advOrEnd(reason){
           setTimeout(()=>settle('player_bj'), 600);
         } else {
           notif('BLACKJACK on split hand!');
-          setTimeout(()=>advOrEnd(),300);
+          setActions(false);
+          setTimeout(()=>advOrEnd(), 800);
         }
       } else {
         setActions(true); msg('HAND '+(G.cur+1));
@@ -6213,22 +6214,21 @@ function advOrEnd(reason){
   }
   if(G.cur<G.hands.length-1){
     G.cur++; renderAll();
-    // Re-show stamped boost if the newly active hand has it
     const _nextStamped = G.cur===1 ? G.stampedOn2 : G.stampedOn;
     if(_nextStamped) showStampedBoost();
     if(isBJ(G.hands[G.cur])){
-      // BJ on newly active hand — split hand OR second seat in two-hand mode
       const _isH2Seat=G._hand2Active&&G.cur===1&&G.splits===0;
       sfx('bj'); showBJ();
       if(_isH2Seat){
-        // Two-hand mode: hand 2 is a BJ — reveal hole then settle
         msg('HAND 2: BLACKJACK!','bj');
         setActions(false);
         revealHole(); renderAll();
         setTimeout(()=>settle('player_bj'), 600);
       } else {
+        // Split hand BJ — show briefly then auto-advance (player cannot act on BJ)
         notif('BLACKJACK on split hand!');
-        setTimeout(()=>advOrEnd(),300);
+        setActions(false);
+        setTimeout(()=>advOrEnd(), 800);
       }
     } else {
       setActions(true); msg('HAND '+(G.cur+1));
@@ -6943,7 +6943,8 @@ function setActions(playing){
     const curHand=G.hands&&G.hands[G.cur];
     const _hasArrow=(G.arrowCounts&&G.arrowCounts[G.cur||0])||0;
     // Arrow card overrides the 2-card restriction (free double from bonus card)
-    dblEl.disabled=(curHand&&curHand.length!==2)&&!_hasArrow;
+    const _valueCards = curHand ? curHand.filter(c=>!(c.bonus&&c.bonus.jester)) : [];
+    dblEl.disabled=(_valueCards.length!==2)&&!_hasArrow;
   }
   // Split: only show when a valid split is available
   const splitEl=document.getElementById('btn-split');
@@ -7574,7 +7575,7 @@ function updateStrategyHint(){
   const dealerUpCard=G.dealer[0];
   const d=dealerUpCard?cv(dealerUpCard):0;
   const valueCards=hand.filter(c=>!(c.bonus&&c.bonus.jester));
-  const canDouble=hand.length===2&&!document.getElementById('btn-double')?.disabled;
+  const canDouble=valueCards.length===2&&!document.getElementById('btn-double')?.disabled;
   const canSplit=valueCards.length===2&&cv(valueCards[0])===cv(valueCards[1])&&G.splits<2;
   const action=basicStrategyAction(pv,d,canDouble,canSplit,hand);
   const labels={hit:'Hit',stand:'Stand',double:'Double',split:'Split'};
