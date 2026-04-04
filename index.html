@@ -5428,7 +5428,7 @@ function buildPuPanel(){
 
   // All Side Bets min
   const allSBOwned = G._allSBNextHand;
-  _addRedemption('All Side Bets (Min)','Auto-places sMin on all 4 SBs','pts-allsb',PTS_COST.allsb,
+  _addRedemption('All Side Bets (Min Bet)','Auto-places min bet on all 4 SBs','pts-allsb',PTS_COST.allsb,
     ()=>_redeemAllSB(), allSBOwned || G.phase!=='bet');
 
   // Extra shoe
@@ -5584,10 +5584,10 @@ function deal(){
   }
   // All Side Bets token: auto-place sMin on each side bet for this hand
   if(G._allSBNextHand){
-    SB_NAMES.forEach(n=>{ if((G.sideBets[n]||0)===0) G.sideBets[n]=G.s.sMin; });
+    SB_NAMES.forEach(n=>{ if((G.sideBets[n]||0)===0) G.sideBets[n]=G.s.min; });
     G._allSBNextHand=false;
     updateSBCircles();
-    notif('⭐ All side bets covered (sMin)');
+    notif('⭐ All side bets covered at '+fmtKFC(G.s.min));
   }
   const totalDeducted=G.mainBet+Object.values(G.sideBets).reduce((a,b)=>a+b,0)+(G.leverage==='2x'?G.s.min*2:0)
     +((G._hand2Active&&(G.mainBet2||0)>=G.s.min)?(G.mainBet2+Object.values(G.sideBets2||{}).reduce((a,b)=>a+b,0)):0);
